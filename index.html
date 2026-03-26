@@ -569,7 +569,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <button class="mo-x" onclick="closeImport()">✕</button>
     </div>
     <div class="mo-body">
-      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 <b>법인·일반·면세·신고대리 모든 시트</b>를 한꺼번에 가져옵니다. 중복(사업자번호 기준)은 건너뜁니다.</div>
+      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 <b>법인·일반·면세·신고대리 모든 시트</b>와 <b>담당자별현황</b>을 한꺼번에 읽어 담당자 자동 배정합니다.</div>
+      <div id="delAllWrap" style="text-align:right;margin-bottom:8px;display:none"><button class="btn btn-d btn-sm" onclick="delAllClients()">⚠️ 기존 거래처 전체삭제 후 재임포트</button></div>
       <div style="border:2px dashed #dde;border-radius:11px;padding:28px;text-align:center;cursor:pointer" onclick="document.getElementById('impFile').click()">
         <div style="font-size:30px;margin-bottom:7px">📁</div>
         <div style="font-size:13px;color:#667">클릭하여 Excel 파일 선택</div>
@@ -895,7 +896,11 @@ function renderPlats(){
 
 // =================== IMPORT ===================
 let impData=[];
-function openImport(){document.getElementById('moImport').style.display='flex';}
+function openImport(){
+  document.getElementById('moImport').style.display='flex';
+  const w=document.getElementById('delAllWrap');
+  if(w) w.style.display=ROLE==='admin'?'block':'none';
+}
 function closeImport(){
   document.getElementById('moImport').style.display='none';
   impData=[];document.getElementById('impPrev').innerHTML='';
@@ -946,6 +951,34 @@ function parseSheet(wb, sheetName, type){
   return result;
 }
 
+function buildManagerMap(wb){
+  // 담당자별현황 시트에서 상호→담당자 매핑 생성
+  const map={};
+  const sn=wb.SheetNames.find(s=>s.includes('담당자'));
+  if(!sn) return map;
+  const ws=wb.Sheets[sn];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  // 헤더행(No/상호/구분) 찾기
+  let hr=-1;
+  for(let i=0;i<rows.length;i++){
+    if(rows[i].some(c=>c==='No')){hr=i;break;}
+  }
+  if(hr<0) return map;
+  // 4개 컬럼 그룹: [0]서지 [4]승희 [8]지윤 [12]미배정
+  const groups=[
+    {col:1,mgr:'김서지'},{col:5,mgr:'유승희'},
+    {col:9,mgr:'안지윤'},{col:13,mgr:'미배정'}
+  ];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i];
+    groups.forEach(({col,mgr})=>{
+      const name=String(r[col]||'').trim();
+      if(name) map[name]=mgr;
+    });
+  }
+  return map;
+}
+
 function previewImp(){
   const file=document.getElementById('impFile').files[0]; if(!file) return;
   const reader=new FileReader();
@@ -953,12 +986,18 @@ function previewImp(){
     try{
       const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
       const TYPE_MAP={'법인':'법인','일반':'일반','면세':'면세','신고대리':'신고대리'};
+      // 담당자 매핑 먼저 생성
+      const mgrMap=buildManagerMap(wb);
       impData=[];
       const summary=[];
       wb.SheetNames.forEach(sn=>{
         const matched=Object.keys(TYPE_MAP).find(k=>sn.includes(k));
         if(!matched) return;
         const rows=parseSheet(wb,sn,TYPE_MAP[matched]);
+        // 담당자 자동 배정
+        rows.forEach(r=>{
+          if(mgrMap[r.name]) r.manager=mgrMap[r.name];
+        });
         if(rows.length){
           impData.push(...rows);
           summary.push({sn,type:matched,cnt:rows.length});
@@ -966,21 +1005,38 @@ function previewImp(){
       });
       if(!impData.length){document.getElementById('impPrev').innerHTML='<div class="al al-e">가져올 데이터가 없습니다. 시트명에 법인/일반/면세/신고대리가 포함되어야 합니다.</div>';return;}
       document.getElementById('impPrev').innerHTML=`
-        <div class="al al-i"><b>총 ${impData.length}개</b> 거래처 발견</div>
+        <div class="al al-i"><b>총 ${impData.length}개</b> 거래처 발견 · 담당자 자동 배정 완료</div>
         <div style="margin-bottom:10px">
           ${summary.map(s=>`<span class="bdg bdg-gen" style="margin-right:5px">${s.type} ${s.cnt}개</span>`).join('')}
         </div>
-        <div style="max-height:180px;overflow-y:auto">
+        <div style="margin-bottom:8px;font-size:12px;color:#667">
+          담당자 배정: 
+          ${['김서지','유승희','안지윤','미배정'].map(m=>{
+            const cnt=impData.filter(d=>d.manager===m).length;
+            return cnt?`<span class="tag" style="margin-right:4px">${m} ${cnt}명</span>`:'';
+          }).join('')}
+        </div>
+        <div style="max-height:200px;overflow-y:auto">
           <table style="width:100%;font-size:12px">
             <tr><th>상호</th><th>유형</th><th>사업자번호</th><th>담당자</th></tr>
-            ${impData.slice(0,10).map(d=>`<tr><td>${d.name}</td><td>${d.type}</td><td>${d.bizNo}</td><td>${d.manager}</td></tr>`).join('')}
-            ${impData.length>10?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-10}개</td></tr>`:''}
+            ${impData.slice(0,12).map(d=>`<tr><td>${d.name}</td><td>${d.type}</td><td>${d.bizNo}</td><td style="color:${d.manager==='미배정'?'#aab':'#1A3169'};font-weight:600">${d.manager}</td></tr>`).join('')}
+            ${impData.length>12?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-12}개</td></tr>`:''}
           </table>
         </div>`;
       document.getElementById('doImpBtn').style.display='inline-block';
     }catch(err){document.getElementById('impPrev').innerHTML=`<div class="al al-e">오류: ${err.message}</div>`;}
   };
   reader.readAsBinaryString(file);
+}
+
+async function delAllClients(){
+  if(!confirm('기존 거래처를 전체 삭제하고 새로 임포트하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
+  const snap=await db.collection('clients').get();
+  const batch=db.batch();
+  snap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  ALL=[];updateCounts();renderClients();
+  alert('전체 삭제 완료! 이제 파일을 업로드하세요.');
 }
 
 async function doImport(){
