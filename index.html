@@ -569,14 +569,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <button class="mo-x" onclick="closeImport()">✕</button>
     </div>
     <div class="mo-body">
-      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 거래처를 자동으로 가져옵니다. 중복(사업자번호 기준)은 건너뜁니다.</div>
-      <div class="fld" style="margin-bottom:12px">
-        <label>가져올 시트(유형) 선택</label>
-        <select class="fi" id="impType">
-          <option value="법인">법인</option><option value="일반">일반</option>
-          <option value="면세">면세</option><option value="신고대리">신고대리</option>
-        </select>
-      </div>
+      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 <b>법인·일반·면세·신고대리 모든 시트</b>를 한꺼번에 가져옵니다. 중복(사업자번호 기준)은 건너뜁니다.</div>
       <div style="border:2px dashed #dde;border-radius:11px;padding:28px;text-align:center;cursor:pointer" onclick="document.getElementById('impFile').click()">
         <div style="font-size:30px;margin-bottom:7px">📁</div>
         <div style="font-size:13px;color:#667">클릭하여 Excel 파일 선택</div>
@@ -905,60 +898,78 @@ function closeImport(){
   document.getElementById('impFile').value='';
 }
 
+function parseSheet(wb, sheetName, type){
+  const ws=wb.Sheets[sheetName];
+  if(!ws) return [];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let hr=-1;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    if(rows[i].some(c=>c==='상호')){hr=i;break;}
+  }
+  if(hr<0) return [];
+  const h=rows[hr];
+  const idx=(labels)=>h.findIndex(c=>labels.some(l=>String(c).includes(l)));
+  const ni=idx(['상호']),ri=idx(['대표자']),bi=idx(['사업자등록번호']),
+        moi=idx(['핸드폰']),phi=idx(['사무실']),ei=idx(['e-mail','email','Email']),
+        mai=idx(['담당자']),iid=idx(['국세청 ID','국세청ID']),ipw=idx(['국세청 PW','국세청PW']),
+        ci=idx(['계약일']),si=idx(['주민등록번호']),ai=idx(['주소']),pi=idx(['POS']);
+  const result=[];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i];
+    const name=ni>=0?String(r[ni]||'').trim():'';
+    if(!name||name.startsWith('[')||name==='상호'||name==='합계') continue;
+    let bn=bi>=0?String(r[bi]||'').trim():'';
+    if(bn&&!bn.includes('-'))bn=bn.replace(/(\d{3})(\d{2})(\d{5})/,'$1-$2-$3');
+    result.push({
+      name,type,
+      rep:ri>=0?String(r[ri]||'').trim():'',
+      bizNo:bn,
+      ssn:si>=0?String(r[si]||'').trim():'',
+      mobile:moi>=0?String(r[moi]||'').trim():'',
+      phone:phi>=0?String(r[phi]||'').trim():'',
+      email:ei>=0?String(r[ei]||'').trim():'',
+      manager:mai>=0&&r[mai]?String(r[mai]).trim():'미배정',
+      ntsId:iid>=0?String(r[iid]||'').trim():'',
+      ntsPw:ipw>=0?String(r[ipw]||'').trim():'',
+      posContact:pi>=0?String(r[pi]||'').trim():'',
+      addr:ai>=0?String(r[ai]||'').trim():'',
+      contract:ci>=0&&r[ci] instanceof Date?r[ci].toISOString().split('T')[0]:'',
+      status:'활성',vatType:type==='면세'?'면세':'일반',vatCycle:'반기',
+      fee:0,payrollSettings:{},platforms:[],memo:''
+    });
+  }
+  return result;
+}
+
 function previewImp(){
   const file=document.getElementById('impFile').files[0]; if(!file) return;
-  const type=document.getElementById('impType').value;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
-      let sn=wb.SheetNames.find(s=>s.includes(type))||wb.SheetNames[0];
-      const ws=wb.Sheets[sn];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      let hr=-1;
-      for(let i=0;i<Math.min(rows.length,10);i++){
-        if(rows[i].some(c=>c==='상호')){hr=i;break;}
-      }
-      if(hr<0){document.getElementById('impPrev').innerHTML='<div class="al al-e">헤더 행을 찾을 수 없습니다.</div>';return;}
-      const h=rows[hr];
-      const idx=(labels)=>h.findIndex(c=>labels.some(l=>String(c).includes(l)));
-      const ni=idx(['상호']),ri=idx(['대표자']),bi=idx(['사업자등록번호']),
-            moi=idx(['핸드폰']),phi=idx(['사무실']),ei=idx(['e-mail','email','Email']),
-            mai=idx(['담당자']),iid=idx(['국세청 ID','국세청ID']),ipw=idx(['국세청 PW','국세청PW']),
-            ci=idx(['계약일']),si=idx(['주민등록번호']),ai=idx(['주소']),pi=idx(['POS']);
+      const TYPE_MAP={'법인':'법인','일반':'일반','면세':'면세','신고대리':'신고대리'};
       impData=[];
-      for(let i=hr+1;i<rows.length;i++){
-        const r=rows[i];
-        const name=ni>=0?String(r[ni]||'').trim():'';
-        if(!name||name.startsWith('[')||name==='상호') continue;
-        let bn=bi>=0?String(r[bi]||'').trim():'';
-        if(bn&&!bn.includes('-'))bn=bn.replace(/(\d{3})(\d{2})(\d{5})/,'$1-$2-$3');
-        impData.push({
-          no:impData.length+1,name,type,
-          rep:ri>=0?String(r[ri]||'').trim():'',
-          bizNo:bn,
-          ssn:si>=0?String(r[si]||'').trim():'',
-          mobile:moi>=0?String(r[moi]||'').trim():'',
-          phone:phi>=0?String(r[phi]||'').trim():'',
-          email:ei>=0?String(r[ei]||'').trim():'',
-          manager:mai>=0&&r[mai]?String(r[mai]).trim():'미배정',
-          ntsId:iid>=0?String(r[iid]||'').trim():'',
-          ntsPw:ipw>=0?String(r[ipw]||'').trim():'',
-          posContact:pi>=0?String(r[pi]||'').trim():'',
-          addr:ai>=0?String(r[ai]||'').trim():'',
-          contract:ci>=0&&r[ci] instanceof Date?r[ci].toISOString().split('T')[0]:'',
-          status:'활성',vatType:type==='면세'?'면세':'일반',vatCycle:'반기',
-          fee:0,payrollSettings:{},platforms:[],memo:''
-        });
-      }
-      if(!impData.length){document.getElementById('impPrev').innerHTML='<div class="al al-e">가져올 데이터가 없습니다.</div>';return;}
+      const summary=[];
+      wb.SheetNames.forEach(sn=>{
+        const matched=Object.keys(TYPE_MAP).find(k=>sn.includes(k));
+        if(!matched) return;
+        const rows=parseSheet(wb,sn,TYPE_MAP[matched]);
+        if(rows.length){
+          impData.push(...rows);
+          summary.push({sn,type:matched,cnt:rows.length});
+        }
+      });
+      if(!impData.length){document.getElementById('impPrev').innerHTML='<div class="al al-e">가져올 데이터가 없습니다. 시트명에 법인/일반/면세/신고대리가 포함되어야 합니다.</div>';return;}
       document.getElementById('impPrev').innerHTML=`
-        <div class="al al-i"><b>${impData.length}개</b> 거래처 발견 (시트: ${sn})</div>
+        <div class="al al-i"><b>총 ${impData.length}개</b> 거래처 발견</div>
+        <div style="margin-bottom:10px">
+          ${summary.map(s=>`<span class="bdg bdg-gen" style="margin-right:5px">${s.type} ${s.cnt}개</span>`).join('')}
+        </div>
         <div style="max-height:180px;overflow-y:auto">
           <table style="width:100%;font-size:12px">
-            <tr><th>상호</th><th>대표자</th><th>사업자번호</th><th>담당자</th></tr>
-            ${impData.slice(0,8).map(d=>`<tr><td>${d.name}</td><td>${d.rep}</td><td>${d.bizNo}</td><td>${d.manager}</td></tr>`).join('')}
-            ${impData.length>8?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-8}개</td></tr>`:''}
+            <tr><th>상호</th><th>유형</th><th>사업자번호</th><th>담당자</th></tr>
+            ${impData.slice(0,10).map(d=>`<tr><td>${d.name}</td><td>${d.type}</td><td>${d.bizNo}</td><td>${d.manager}</td></tr>`).join('')}
+            ${impData.length>10?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-10}개</td></tr>`:''}
           </table>
         </div>`;
       document.getElementById('doImpBtn').style.display='inline-block';
