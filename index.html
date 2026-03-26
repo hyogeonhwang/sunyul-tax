@@ -628,7 +628,7 @@ firebase.initializeApp(FC);
 const db = firebase.firestore();
 const auth = firebase.auth();
 // 로그인 상태 영구 유지 (브라우저 닫아도 유지)
-auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
 // =================== GLOBALS ===================
 let ME = null, ROLE = 'staff';
@@ -645,9 +645,6 @@ let cType='전체', pyTab='monthly';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
 // =================== AUTH ===================
-// 페이지 열 때 항상 로그인 화면 표시 (자동로그인 방지)
-auth.signOut();
-
 auth.onAuthStateChanged(u=>{
   if(u){
     ME=u;
