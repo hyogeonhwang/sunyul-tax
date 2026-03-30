@@ -279,9 +279,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <button class="btn btn-p btn-sm" onclick="openClient()">+ 거래처 추가</button>
           </div>
         </div>
+        <!-- 배정현황 검증 패널 -->
+        <div id="assignPanel" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px"></div>
         <div class="fbar">
           <input class="si" id="cSearch" placeholder="🔍 상호 · 사업자번호 · 대표자 검색" oninput="renderClients()">
-          <select class="sel" id="cManager" onchange="renderClients()">
+          <select class="sel" id="cManager" onchange="updateCounts();renderClients()">
             <option value="">전체 담당자</option>
             <option value="미배정">미배정</option>
             <option value="황효건">황효건</option>
@@ -290,7 +292,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <option value="유승희">유승희</option>
             <option value="김희진">김희진</option>
           </select>
-          <select class="sel" id="cStatus" onchange="renderClients()">
+          <select class="sel" id="cStatus" onchange="updateCounts();renderClients()">
             <option value="">전체 상태</option>
             <option value="활성">활성</option>
             <option value="휴면">휴면</option>
@@ -727,12 +729,47 @@ function loadClients(){
 }
 
 function updateCounts(){
-  const tot=ALL.length;
+  // 탭 카운트: 담당자 필터 선택 기준으로 계산
+  const mgr=document.getElementById('cManager')?.value||'';
+  const st=document.getElementById('cStatus')?.value||'';
+  const base=ALL.filter(c=>{
+    if(mgr&&c.manager!==mgr) return false;
+    if(st&&c.status!==st) return false;
+    return true;
+  });
+  const tot=base.length;
   document.getElementById('nc-clients').textContent=tot;
   ['전체','법인','일반','면세','신고대리','폐업자'].forEach(t=>{
     const el=document.getElementById('cnt-'+t);
-    if(el) el.textContent= t==='전체'?tot:ALL.filter(c=>c.type===t).length;
+    if(el) el.textContent= t==='전체'?tot:base.filter(c=>c.type===t).length;
   });
+  // 배정현황 검증 패널
+  renderAssignPanel();
+}
+
+function renderAssignPanel(){
+  const el=document.getElementById('assignPanel'); if(!el) return;
+  const active=ALL.filter(c=>c.status!=='탈퇴');
+  const mgrs=['김서지','유승희','안지윤','미배정','김희진','황효건'];
+  const total=active.length;
+  const unassigned=active.filter(c=>!c.manager||c.manager==='미배정').length;
+  const assigned=active.filter(c=>c.manager&&c.manager!=='미배정').length;
+  // 검증: 전체 = 배정 + 미배정
+  const isValid=assigned+unassigned===total;
+
+  const cards=[
+    {lbl:'전체',val:total,color:'#1A3169',bg:'#edf1ff'},
+    {lbl:'김서지',val:active.filter(c=>c.manager==='김서지').length,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'유승희',val:active.filter(c=>c.manager==='유승희').length,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'안지윤',val:active.filter(c=>c.manager==='안지윤').length,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'미배정',val:unassigned,color:unassigned>0?'#c62828':'#1b7a4f',bg:unassigned>0?'#ffeaea':'#e0f4ec'},
+    {lbl:'검증',val:isValid?'✅ 일치':'❌ 불일치',color:isValid?'#1b7a4f':'#c62828',bg:isValid?'#e0f4ec':'#ffeaea',isText:true},
+  ];
+  el.innerHTML=cards.map(c=>`
+    <div style="background:${c.bg};border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:11px;color:#667;font-weight:600;margin-bottom:3px">${c.lbl}</div>
+      <div style="font-size:${c.isText?'13px':'20px'};font-weight:800;color:${c.color}">${c.val}</div>
+    </div>`).join('');
 }
 
 function setType(t,btn){
@@ -1393,7 +1430,7 @@ async function saveTmpl(){
 }
 
 // =================== CALENDAR ===================
-const DL=[
+const DL_DEFAULT=[
   {m:1,d:10,lbl:'원천세 납부',t:'wht'},{m:1,d:25,lbl:'부가세 납부',t:'vat'},
   {m:1,d:31,lbl:'근로 간이(하반기)',t:'pay'},
   {m:2,d:10,lbl:'원천세 납부',t:'wht'},{m:2,d:28,lbl:'이자·배당·기타 지급명세서',t:'pay'},
@@ -1409,30 +1446,119 @@ const DL=[
   {m:11,d:10,lbl:'원천세 납부',t:'wht'},
   {m:12,d:10,lbl:'원천세 납부',t:'wht'},{m:12,d:25,lbl:'부가세 2기 확정',t:'vat'},
 ];
+let DL_CUSTOM=[], DL=[...DL_DEFAULT];
 const TC={vat:'ev-vat',wht:'ev-wht',inc:'ev-inc',pay:'ev-pay'};
+const T_LBL={vat:'부가세',wht:'원천세',inc:'종소세·법인세',pay:'지급명세서'};
+
+function loadCalEvents(){
+  db.collection('calEvents').onSnapshot(snap=>{
+    DL_CUSTOM=snap.docs.map(d=>({id:d.id,...d.data()}));
+    DL=[...DL_DEFAULT,...DL_CUSTOM];
+    renderCal();
+    renderDash();
+  });
+}
+
+function checkDeadlineAlerts(){
+  setTimeout(()=>{
+    const today=new Date(), yr=today.getFullYear();
+    const alerts=DL.filter(e=>{
+      if(!e.alert) return false;
+      const diff=Math.ceil((new Date(yr,e.m-1,e.d)-today)/(1000*60*60*24));
+      return diff>=0&&diff<=3;
+    });
+    if(!alerts.length) return;
+    const msg=alerts.map(e=>{
+      const diff=Math.ceil((new Date(yr,e.m-1,e.d)-today)/(1000*60*60*24));
+      return `• ${e.lbl} (${e.m}/${e.d}) — ${diff===0?'오늘 마감!':'D-'+diff}`;
+    }).join('\n');
+    showAlertBanner(msg);
+  },2000);
+}
+
+function showAlertBanner(msg){
+  const ex=document.getElementById('deadlineAlert'); if(ex) ex.remove();
+  const div=document.createElement('div');
+  div.id='deadlineAlert';
+  div.style.cssText='position:fixed;top:64px;right:16px;background:#fff;border:2px solid #C9A84C;border-radius:12px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:300px;font-size:13px;line-height:1.8;white-space:pre-line';
+  div.innerHTML='<div style="font-weight:700;color:#1A3169;margin-bottom:6px">🔔 마감 알림</div><div style="color:#334">'+msg+'</div><button onclick="document.getElementById('deadlineAlert').remove()" style="margin-top:10px;width:100%;background:#1A3169;color:#fff;border:none;border-radius:7px;padding:6px;cursor:pointer;font-size:12px;font-weight:600">확인</button>';
+  document.body.appendChild(div);
+}
+
+let editCalId=null;
+function openCalEv(id){
+  editCalId=id||null;
+  if(id){
+    const ev=DL_CUSTOM.find(e=>e.id===id);
+    if(ev){
+      document.getElementById('ev-m').value=ev.m;
+      document.getElementById('ev-d').value=ev.d;
+      document.getElementById('ev-lbl').value=ev.lbl;
+      document.getElementById('ev-t').value=ev.t;
+      document.getElementById('ev-alert').checked=!!ev.alert;
+    }
+    document.getElementById('moCalEvTtl').textContent='일정 수정';
+  } else {
+    document.getElementById('ev-m').value=calM+1;
+    document.getElementById('ev-d').value='';
+    document.getElementById('ev-lbl').value='';
+    document.getElementById('ev-t').value='vat';
+    document.getElementById('ev-alert').checked=true;
+    document.getElementById('moCalEvTtl').textContent='일정 추가';
+  }
+  document.getElementById('moCalEv').style.display='flex';
+}
+function closeCalEv(){document.getElementById('moCalEv').style.display='none';}
+async function saveCalEv(){
+  const m=parseInt(document.getElementById('ev-m').value);
+  const d=parseInt(document.getElementById('ev-d').value);
+  const lbl=document.getElementById('ev-lbl').value.trim();
+  if(!lbl||!d){alert('일정명과 날짜를 입력하세요.');return;}
+  const data={m,d,lbl,t:document.getElementById('ev-t').value,alert:document.getElementById('ev-alert').checked};
+  if(editCalId) await db.collection('calEvents').doc(editCalId).update(data);
+  else await db.collection('calEvents').add(data);
+  closeCalEv();
+}
+
+function openCalMgr(){
+  renderCalMgrList();
+  document.getElementById('moCalMgr').style.display='flex';
+}
+function closeCalMgr(){document.getElementById('moCalMgr').style.display='none';}
+function renderCalMgrList(){
+  const el=document.getElementById('calMgrList'); if(!el) return;
+  if(!DL_CUSTOM.length){el.innerHTML='<div class="muted" style="text-align:center;padding:30px">추가한 일정이 없습니다</div>';return;}
+  el.innerHTML='<table style="width:100%"><thead><tr><th>월/일</th><th>일정명</th><th>유형</th><th>알림</th><th>관리</th></tr></thead><tbody>'+
+    DL_CUSTOM.sort((a,b)=>a.m*100+a.d-(b.m*100+b.d)).map(e=>
+      '<tr><td>'+e.m+'/'+e.d+'</td><td>'+e.lbl+'</td><td><span class="cal-ev '+(TC[e.t]||'')+'" style="display:inline-block">'+(T_LBL[e.t]||e.t)+'</span></td><td style="text-align:center">'+(e.alert?'🔔':'-')+'</td><td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="closeCalMgr();openCalEv(''+e.id+'')">수정</button> <button class="btn btn-d btn-xs" onclick="delCalEv(''+e.id+'',''+e.lbl.replace(/'/g,"\'")+"'">삭제</button></td></tr>"
+    ).join('')+'</tbody></table>';
+}
+async function delCalEv(id,lbl){
+  if(!confirm('"'+lbl+'" 일정을 삭제하시겠습니까?')) return;
+  await db.collection('calEvents').doc(id).delete();
+  renderCalMgrList();
+}
 
 function chMonth(d){calM+=d;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--;}renderCal();}
 function renderCal(){
   const lbl=document.getElementById('calLbl');
-  if(lbl) lbl.textContent=`${calY}년 ${calM+1}월`;
+  if(lbl) lbl.textContent=calY+'년 '+(calM+1)+'월';
   const grid=document.getElementById('calGrid'); if(!grid) return;
   const dns=['일','월','화','수','목','금','토'];
-  let html=dns.map(d=>`<div class="cal-dn">${d}</div>`).join('');
+  let html=dns.map(d=>'<div class="cal-dn">'+d+'</div>').join('');
   const fd=new Date(calY,calM,1).getDay();
   const dim=new Date(calY,calM+1,0).getDate();
   const pd=new Date(calY,calM,0).getDate();
   const today=new Date();
-  for(let i=fd-1;i>=0;i--) html+=`<div class="cal-d om"><div class="cal-dt">${pd-i}</div></div>`;
+  for(let i=fd-1;i>=0;i--) html+='<div class="cal-d om"><div class="cal-dt">'+(pd-i)+'</div></div>';
   for(let d=1;d<=dim;d++){
     const isTd=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
     const evs=DL.filter(e=>e.m===calM+1&&e.d===d);
-    html+=`<div class="cal-d ${isTd?'td':''}">
-      <div class="cal-dt" style="${isTd?'color:#1A3169':'}'}">${d}</div>
-      ${evs.map(e=>`<div class="cal-ev ${TC[e.t]||''}">${e.lbl}</div>`).join('')}
-    </div>`;
+    html+='<div class="cal-d '+(isTd?'td':'')+'"><div class="cal-dt" style="'+(isTd?'color:#1A3169':'')+'">'+d+'</div>'+
+      evs.map(e=>'<div class="cal-ev '+(TC[e.t]||'')+'">'+e.lbl+(e.id?' ✎':'')+'</div>').join('')+'</div>';
   }
   const tot=fd+dim, nxt=tot%7===0?0:7-(tot%7);
-  for(let d=1;d<=nxt;d++) html+=`<div class="cal-d om"><div class="cal-dt">${d}</div></div>`;
+  for(let d=1;d<=nxt;d++) html+='<div class="cal-d om"><div class="cal-dt">'+d+'</div></div>';
   grid.innerHTML=html;
 }
 
