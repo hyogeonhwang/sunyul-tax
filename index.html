@@ -392,6 +392,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <button class="btn btn-s btn-sm" onclick="chMonth(-1)">◀</button>
             <span id="calLbl" style="font-weight:700;min-width:96px;text-align:center"></span>
             <button class="btn btn-s btn-sm" onclick="chMonth(1)">▶</button>
+            <button class="btn btn-p btn-sm" onclick="openCalEv()">+ 일정 추가</button>
+            <button class="btn btn-s btn-sm" onclick="openCalMgr()">📋 일정 관리</button>
           </div>
         </div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">
@@ -692,8 +694,9 @@ function logout(){auth.signOut();}
 function init(){
   loadClients();
   loadTemplates();
-  renderCal();
+  loadCalEvents();
   updateTxPeriod();
+  checkDeadlineAlerts();
 }
 
 // =================== NAVIGATION ===================
@@ -1310,7 +1313,13 @@ function renderTmplList(){
   const el=document.getElementById('tmplList'); if(!el) return;
   el.innerHTML=TMPLS.map((t,i)=>`
     <div class="tmpl-item ${selTI===i?'on':''}" onclick="selTmpl(${i})">
-      <div class="tmpl-name">${t.name}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="tmpl-name" style="flex:1">${t.name}</div>
+        <div style="display:flex;gap:3px;flex-shrink:0">
+          <button class="btn btn-s btn-xs" onclick="event.stopPropagation();openTmpl('${t.id}')">수정</button>
+          <button class="btn btn-d btn-xs" onclick="event.stopPropagation();delTmpl('${t.id}','${esc(t.name)}')">삭제</button>
+        </div>
+      </div>
       <div class="tmpl-trg">⏰ ${t.trigger}</div>
     </div>`).join('');
 }
@@ -1367,6 +1376,12 @@ function openTmpl(id){
   document.getElementById('moTmpl').style.display='flex';
 }
 function closeTmpl(){document.getElementById('moTmpl').style.display='none';}
+async function delTmpl(id,name){
+  if(!confirm(`"${name}" 템플릿을 삭제하시겠습니까?`)) return;
+  await db.collection('templates').doc(id).delete();
+  if(selTI>=TMPLS.length) selTI=-1;
+  document.getElementById('msgPre').textContent='왼쪽에서 템플릿을 선택하세요.';
+}
 async function saveTmpl(){
   const name=document.getElementById('t-name').value.trim();
   const body=document.getElementById('t-body').value.trim();
@@ -1463,5 +1478,75 @@ function renderDash(){
   }
 }
 </script>
+
+<!-- ===== CALENDAR EVENT MODAL ===== -->
+<div class="mo" id="moCalEv" style="display:none" onclick="if(event.target===this)closeCalEv()">
+  <div class="mo-box" style="max-width:440px">
+    <div class="mo-hdr">
+      <div class="mo-ttl" id="moCalEvTtl">일정 추가</div>
+      <button class="mo-x" onclick="closeCalEv()">✕</button>
+    </div>
+    <div class="mo-body">
+      <div class="fr">
+        <div class="fld"><label>월 *</label>
+          <select class="fi" id="ev-m">
+            <option value="1">1월</option>
+            <option value="2">2월</option>
+            <option value="3">3월</option>
+            <option value="4">4월</option>
+            <option value="5">5월</option>
+            <option value="6">6월</option>
+            <option value="7">7월</option>
+            <option value="8">8월</option>
+            <option value="9">9월</option>
+            <option value="10">10월</option>
+            <option value="11">11월</option>
+            <option value="12">12월</option>
+          </select>
+        </div>
+        <div class="fld"><label>일 *</label>
+          <input class="fi" type="number" id="ev-d" min="1" max="31" placeholder="예: 25">
+        </div>
+      </div>
+      <div class="fld" style="margin-bottom:12px">
+        <label>일정명 *</label>
+        <input class="fi" id="ev-lbl" placeholder="예: 부가세 1기 예정 신고">
+      </div>
+      <div class="fld">
+        <label>유형 (색상)</label>
+        <select class="fi" id="ev-t">
+          <option value="vat">🔵 부가세</option>
+          <option value="wht">🟠 원천세</option>
+          <option value="inc">🟢 종소세·법인세</option>
+          <option value="pay">🟣 지급명세서</option>
+        </select>
+      </div>
+      <div class="fld" style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px">
+          <input type="checkbox" id="ev-alert"> D-3일, 당일 앱 접속시 알림 표시
+        </label>
+      </div>
+    </div>
+    <div class="mo-foot">
+      <button class="btn btn-s" onclick="closeCalEv()">취소</button>
+      <button class="btn btn-p" onclick="saveCalEv()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CALENDAR MANAGE MODAL ===== -->
+<div class="mo" id="moCalMgr" style="display:none" onclick="if(event.target===this)closeCalMgr()">
+  <div class="mo-box" style="max-width:600px">
+    <div class="mo-hdr">
+      <div class="mo-ttl">📋 일정 관리</div>
+      <button class="mo-x" onclick="closeCalMgr()">✕</button>
+    </div>
+    <div class="mo-body">
+      <div class="al al-i" style="margin-bottom:12px">기본 내장 일정은 수정/삭제 불가. 추가한 일정만 관리 가능합니다.</div>
+      <div id="calMgrList"></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
