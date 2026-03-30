@@ -305,7 +305,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <button class="tab" onclick="setType('일반',this)">일반 <span id="cnt-일반" class="tag"></span></button>
           <button class="tab" onclick="setType('면세',this)">면세 <span id="cnt-면세" class="tag"></span></button>
           <button class="tab" onclick="setType('신고대리',this)">신고대리 <span id="cnt-신고대리" class="tag"></span></button>
-          <button class="tab" onclick="setType('폐업자',this)">폐업자 <span id="cnt-폐업자" class="tag"></span></button>
+          <button class="tab" onclick="setType('탈퇴',this)">폐업(탈퇴) <span id="cnt-탈퇴" class="tag"></span></button>
         </div>
         <div class="tw">
           <table>
@@ -454,7 +454,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div class="fld"><label>유형 *</label>
             <select class="fi" id="f-type">
               <option value="일반">일반</option><option value="법인">법인</option>
-              <option value="면세">면세</option><option value="신고대리">신고대리</option><option value="폐업자">폐업자</option>
+              <option value="면세">면세</option><option value="신고대리">신고대리</option>
             </select>
           </div>
         </div>
@@ -739,29 +739,41 @@ function updateCounts(){
   });
   const tot=base.length;
   document.getElementById('nc-clients').textContent=tot;
-  ['전체','법인','일반','면세','신고대리','폐업자'].forEach(t=>{
+  ['전체','법인','일반','면세','신고대리'].forEach(t=>{
     const el=document.getElementById('cnt-'+t);
     if(el) el.textContent= t==='전체'?tot:base.filter(c=>c.type===t).length;
   });
+  // 탈퇴(폐업자)는 상태 기준 - 필터 무관하게 전체에서 카운트
+  const elTalwi=document.getElementById('cnt-탈퇴');
+  if(elTalwi) elTalwi.textContent=ALL.filter(c=>c.status==='탈퇴').length;
   // 배정현황 검증 패널
   renderAssignPanel();
 }
 
 function renderAssignPanel(){
   const el=document.getElementById('assignPanel'); if(!el) return;
+  // 신고대리 제외한 기장 업체만 배정검증 대상
   const active=ALL.filter(c=>c.status!=='탈퇴');
-  const mgrs=['김서지','유승희','안지윤','미배정','김희진','황효건'];
-  const total=active.length;
-  const unassigned=active.filter(c=>!c.manager||c.manager==='미배정').length;
-  const assigned=active.filter(c=>c.manager&&c.manager!=='미배정').length;
-  // 검증: 전체 = 배정 + 미배정
+  const kijang=active.filter(c=>c.type!=='신고대리');
+  const singoD=active.filter(c=>c.type==='신고대리').length;
+  const total=kijang.length;
+  const unassigned=kijang.filter(c=>!c.manager||c.manager==='미배정').length;
+  const sj=kijang.filter(c=>c.manager==='김서지').length;
+  const sh=kijang.filter(c=>c.manager==='유승희').length;
+  const jy=kijang.filter(c=>c.manager==='안지윤').length;
+  const hg=kijang.filter(c=>c.manager==='황효건').length;
+  const hj=kijang.filter(c=>c.manager==='김희진').length;
+  const assigned=sj+sh+jy+hg+hj;
   const isValid=assigned+unassigned===total;
 
+  // 패널 그리드를 7칸으로
+  el.style.gridTemplateColumns='repeat(7,1fr)';
   const cards=[
-    {lbl:'전체',val:total,color:'#1A3169',bg:'#edf1ff'},
-    {lbl:'김서지',val:active.filter(c=>c.manager==='김서지').length,color:'#1b7a4f',bg:'#e0f4ec'},
-    {lbl:'유승희',val:active.filter(c=>c.manager==='유승희').length,color:'#1b7a4f',bg:'#e0f4ec'},
-    {lbl:'안지윤',val:active.filter(c=>c.manager==='안지윤').length,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'기장 전체',val:total,color:'#1A3169',bg:'#edf1ff'},
+    {lbl:'김서지',val:sj,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'유승희',val:sh,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'안지윤',val:jy,color:'#1b7a4f',bg:'#e0f4ec'},
+    {lbl:'신고대리',val:singoD,color:'#5c1a9a',bg:'#f0e4ff'},
     {lbl:'미배정',val:unassigned,color:unassigned>0?'#c62828':'#1b7a4f',bg:unassigned>0?'#ffeaea':'#e0f4ec'},
     {lbl:'검증',val:isValid?'✅ 일치':'❌ 불일치',color:isValid?'#1b7a4f':'#c62828',bg:isValid?'#e0f4ec':'#ffeaea',isText:true},
   ];
@@ -784,7 +796,14 @@ function renderClients(){
   const mgr=document.getElementById('cManager')?.value||'';
   const st=document.getElementById('cStatus')?.value||'';
   const list=ALL.filter(c=>{
-    if(cType!=='전체'&&c.type!==cType) return false;
+    // 탈퇴 탭: 상태=탈퇴인 것만
+    if(cType==='탈퇴'){
+      if(c.status!=='탈퇴') return false;
+    } else {
+      // 나머지 탭: 탈퇴 제외 + 유형 필터
+      if(c.status==='탈퇴') return false;
+      if(cType!=='전체'&&c.type!==cType) return false;
+    }
     if(mgr&&c.manager!==mgr) return false;
     if(st&&c.status!==st) return false;
     if(q&&!`${c.name||''}${c.bizNo||''}${c.rep||''}${c.manager||''}`.toLowerCase().includes(q)) return false;
@@ -1481,7 +1500,16 @@ function showAlertBanner(msg){
   const div=document.createElement('div');
   div.id='deadlineAlert';
   div.style.cssText='position:fixed;top:64px;right:16px;background:#fff;border:2px solid #C9A84C;border-radius:12px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:300px;font-size:13px;line-height:1.8;white-space:pre-line';
-  div.innerHTML='<div style="font-weight:700;color:#1A3169;margin-bottom:6px">🔔 마감 알림</div><div style="color:#334">'+msg+'</div><button onclick="document.getElementById('deadlineAlert').remove()" style="margin-top:10px;width:100%;background:#1A3169;color:#fff;border:none;border-radius:7px;padding:6px;cursor:pointer;font-size:12px;font-weight:600">확인</button>';
+  const title=document.createElement('div');
+  title.style.cssText='font-weight:700;color:#1A3169;margin-bottom:6px';
+  title.textContent='🔔 마감 알림';
+  const body=document.createElement('div');
+  body.style.color='#334'; body.textContent=msg;
+  const btn=document.createElement('button');
+  btn.textContent='확인';
+  btn.style.cssText='margin-top:10px;width:100%;background:#1A3169;color:#fff;border:none;border-radius:7px;padding:6px;cursor:pointer;font-size:12px;font-weight:600';
+  btn.onclick=()=>div.remove();
+  div.appendChild(title); div.appendChild(body); div.appendChild(btn);
   document.body.appendChild(div);
 }
 
@@ -1528,10 +1556,20 @@ function closeCalMgr(){document.getElementById('moCalMgr').style.display='none';
 function renderCalMgrList(){
   const el=document.getElementById('calMgrList'); if(!el) return;
   if(!DL_CUSTOM.length){el.innerHTML='<div class="muted" style="text-align:center;padding:30px">추가한 일정이 없습니다</div>';return;}
-  el.innerHTML='<table style="width:100%"><thead><tr><th>월/일</th><th>일정명</th><th>유형</th><th>알림</th><th>관리</th></tr></thead><tbody>'+
-    DL_CUSTOM.sort((a,b)=>a.m*100+a.d-(b.m*100+b.d)).map(e=>
-      '<tr><td>'+e.m+'/'+e.d+'</td><td>'+e.lbl+'</td><td><span class="cal-ev '+(TC[e.t]||'')+'" style="display:inline-block">'+(T_LBL[e.t]||e.t)+'</span></td><td style="text-align:center">'+(e.alert?'🔔':'-')+'</td><td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="closeCalMgr();openCalEv(''+e.id+'')">수정</button> <button class="btn btn-d btn-xs" onclick="delCalEv(''+e.id+'',''+e.lbl.replace(/'/g,"\'")+"'">삭제</button></td></tr>"
-    ).join('')+'</tbody></table>';
+  const sorted=DL_CUSTOM.slice().sort((a,b)=>a.m*100+a.d-(b.m*100+b.d));
+  const tbody=sorted.map(e=>{
+    return `<tr>
+      <td>${e.m}/${e.d}</td>
+      <td>${e.lbl}</td>
+      <td><span class="cal-ev ${TC[e.t]||''}" style="display:inline-block">${T_LBL[e.t]||e.t}</span></td>
+      <td style="text-align:center">${e.alert?'🔔':'-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-xs" onclick="closeCalMgr();openCalEv('${e.id}')">수정</button>
+        <button class="btn btn-d btn-xs" onclick="delCalEv('${e.id}','${esc(e.lbl)}')">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<table style="width:100%"><thead><tr><th>월/일</th><th>일정명</th><th>유형</th><th>알림</th><th>관리</th></tr></thead><tbody>${tbody}</tbody></table>`;
 }
 async function delCalEv(id,lbl){
   if(!confirm('"'+lbl+'" 일정을 삭제하시겠습니까?')) return;
@@ -1545,21 +1583,44 @@ function renderCal(){
   if(lbl) lbl.textContent=calY+'년 '+(calM+1)+'월';
   const grid=document.getElementById('calGrid'); if(!grid) return;
   const dns=['일','월','화','수','목','금','토'];
-  let html=dns.map(d=>'<div class="cal-dn">'+d+'</div>').join('');
+  let html=dns.map(d=>`<div class="cal-dn">${d}</div>`).join('');
   const fd=new Date(calY,calM,1).getDay();
   const dim=new Date(calY,calM+1,0).getDate();
   const pd=new Date(calY,calM,0).getDate();
   const today=new Date();
-  for(let i=fd-1;i>=0;i--) html+='<div class="cal-d om"><div class="cal-dt">'+(pd-i)+'</div></div>';
+  for(let i=fd-1;i>=0;i--) html+=`<div class="cal-d om"><div class="cal-dt">${pd-i}</div></div>`;
   for(let d=1;d<=dim;d++){
     const isTd=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
     const evs=DL.filter(e=>e.m===calM+1&&e.d===d);
-    html+='<div class="cal-d '+(isTd?'td':'')+'"><div class="cal-dt" style="'+(isTd?'color:#1A3169':'')+'">'+d+'</div>'+
-      evs.map(e=>'<div class="cal-ev '+(TC[e.t]||'')+'">'+e.lbl+(e.id?' ✎':'')+'</div>').join('')+'</div>';
+    // 날짜 클릭 → 일정 추가 (해당 날짜 미리 입력)
+    html+=`<div class="cal-d ${isTd?'td':''}" style="cursor:pointer" onclick="openCalEvDate(${calM+1},${d})">
+      <div class="cal-dt" style="${isTd?'color:#1A3169;font-weight:800;':''}">${d}</div>
+      ${evs.map(e=>{
+        if(e.id){
+          // 커스텀 일정: 클릭하면 수정
+          return `<div class="cal-ev ${TC[e.t]||''}" style="cursor:pointer" onclick="event.stopPropagation();openCalEv('${e.id}')" title="클릭하여 수정">${e.lbl} ✎</div>`;
+        } else {
+          // 기본 일정: 클릭 불가
+          return `<div class="cal-ev ${TC[e.t]||''}">${e.lbl}</div>`;
+        }
+      }).join('')}
+    </div>`;
   }
   const tot=fd+dim, nxt=tot%7===0?0:7-(tot%7);
-  for(let d=1;d<=nxt;d++) html+='<div class="cal-d om"><div class="cal-dt">'+d+'</div></div>';
+  for(let d=1;d<=nxt;d++) html+=`<div class="cal-d om"><div class="cal-dt">${d}</div></div>`;
   grid.innerHTML=html;
+}
+
+// 날짜 클릭 시 해당 월/일 미리 입력된 일정 추가 모달
+function openCalEvDate(m,d){
+  editCalId=null;
+  document.getElementById('ev-m').value=m;
+  document.getElementById('ev-d').value=d;
+  document.getElementById('ev-lbl').value='';
+  document.getElementById('ev-t').value='vat';
+  document.getElementById('ev-alert').checked=true;
+  document.getElementById('moCalEvTtl').textContent=m+'월 '+d+'일 일정 추가';
+  document.getElementById('moCalEv').style.display='flex';
 }
 
 // =================== DASHBOARD ===================
