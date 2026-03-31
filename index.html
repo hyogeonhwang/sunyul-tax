@@ -196,7 +196,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <label>비밀번호</label>
       <input type="password" id="lPw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')login()">
     </div>
-    <button class="btn-login" onclick="login()">로그인</button>
+    <button class="btn-login" id="loginBtn">로그인</button>
     <div class="login-err" id="lErr"></div>
   </div>
 </div>
@@ -647,6 +647,12 @@ let calY=new Date().getFullYear(), calM=new Date().getMonth();
 // 페이지 열 때 항상 로그인 화면 표시 (자동로그인 방지)
 auth.signOut();
 
+// 로그인 버튼 이벤트 리스너 (onclick 대신 addEventListener 사용)
+document.addEventListener('DOMContentLoaded', function(){
+  var btn = document.getElementById('loginBtn');
+  if(btn) btn.addEventListener('click', login);
+});
+
 auth.onAuthStateChanged(u=>{
   if(u){
     ME=u;
@@ -666,13 +672,20 @@ auth.onAuthStateChanged(u=>{
 
 function login(){
   try{
+    const ePw=document.getElementById('lPw');
     const e=document.getElementById('lEmail').value.trim();
-    const p=document.getElementById('lPw').value;
+    // 자동완성 비밀번호가 읽히지 않는 경우 대비 - focus/blur 트릭
+    const p=ePw.value || '';
     const errEl=document.getElementById('lErr');
-    const btn=document.querySelector('.btn-login');
+    const btn=document.getElementById('loginBtn');
     errEl.textContent='';
     if(!e){errEl.textContent='이메일을 입력하세요.';return;}
-    if(!p){errEl.textContent='비밀번호를 입력하세요.';return;}
+    if(!p){
+      // 비밀번호 자동완성이 안 읽혔을 경우 - 직접 포커스 요청
+      ePw.focus();
+      errEl.textContent='비밀번호를 다시 한번 클릭하거나 직접 입력해 주세요.';
+      return;
+    }
     if(btn){btn.textContent='로그인 중...';btn.disabled=true;}
     auth.signInWithEmailAndPassword(e,p).then(()=>{
       localStorage.setItem('sunyul_last_email',e);
