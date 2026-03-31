@@ -626,8 +626,8 @@ const FC = {
 firebase.initializeApp(FC);
 const db = firebase.firestore();
 const auth = firebase.auth();
-// 로그인 상태 영구 유지 (브라우저 닫아도 유지)
-auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+// 로그인 상태 설정
+try { auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch(e) { console.warn('Persistence:', e); }
 
 // =================== GLOBALS ===================
 let ME = null, ROLE = 'staff';
@@ -665,29 +665,35 @@ auth.onAuthStateChanged(u=>{
 });
 
 function login(){
-  const e=document.getElementById('lEmail').value.trim();
-  const p=document.getElementById('lPw').value;
-  const errEl=document.getElementById('lErr');
-  const btn=document.querySelector('.btn-login');
-  if(!e||!p){errEl.textContent='이메일과 비밀번호를 입력하세요.';return;}
-  // 버튼 로딩 상태
-  if(btn){btn.textContent='로그인 중...';btn.disabled=true;}
-  errEl.textContent='';
-  auth.signInWithEmailAndPassword(e,p).then(()=>{
-    localStorage.setItem('sunyul_last_email',e);
-  }).catch((err)=>{
+  try{
+    const e=document.getElementById('lEmail').value.trim();
+    const p=document.getElementById('lPw').value;
+    const errEl=document.getElementById('lErr');
+    const btn=document.querySelector('.btn-login');
+    errEl.textContent='';
+    if(!e){errEl.textContent='이메일을 입력하세요.';return;}
+    if(!p){errEl.textContent='비밀번호를 입력하세요.';return;}
+    if(btn){btn.textContent='로그인 중...';btn.disabled=true;}
+    auth.signInWithEmailAndPassword(e,p).then(()=>{
+      localStorage.setItem('sunyul_last_email',e);
+      if(btn){btn.textContent='로그인';btn.disabled=false;}
+    }).catch((err)=>{
+      if(btn){btn.textContent='로그인';btn.disabled=false;}
+      let msg='';
+      if(err.code==='auth/user-not-found'||err.code==='auth/invalid-credential') msg='이메일 또는 비밀번호가 잘못됐습니다.';
+      else if(err.code==='auth/wrong-password') msg='비밀번호가 틀렸습니다.';
+      else if(err.code==='auth/invalid-email') msg='이메일 형식이 잘못됐습니다.';
+      else if(err.code==='auth/too-many-requests') msg='시도 횟수 초과. 잠시 후 다시 시도하세요.';
+      else if(err.code==='auth/network-request-failed') msg='네트워크 오류. 인터넷 연결을 확인하세요.';
+      else msg='오류: '+(err.code||err.message);
+      errEl.textContent=msg;
+      errEl.style.color='#e74c3c';
+    });
+  }catch(e){
+    document.getElementById('lErr').textContent='오류: '+e.message;
+    const btn=document.querySelector('.btn-login');
     if(btn){btn.textContent='로그인';btn.disabled=false;}
-    let msg='';
-    if(err.code==='auth/user-not-found'||err.code==='auth/invalid-credential') msg='이메일 또는 비밀번호가 잘못됐습니다.';
-    else if(err.code==='auth/wrong-password') msg='비밀번호가 틀렸습니다.';
-    else if(err.code==='auth/invalid-email') msg='이메일 형식이 잘못됐습니다.';
-    else if(err.code==='auth/too-many-requests') msg='로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.';
-    else if(err.code==='auth/network-request-failed') msg='네트워크 오류. 인터넷 연결을 확인하세요.';
-    else if(err.code==='auth/operation-not-allowed') msg='이메일/비밀번호 로그인이 비활성화됐습니다. Firebase Console 확인 필요.';
-    else msg='오류: '+(err.code||err.message);
-    errEl.textContent=msg;
-    errEl.style.color='#e74c3c';
-  });
+  }
 }
 // 마지막 로그인 이메일 자동 복원
 function restoreEmail(){
