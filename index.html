@@ -180,13 +180,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 <body>
 
 <!-- ==================== LOGIN ==================== -->
-<div id="initLoader" style="position:fixed;inset:0;background:#1A3169;display:flex;align-items:center;justify-content:center;z-index:999">
-  <div style="text-align:center">
-    <div style="width:40px;height:40px;border:4px solid rgba(255,255,255,.2);border-top-color:#C9A84C;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px"></div>
-    <div style="color:rgba(255,255,255,.7);font-size:13px;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif">세무법인 선율</div>
-  </div>
-</div>
-<div id="loginScreen" style="display:none">
+<div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
       <img src="data:image/png;base64,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" style="height:64px;object-fit:contain;margin-bottom:10px">
@@ -279,11 +273,9 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <button class="btn btn-p btn-sm" onclick="openClient()">+ 거래처 추가</button>
           </div>
         </div>
-        <!-- 배정현황 검증 패널 -->
-        <div id="assignPanel" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px"></div>
         <div class="fbar">
           <input class="si" id="cSearch" placeholder="🔍 상호 · 사업자번호 · 대표자 검색" oninput="renderClients()">
-          <select class="sel" id="cManager" onchange="updateCounts();renderClients()">
+          <select class="sel" id="cManager" onchange="renderClients()">
             <option value="">전체 담당자</option>
             <option value="미배정">미배정</option>
             <option value="황효건">황효건</option>
@@ -292,7 +284,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <option value="유승희">유승희</option>
             <option value="김희진">김희진</option>
           </select>
-          <select class="sel" id="cStatus" onchange="updateCounts();renderClients()">
+          <select class="sel" id="cStatus" onchange="renderClients()">
             <option value="">전체 상태</option>
             <option value="활성">활성</option>
             <option value="휴면">휴면</option>
@@ -305,7 +297,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <button class="tab" onclick="setType('일반',this)">일반 <span id="cnt-일반" class="tag"></span></button>
           <button class="tab" onclick="setType('면세',this)">면세 <span id="cnt-면세" class="tag"></span></button>
           <button class="tab" onclick="setType('신고대리',this)">신고대리 <span id="cnt-신고대리" class="tag"></span></button>
-          <button class="tab" onclick="setType('탈퇴',this)">폐업(탈퇴) <span id="cnt-탈퇴" class="tag"></span></button>
+          <button class="tab" onclick="setType('폐업자',this)">폐업자 <span id="cnt-폐업자" class="tag"></span></button>
         </div>
         <div class="tw">
           <table>
@@ -394,8 +386,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <button class="btn btn-s btn-sm" onclick="chMonth(-1)">◀</button>
             <span id="calLbl" style="font-weight:700;min-width:96px;text-align:center"></span>
             <button class="btn btn-s btn-sm" onclick="chMonth(1)">▶</button>
-            <button class="btn btn-p btn-sm" onclick="openCalEv()">+ 일정 추가</button>
-            <button class="btn btn-s btn-sm" onclick="openCalMgr()">📋 일정 관리</button>
           </div>
         </div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">
@@ -417,11 +407,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <table style="width:100%">
           <thead><tr><th>이름</th><th>이메일</th><th>권한</th><th>직책</th></tr></thead>
           <tbody>
-            <tr><td>황효건</td><td>hg@sunyul.com</td><td><span class="bdg bdg-corp">관리자</span></td><td>대표세무사</td></tr>
-            <tr><td>김서지</td><td>sj@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>안지윤</td><td>jy@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>유승희</td><td>sh@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>김희진</td><td>hj@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>황효건</td><td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f69e91b68583988f839ad895999b">[email&#160;protected]</a></td><td><span class="bdg bdg-corp">관리자</span></td><td>대표세무사</td></tr>
+            <tr><td>김서지</td><td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="24574e6457514a5d51480a474b49">[email&#160;protected]</a></td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>안지윤</td><td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ddb7a49daea8b3a4a8b1f3beb2b0">[email&#160;protected]</a></td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>유승희</td><td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="aeddc6eedddbc0d7dbc280cdc1c3">[email&#160;protected]</a></td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>김희진</td><td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1d75775d6e6873646871337e7270">[email&#160;protected]</a></td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
           </tbody>
         </table>
         <div class="al al-w" style="margin-top:16px">
@@ -454,7 +444,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div class="fld"><label>유형 *</label>
             <select class="fi" id="f-type">
               <option value="일반">일반</option><option value="법인">법인</option>
-              <option value="면세">면세</option><option value="신고대리">신고대리</option>
+              <option value="면세">면세</option><option value="신고대리">신고대리</option><option value="폐업자">폐업자</option>
             </select>
           </div>
         </div>
@@ -579,8 +569,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <button class="mo-x" onclick="closeImport()">✕</button>
     </div>
     <div class="mo-body">
-      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 <b>법인·일반·면세·신고대리 모든 시트</b>와 <b>담당자별현황</b>을 한꺼번에 읽어 담당자 자동 배정합니다.</div>
-      <div id="delAllWrap" style="text-align:right;margin-bottom:8px;display:none"><button class="btn btn-d btn-sm" onclick="delAllClients()">⚠️ 기존 거래처 전체삭제 후 재임포트</button></div>
+      <div class="al al-i">기존 <b>업체관리_통합.xlsm</b> 파일을 업로드하면 <b>법인·일반·면세·신고대리 모든 시트</b>를 한꺼번에 가져옵니다. 중복(사업자번호 기준)은 건너뜁니다.</div>
       <div style="border:2px dashed #dde;border-radius:11px;padding:28px;text-align:center;cursor:pointer" onclick="document.getElementById('impFile').click()">
         <div style="font-size:30px;margin-bottom:7px">📁</div>
         <div style="font-size:13px;color:#667">클릭하여 Excel 파일 선택</div>
@@ -624,7 +613,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // =================== FIREBASE ===================
 const FC = {
   apiKey:"AIzaSyDzqGH3BDUU88rBUf5h0SjQx5-VdTqf08Q",
@@ -655,8 +644,10 @@ let cType='전체', pyTab='monthly';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
 // =================== AUTH ===================
+// 페이지 열 때 항상 로그인 화면 표시 (자동로그인 방지)
+auth.signOut();
+
 auth.onAuthStateChanged(u=>{
-  document.getElementById('initLoader').style.display='none';
   if(u){
     ME=u;
     const info=USERS[u.email]||{name:u.email,role:'staff',title:''};
@@ -669,6 +660,7 @@ auth.onAuthStateChanged(u=>{
   } else {
     document.getElementById('loginScreen').style.display='flex';
     document.getElementById('app').style.display='none';
+    restoreEmail();
   }
 });
 
@@ -683,22 +675,24 @@ function login(){
   });
 }
 // 마지막 로그인 이메일 자동 복원
-window.addEventListener('DOMContentLoaded',()=>{
+function restoreEmail(){
   const saved=localStorage.getItem('sunyul_last_email');
   if(saved){
     const el=document.getElementById('lEmail');
-    if(el){el.value=saved;document.getElementById('lPw').focus();}
+    if(el){el.value=saved;}
   }
-});
+}
+window.addEventListener('DOMContentLoaded', restoreEmail);
+// auth 상태 확인 후 로그인화면 보일 때도 복원
+
 function logout(){auth.signOut();}
 
 // =================== INIT ===================
 function init(){
   loadClients();
   loadTemplates();
-  loadCalEvents();
+  renderCal();
   updateTxPeriod();
-  checkDeadlineAlerts();
 }
 
 // =================== NAVIGATION ===================
@@ -729,59 +723,12 @@ function loadClients(){
 }
 
 function updateCounts(){
-  // 탭 카운트: 담당자 필터 선택 기준으로 계산
-  const mgr=document.getElementById('cManager')?.value||'';
-  const st=document.getElementById('cStatus')?.value||'';
-  const base=ALL.filter(c=>{
-    if(mgr&&c.manager!==mgr) return false;
-    if(st&&c.status!==st) return false;
-    return true;
-  });
-  const tot=base.length;
+  const tot=ALL.length;
   document.getElementById('nc-clients').textContent=tot;
-  ['전체','법인','일반','면세','신고대리'].forEach(t=>{
+  ['전체','법인','일반','면세','신고대리','폐업자'].forEach(t=>{
     const el=document.getElementById('cnt-'+t);
-    if(el) el.textContent= t==='전체'?tot:base.filter(c=>c.type===t).length;
+    if(el) el.textContent= t==='전체'?tot:ALL.filter(c=>c.type===t).length;
   });
-  // 탈퇴(폐업자)는 상태 기준 - 필터 무관하게 전체에서 카운트
-  const elTalwi=document.getElementById('cnt-탈퇴');
-  if(elTalwi) elTalwi.textContent=ALL.filter(c=>c.status==='탈퇴').length;
-  // 배정현황 검증 패널
-  renderAssignPanel();
-}
-
-function renderAssignPanel(){
-  const el=document.getElementById('assignPanel'); if(!el) return;
-  // 신고대리 제외한 기장 업체만 배정검증 대상
-  const active=ALL.filter(c=>c.status!=='탈퇴');
-  const kijang=active.filter(c=>c.type!=='신고대리');
-  const singoD=active.filter(c=>c.type==='신고대리').length;
-  const total=kijang.length;
-  const unassigned=kijang.filter(c=>!c.manager||c.manager==='미배정').length;
-  const sj=kijang.filter(c=>c.manager==='김서지').length;
-  const sh=kijang.filter(c=>c.manager==='유승희').length;
-  const jy=kijang.filter(c=>c.manager==='안지윤').length;
-  const hg=kijang.filter(c=>c.manager==='황효건').length;
-  const hj=kijang.filter(c=>c.manager==='김희진').length;
-  const assigned=sj+sh+jy+hg+hj;
-  const isValid=assigned+unassigned===total;
-
-  // 패널 그리드를 7칸으로
-  el.style.gridTemplateColumns='repeat(7,1fr)';
-  const cards=[
-    {lbl:'기장 전체',val:total,color:'#1A3169',bg:'#edf1ff'},
-    {lbl:'김서지',val:sj,color:'#1b7a4f',bg:'#e0f4ec'},
-    {lbl:'유승희',val:sh,color:'#1b7a4f',bg:'#e0f4ec'},
-    {lbl:'안지윤',val:jy,color:'#1b7a4f',bg:'#e0f4ec'},
-    {lbl:'신고대리',val:singoD,color:'#5c1a9a',bg:'#f0e4ff'},
-    {lbl:'미배정',val:unassigned,color:unassigned>0?'#c62828':'#1b7a4f',bg:unassigned>0?'#ffeaea':'#e0f4ec'},
-    {lbl:'검증',val:isValid?'✅ 일치':'❌ 불일치',color:isValid?'#1b7a4f':'#c62828',bg:isValid?'#e0f4ec':'#ffeaea',isText:true},
-  ];
-  el.innerHTML=cards.map(c=>`
-    <div style="background:${c.bg};border-radius:10px;padding:10px 12px;text-align:center">
-      <div style="font-size:11px;color:#667;font-weight:600;margin-bottom:3px">${c.lbl}</div>
-      <div style="font-size:${c.isText?'13px':'20px'};font-weight:800;color:${c.color}">${c.val}</div>
-    </div>`).join('');
 }
 
 function setType(t,btn){
@@ -796,14 +743,7 @@ function renderClients(){
   const mgr=document.getElementById('cManager')?.value||'';
   const st=document.getElementById('cStatus')?.value||'';
   const list=ALL.filter(c=>{
-    // 탈퇴 탭: 상태=탈퇴인 것만
-    if(cType==='탈퇴'){
-      if(c.status!=='탈퇴') return false;
-    } else {
-      // 나머지 탭: 탈퇴 제외 + 유형 필터
-      if(c.status==='탈퇴') return false;
-      if(cType!=='전체'&&c.type!==cType) return false;
-    }
+    if(cType!=='전체'&&c.type!==cType) return false;
     if(mgr&&c.manager!==mgr) return false;
     if(st&&c.status!==st) return false;
     if(q&&!`${c.name||''}${c.bizNo||''}${c.rep||''}${c.manager||''}`.toLowerCase().includes(q)) return false;
@@ -959,11 +899,7 @@ function renderPlats(){
 
 // =================== IMPORT ===================
 let impData=[];
-function openImport(){
-  document.getElementById('moImport').style.display='flex';
-  const w=document.getElementById('delAllWrap');
-  if(w) w.style.display=ROLE==='admin'?'block':'none';
-}
+function openImport(){document.getElementById('moImport').style.display='flex';}
 function closeImport(){
   document.getElementById('moImport').style.display='none';
   impData=[];document.getElementById('impPrev').innerHTML='';
@@ -1014,34 +950,6 @@ function parseSheet(wb, sheetName, type){
   return result;
 }
 
-function buildManagerMap(wb){
-  // 담당자별현황 시트에서 상호→담당자 매핑 생성
-  const map={};
-  const sn=wb.SheetNames.find(s=>s.includes('담당자'));
-  if(!sn) return map;
-  const ws=wb.Sheets[sn];
-  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-  // 헤더행(No/상호/구분) 찾기
-  let hr=-1;
-  for(let i=0;i<rows.length;i++){
-    if(rows[i].some(c=>c==='No')){hr=i;break;}
-  }
-  if(hr<0) return map;
-  // 4개 컬럼 그룹: [0]서지 [4]승희 [8]지윤 [12]미배정
-  const groups=[
-    {col:1,mgr:'김서지'},{col:5,mgr:'유승희'},
-    {col:9,mgr:'안지윤'},{col:13,mgr:'미배정'}
-  ];
-  for(let i=hr+1;i<rows.length;i++){
-    const r=rows[i];
-    groups.forEach(({col,mgr})=>{
-      const name=String(r[col]||'').trim();
-      if(name) map[name]=mgr;
-    });
-  }
-  return map;
-}
-
 function previewImp(){
   const file=document.getElementById('impFile').files[0]; if(!file) return;
   const reader=new FileReader();
@@ -1049,18 +957,12 @@ function previewImp(){
     try{
       const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
       const TYPE_MAP={'법인':'법인','일반':'일반','면세':'면세','신고대리':'신고대리'};
-      // 담당자 매핑 먼저 생성
-      const mgrMap=buildManagerMap(wb);
       impData=[];
       const summary=[];
       wb.SheetNames.forEach(sn=>{
         const matched=Object.keys(TYPE_MAP).find(k=>sn.includes(k));
         if(!matched) return;
         const rows=parseSheet(wb,sn,TYPE_MAP[matched]);
-        // 담당자 자동 배정
-        rows.forEach(r=>{
-          if(mgrMap[r.name]) r.manager=mgrMap[r.name];
-        });
         if(rows.length){
           impData.push(...rows);
           summary.push({sn,type:matched,cnt:rows.length});
@@ -1068,38 +970,21 @@ function previewImp(){
       });
       if(!impData.length){document.getElementById('impPrev').innerHTML='<div class="al al-e">가져올 데이터가 없습니다. 시트명에 법인/일반/면세/신고대리가 포함되어야 합니다.</div>';return;}
       document.getElementById('impPrev').innerHTML=`
-        <div class="al al-i"><b>총 ${impData.length}개</b> 거래처 발견 · 담당자 자동 배정 완료</div>
+        <div class="al al-i"><b>총 ${impData.length}개</b> 거래처 발견</div>
         <div style="margin-bottom:10px">
           ${summary.map(s=>`<span class="bdg bdg-gen" style="margin-right:5px">${s.type} ${s.cnt}개</span>`).join('')}
         </div>
-        <div style="margin-bottom:8px;font-size:12px;color:#667">
-          담당자 배정: 
-          ${['김서지','유승희','안지윤','미배정'].map(m=>{
-            const cnt=impData.filter(d=>d.manager===m).length;
-            return cnt?`<span class="tag" style="margin-right:4px">${m} ${cnt}명</span>`:'';
-          }).join('')}
-        </div>
-        <div style="max-height:200px;overflow-y:auto">
+        <div style="max-height:180px;overflow-y:auto">
           <table style="width:100%;font-size:12px">
             <tr><th>상호</th><th>유형</th><th>사업자번호</th><th>담당자</th></tr>
-            ${impData.slice(0,12).map(d=>`<tr><td>${d.name}</td><td>${d.type}</td><td>${d.bizNo}</td><td style="color:${d.manager==='미배정'?'#aab':'#1A3169'};font-weight:600">${d.manager}</td></tr>`).join('')}
-            ${impData.length>12?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-12}개</td></tr>`:''}
+            ${impData.slice(0,10).map(d=>`<tr><td>${d.name}</td><td>${d.type}</td><td>${d.bizNo}</td><td>${d.manager}</td></tr>`).join('')}
+            ${impData.length>10?`<tr><td colspan="4" class="muted" style="text-align:center">... 외 ${impData.length-10}개</td></tr>`:''}
           </table>
         </div>`;
       document.getElementById('doImpBtn').style.display='inline-block';
     }catch(err){document.getElementById('impPrev').innerHTML=`<div class="al al-e">오류: ${err.message}</div>`;}
   };
   reader.readAsBinaryString(file);
-}
-
-async function delAllClients(){
-  if(!confirm('기존 거래처를 전체 삭제하고 새로 임포트하시겠습니까?\n이 작업은 되돌릴 수 없습니다!')) return;
-  const snap=await db.collection('clients').get();
-  const batch=db.batch();
-  snap.docs.forEach(d=>batch.delete(d.ref));
-  await batch.commit();
-  ALL=[];updateCounts();renderClients();
-  alert('전체 삭제 완료! 이제 파일을 업로드하세요.');
 }
 
 async function doImport(){
@@ -1369,13 +1254,7 @@ function renderTmplList(){
   const el=document.getElementById('tmplList'); if(!el) return;
   el.innerHTML=TMPLS.map((t,i)=>`
     <div class="tmpl-item ${selTI===i?'on':''}" onclick="selTmpl(${i})">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div class="tmpl-name" style="flex:1">${t.name}</div>
-        <div style="display:flex;gap:3px;flex-shrink:0">
-          <button class="btn btn-s btn-xs" onclick="event.stopPropagation();openTmpl('${t.id}')">수정</button>
-          <button class="btn btn-d btn-xs" onclick="event.stopPropagation();delTmpl('${t.id}','${esc(t.name)}')">삭제</button>
-        </div>
-      </div>
+      <div class="tmpl-name">${t.name}</div>
       <div class="tmpl-trg">⏰ ${t.trigger}</div>
     </div>`).join('');
 }
@@ -1432,12 +1311,6 @@ function openTmpl(id){
   document.getElementById('moTmpl').style.display='flex';
 }
 function closeTmpl(){document.getElementById('moTmpl').style.display='none';}
-async function delTmpl(id,name){
-  if(!confirm(`"${name}" 템플릿을 삭제하시겠습니까?`)) return;
-  await db.collection('templates').doc(id).delete();
-  if(selTI>=TMPLS.length) selTI=-1;
-  document.getElementById('msgPre').textContent='왼쪽에서 템플릿을 선택하세요.';
-}
 async function saveTmpl(){
   const name=document.getElementById('t-name').value.trim();
   const body=document.getElementById('t-body').value.trim();
@@ -1449,7 +1322,7 @@ async function saveTmpl(){
 }
 
 // =================== CALENDAR ===================
-const DL_DEFAULT=[
+const DL=[
   {m:1,d:10,lbl:'원천세 납부',t:'wht'},{m:1,d:25,lbl:'부가세 납부',t:'vat'},
   {m:1,d:31,lbl:'근로 간이(하반기)',t:'pay'},
   {m:2,d:10,lbl:'원천세 납부',t:'wht'},{m:2,d:28,lbl:'이자·배당·기타 지급명세서',t:'pay'},
@@ -1465,122 +1338,12 @@ const DL_DEFAULT=[
   {m:11,d:10,lbl:'원천세 납부',t:'wht'},
   {m:12,d:10,lbl:'원천세 납부',t:'wht'},{m:12,d:25,lbl:'부가세 2기 확정',t:'vat'},
 ];
-let DL_CUSTOM=[], DL=[...DL_DEFAULT];
 const TC={vat:'ev-vat',wht:'ev-wht',inc:'ev-inc',pay:'ev-pay'};
-const T_LBL={vat:'부가세',wht:'원천세',inc:'종소세·법인세',pay:'지급명세서'};
-
-function loadCalEvents(){
-  db.collection('calEvents').onSnapshot(snap=>{
-    DL_CUSTOM=snap.docs.map(d=>({id:d.id,...d.data()}));
-    DL=[...DL_DEFAULT,...DL_CUSTOM];
-    renderCal();
-    renderDash();
-  });
-}
-
-function checkDeadlineAlerts(){
-  setTimeout(()=>{
-    const today=new Date(), yr=today.getFullYear();
-    const alerts=DL.filter(e=>{
-      if(!e.alert) return false;
-      const diff=Math.ceil((new Date(yr,e.m-1,e.d)-today)/(1000*60*60*24));
-      return diff>=0&&diff<=3;
-    });
-    if(!alerts.length) return;
-    const msg=alerts.map(e=>{
-      const diff=Math.ceil((new Date(yr,e.m-1,e.d)-today)/(1000*60*60*24));
-      return `• ${e.lbl} (${e.m}/${e.d}) — ${diff===0?'오늘 마감!':'D-'+diff}`;
-    }).join('\n');
-    showAlertBanner(msg);
-  },2000);
-}
-
-function showAlertBanner(msg){
-  const ex=document.getElementById('deadlineAlert'); if(ex) ex.remove();
-  const div=document.createElement('div');
-  div.id='deadlineAlert';
-  div.style.cssText='position:fixed;top:64px;right:16px;background:#fff;border:2px solid #C9A84C;border-radius:12px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:300px;font-size:13px;line-height:1.8;white-space:pre-line';
-  const title=document.createElement('div');
-  title.style.cssText='font-weight:700;color:#1A3169;margin-bottom:6px';
-  title.textContent='🔔 마감 알림';
-  const body=document.createElement('div');
-  body.style.color='#334'; body.textContent=msg;
-  const btn=document.createElement('button');
-  btn.textContent='확인';
-  btn.style.cssText='margin-top:10px;width:100%;background:#1A3169;color:#fff;border:none;border-radius:7px;padding:6px;cursor:pointer;font-size:12px;font-weight:600';
-  btn.onclick=()=>div.remove();
-  div.appendChild(title); div.appendChild(body); div.appendChild(btn);
-  document.body.appendChild(div);
-}
-
-let editCalId=null;
-function openCalEv(id){
-  editCalId=id||null;
-  if(id){
-    const ev=DL_CUSTOM.find(e=>e.id===id);
-    if(ev){
-      document.getElementById('ev-m').value=ev.m;
-      document.getElementById('ev-d').value=ev.d;
-      document.getElementById('ev-lbl').value=ev.lbl;
-      document.getElementById('ev-t').value=ev.t;
-      document.getElementById('ev-alert').checked=!!ev.alert;
-    }
-    document.getElementById('moCalEvTtl').textContent='일정 수정';
-  } else {
-    document.getElementById('ev-m').value=calM+1;
-    document.getElementById('ev-d').value='';
-    document.getElementById('ev-lbl').value='';
-    document.getElementById('ev-t').value='vat';
-    document.getElementById('ev-alert').checked=true;
-    document.getElementById('moCalEvTtl').textContent='일정 추가';
-  }
-  document.getElementById('moCalEv').style.display='flex';
-}
-function closeCalEv(){document.getElementById('moCalEv').style.display='none';}
-async function saveCalEv(){
-  const m=parseInt(document.getElementById('ev-m').value);
-  const d=parseInt(document.getElementById('ev-d').value);
-  const lbl=document.getElementById('ev-lbl').value.trim();
-  if(!lbl||!d){alert('일정명과 날짜를 입력하세요.');return;}
-  const data={m,d,lbl,t:document.getElementById('ev-t').value,alert:document.getElementById('ev-alert').checked};
-  if(editCalId) await db.collection('calEvents').doc(editCalId).update(data);
-  else await db.collection('calEvents').add(data);
-  closeCalEv();
-}
-
-function openCalMgr(){
-  renderCalMgrList();
-  document.getElementById('moCalMgr').style.display='flex';
-}
-function closeCalMgr(){document.getElementById('moCalMgr').style.display='none';}
-function renderCalMgrList(){
-  const el=document.getElementById('calMgrList'); if(!el) return;
-  if(!DL_CUSTOM.length){el.innerHTML='<div class="muted" style="text-align:center;padding:30px">추가한 일정이 없습니다</div>';return;}
-  const sorted=DL_CUSTOM.slice().sort((a,b)=>a.m*100+a.d-(b.m*100+b.d));
-  const tbody=sorted.map(e=>{
-    return `<tr>
-      <td>${e.m}/${e.d}</td>
-      <td>${e.lbl}</td>
-      <td><span class="cal-ev ${TC[e.t]||''}" style="display:inline-block">${T_LBL[e.t]||e.t}</span></td>
-      <td style="text-align:center">${e.alert?'🔔':'-'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-s btn-xs" onclick="closeCalMgr();openCalEv('${e.id}')">수정</button>
-        <button class="btn btn-d btn-xs" onclick="delCalEv('${e.id}','${esc(e.lbl)}')">삭제</button>
-      </td>
-    </tr>`;
-  }).join('');
-  el.innerHTML=`<table style="width:100%"><thead><tr><th>월/일</th><th>일정명</th><th>유형</th><th>알림</th><th>관리</th></tr></thead><tbody>${tbody}</tbody></table>`;
-}
-async function delCalEv(id,lbl){
-  if(!confirm('"'+lbl+'" 일정을 삭제하시겠습니까?')) return;
-  await db.collection('calEvents').doc(id).delete();
-  renderCalMgrList();
-}
 
 function chMonth(d){calM+=d;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--;}renderCal();}
 function renderCal(){
   const lbl=document.getElementById('calLbl');
-  if(lbl) lbl.textContent=calY+'년 '+(calM+1)+'월';
+  if(lbl) lbl.textContent=`${calY}년 ${calM+1}월`;
   const grid=document.getElementById('calGrid'); if(!grid) return;
   const dns=['일','월','화','수','목','금','토'];
   let html=dns.map(d=>`<div class="cal-dn">${d}</div>`).join('');
@@ -1592,35 +1355,14 @@ function renderCal(){
   for(let d=1;d<=dim;d++){
     const isTd=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
     const evs=DL.filter(e=>e.m===calM+1&&e.d===d);
-    // 날짜 클릭 → 일정 추가 (해당 날짜 미리 입력)
-    html+=`<div class="cal-d ${isTd?'td':''}" style="cursor:pointer" onclick="openCalEvDate(${calM+1},${d})">
-      <div class="cal-dt" style="${isTd?'color:#1A3169;font-weight:800;':''}">${d}</div>
-      ${evs.map(e=>{
-        if(e.id){
-          // 커스텀 일정: 클릭하면 수정
-          return `<div class="cal-ev ${TC[e.t]||''}" style="cursor:pointer" onclick="event.stopPropagation();openCalEv('${e.id}')" title="클릭하여 수정">${e.lbl} ✎</div>`;
-        } else {
-          // 기본 일정: 클릭 불가
-          return `<div class="cal-ev ${TC[e.t]||''}">${e.lbl}</div>`;
-        }
-      }).join('')}
+    html+=`<div class="cal-d ${isTd?'td':''}">
+      <div class="cal-dt" style="${isTd?'color:#1A3169':'}'}">${d}</div>
+      ${evs.map(e=>`<div class="cal-ev ${TC[e.t]||''}">${e.lbl}</div>`).join('')}
     </div>`;
   }
   const tot=fd+dim, nxt=tot%7===0?0:7-(tot%7);
   for(let d=1;d<=nxt;d++) html+=`<div class="cal-d om"><div class="cal-dt">${d}</div></div>`;
   grid.innerHTML=html;
-}
-
-// 날짜 클릭 시 해당 월/일 미리 입력된 일정 추가 모달
-function openCalEvDate(m,d){
-  editCalId=null;
-  document.getElementById('ev-m').value=m;
-  document.getElementById('ev-d').value=d;
-  document.getElementById('ev-lbl').value='';
-  document.getElementById('ev-t').value='vat';
-  document.getElementById('ev-alert').checked=true;
-  document.getElementById('moCalEvTtl').textContent=m+'월 '+d+'일 일정 추가';
-  document.getElementById('moCalEv').style.display='flex';
 }
 
 // =================== DASHBOARD ===================
@@ -1650,90 +1392,4 @@ function renderDash(){
         <span class="${cl}" style="font-size:12px;font-weight:700">${m}/${e.d} (D-${dl})</span>
       </div>`;
     }).join(''):'<div class="muted" style="text-align:center;padding:22px">이번달 남은 마감일이 없습니다</div>';
-  }
-
-  const me=document.getElementById('dashMy');
-  if(me){
-    const myList=ROLE==='admin'
-      ?ALL.filter(c=>c.status==='활성').slice(0,6)
-      :ALL.filter(c=>c.manager===info.name&&c.status==='활성').slice(0,6);
-    me.innerHTML=myList.length?myList.map(c=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f6fa;cursor:pointer" onclick="go('clients')">
-        <span style="font-size:13px;font-weight:600">${c.name}</span>
-        ${tb_type(c.type)}
-      </div>`).join(''):'<div class="muted" style="text-align:center;padding:22px">담당 거래처가 없습니다</div>';
-  }
-}
-</script>
-
-<!-- ===== CALENDAR EVENT MODAL ===== -->
-<div class="mo" id="moCalEv" style="display:none" onclick="if(event.target===this)closeCalEv()">
-  <div class="mo-box" style="max-width:440px">
-    <div class="mo-hdr">
-      <div class="mo-ttl" id="moCalEvTtl">일정 추가</div>
-      <button class="mo-x" onclick="closeCalEv()">✕</button>
-    </div>
-    <div class="mo-body">
-      <div class="fr">
-        <div class="fld"><label>월 *</label>
-          <select class="fi" id="ev-m">
-            <option value="1">1월</option>
-            <option value="2">2월</option>
-            <option value="3">3월</option>
-            <option value="4">4월</option>
-            <option value="5">5월</option>
-            <option value="6">6월</option>
-            <option value="7">7월</option>
-            <option value="8">8월</option>
-            <option value="9">9월</option>
-            <option value="10">10월</option>
-            <option value="11">11월</option>
-            <option value="12">12월</option>
-          </select>
-        </div>
-        <div class="fld"><label>일 *</label>
-          <input class="fi" type="number" id="ev-d" min="1" max="31" placeholder="예: 25">
-        </div>
-      </div>
-      <div class="fld" style="margin-bottom:12px">
-        <label>일정명 *</label>
-        <input class="fi" id="ev-lbl" placeholder="예: 부가세 1기 예정 신고">
-      </div>
-      <div class="fld">
-        <label>유형 (색상)</label>
-        <select class="fi" id="ev-t">
-          <option value="vat">🔵 부가세</option>
-          <option value="wht">🟠 원천세</option>
-          <option value="inc">🟢 종소세·법인세</option>
-          <option value="pay">🟣 지급명세서</option>
-        </select>
-      </div>
-      <div class="fld" style="margin-top:12px">
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px">
-          <input type="checkbox" id="ev-alert"> D-3일, 당일 앱 접속시 알림 표시
-        </label>
-      </div>
-    </div>
-    <div class="mo-foot">
-      <button class="btn btn-s" onclick="closeCalEv()">취소</button>
-      <button class="btn btn-p" onclick="saveCalEv()">저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== CALENDAR MANAGE MODAL ===== -->
-<div class="mo" id="moCalMgr" style="display:none" onclick="if(event.target===this)closeCalMgr()">
-  <div class="mo-box" style="max-width:600px">
-    <div class="mo-hdr">
-      <div class="mo-ttl">📋 일정 관리</div>
-      <button class="mo-x" onclick="closeCalMgr()">✕</button>
-    </div>
-    <div class="mo-body">
-      <div class="al al-i" style="margin-bottom:12px">기본 내장 일정은 수정/삭제 불가. 추가한 일정만 관리 가능합니다.</div>
-      <div id="calMgrList"></div>
-    </div>
-  </div>
-</div>
-
-</body>
-</html>
+  
