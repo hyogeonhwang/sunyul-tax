@@ -196,7 +196,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <label>비밀번호</label>
       <input type="password" id="lPw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')login()">
     </div>
-    <button class="btn-login" id="loginBtn">로그인</button>
+    <button class="btn-login" id="loginBtn" onclick="login()">로그인</button>
     <div class="login-err" id="lErr"></div>
   </div>
 </div>
@@ -645,14 +645,6 @@ let calY=new Date().getFullYear(), calM=new Date().getMonth();
 
 // =================== AUTH ===================
 // 페이지 열 때 항상 로그인 화면 표시 (자동로그인 방지)
-auth.signOut();
-
-// 로그인 버튼 이벤트 리스너 (onclick 대신 addEventListener 사용)
-document.addEventListener('DOMContentLoaded', function(){
-  var btn = document.getElementById('loginBtn');
-  if(btn) btn.addEventListener('click', login);
-});
-
 auth.onAuthStateChanged(u=>{
   if(u){
     ME=u;
