@@ -626,8 +626,7 @@ const FC = {
 firebase.initializeApp(FC);
 const db = firebase.firestore();
 const auth = firebase.auth();
-// 로그인 상태 설정
-try { auth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch(e) { console.warn('Persistence:', e); }
+
 
 // =================== GLOBALS ===================
 let ME = null, ROLE = 'staff';
