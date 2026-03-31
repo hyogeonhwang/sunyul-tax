@@ -1417,4 +1417,20 @@ function renderDash(){
         <span class="${cl}" style="font-size:12px;font-weight:700">${m}/${e.d} (D-${dl})</span>
       </div>`;
     }).join(''):'<div class="muted" style="text-align:center;padding:22px">이번달 남은 마감일이 없습니다</div>';
-  
+  }
+
+  const me=document.getElementById('dashMy');
+  if(me){
+    const myList=ROLE==='admin'
+      ?ALL.filter(c=>c.status==='활성').slice(0,6)
+      :ALL.filter(c=>c.manager===info.name&&c.status==='활성').slice(0,6);
+    me.innerHTML=myList.length?myList.map(c=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f6fa;cursor:pointer" onclick="go('clients')">
+        <span style="font-size:13px;font-weight:600">${c.name}</span>
+        ${tb_type(c.type)}
+      </div>`).join(''):'<div class="muted" style="text-align:center;padding:22px">담당 거래처가 없습니다</div>';
+  }
+}
+</script>
+</body>
+</html>
