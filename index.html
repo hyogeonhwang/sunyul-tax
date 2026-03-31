@@ -407,11 +407,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <table style="width:100%">
           <thead><tr><th>이름</th><th>이메일</th><th>권한</th><th>직책</th></tr></thead>
           <tbody>
-            <tr><td>황효건</td><td>hg@sunyul.com</td><td><span class="bdg bdg-corp">관리자</span></td><td>대표세무사</td></tr>
-            <tr><td>김서지</td><td>sj@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>안지윤</td><td>jy@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>유승희</td><td>sh@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
-            <tr><td>김희진</td><td>hj@sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>황효건</td><td>hg[at]sunyul.com</td><td><span class="bdg bdg-corp">관리자</span></td><td>대표세무사</td></tr>
+            <tr><td>김서지</td><td>sj[at]sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>안지윤</td><td>jy[at]sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>유승희</td><td>sh[at]sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
+            <tr><td>김희진</td><td>hj[at]sunyul.com</td><td><span class="bdg bdg-gen">직원</span></td><td>세무사</td></tr>
           </tbody>
         </table>
         <div class="al al-w" style="margin-top:16px">
@@ -630,13 +630,13 @@ const auth = firebase.auth();
 
 // =================== GLOBALS ===================
 let ME = null, ROLE = 'staff';
-const ADMIN_EMAIL = 'hg@sunyul.com'; // 대표 전용 — 이 이메일만 관리자 권한
+const ADMIN_EMAIL = 'hg'+'@'+'sunyul.com'; // 대표 전용 — 이 이메일만 관리자 권한
 const USERS = {
-  'hg@sunyul.com':{name:'황효건',role:'admin',title:'대표세무사'},
-  'sj@sunyul.com':{name:'김서지',role:'staff',title:'세무사'},
-  'jy@sunyul.com':{name:'안지윤',role:'staff',title:'세무사'},
-  'sh@sunyul.com':{name:'유승희',role:'staff',title:'세무사'},
-  'hj@sunyul.com':{name:'김희진',role:'staff',title:'세무사'},
+  'hg'+'@'+'sunyul.com':{name:'황효건',role:'admin',title:'대표세무사'},
+  'sj'+'@'+'sunyul.com':{name:'김서지',role:'staff',title:'세무사'},
+  'jy'+'@'+'sunyul.com':{name:'안지윤',role:'staff',title:'세무사'},
+  'sh'+'@'+'sunyul.com':{name:'유승희',role:'staff',title:'세무사'},
+  'hj'+'@'+'sunyul.com':{name:'김희진',role:'staff',title:'세무사'},
 };
 let ALL=[], TMPLS=[], platRows=[], editCId=null, editTId=null, selTI=-1;
 let cType='전체', pyTab='monthly';
