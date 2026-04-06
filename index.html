@@ -395,6 +395,15 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 .tbtn.act{background:#fff;color:#1A3169;border-color:#c8d4ff;border-bottom-color:#fff;position:relative;top:1px}
 .tbtn .tclose{opacity:.45;font-size:12px;padding:0 2px;border-radius:3px}
 .tbtn .tclose:hover{opacity:1;color:#e74c3c}
+
+.toast-wrap{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#1A3169;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;
+  box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transform:translateY(10px);
+  transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:#27ae60}
+.toast.error{background:#e74c3c}
+.toast.warn{background:#e67e22}
 </style>
 </head>
 <body>
@@ -2319,6 +2328,7 @@ async function savePyInstant(docId,key,val,cbEl){
 
 async function savePy(docId,key,val){
   await db.collection('payrollChecks').doc(docId).set({[key]:val},{merge:true});
+  if(val===true) showToast('✅ 지급명세서 체크 저장!');
 }
 
 // =================== KAKAO ===================
@@ -2548,11 +2558,13 @@ async function saveCalEvent(){
   const data={date,lbl,type:calType,color:calColor};
   if(editCalId) await db.collection('calEvents').doc(editCalId).update(data);
   else await db.collection('calEvents').add(data);
+  showToast('✅ 일정 저장 완료!');
   closeCalModal();
 }
 async function delCalEvent(){
   if(!editCalId||!confirm('이 일정을 삭제하시겠습니까?')) return;
   await db.collection('calEvents').doc(editCalId).delete();
+  showToast('🗑️ 일정 삭제 완료!', 'warn');
   closeCalModal();
 }
 
@@ -3674,8 +3686,9 @@ function delClientFromModal(){
   if(!confirm('⚠️ "'+name+'" 거래처를 삭제하시겠습니까?\n\n삭제하면 복구할 수 없습니다.')) return;
   if(!confirm('정말로 삭제하시겠습니까?\n\n[ '+name+' ]')) return;
   db.collection('clients').doc(editCId).delete().then(function(){
+    showToast('🗑️ 거래처 삭제 완료!', 'warn');
     closeClient();
-  }).catch(function(e){ alert('삭제 실패: '+e.message); });
+  }).catch(function(e){ showToast('❌ 삭제 실패: '+e.message,'error'); });
 }
 
 
@@ -4011,6 +4024,7 @@ async function saveSalaryInstant(docId,key,val,cbEl){
 
 async function saveSalary(docId,key,val){
   await db.collection('salaryChecks').doc(docId).set({[key]:val},{merge:true});
+  if(key&&key.endsWith('_done')&&val) showToast('✅ 급여작성 완료 저장!');
 }
 
 
@@ -4104,6 +4118,25 @@ async function checkSalaryAlerts(){
       prevWrap.style.display='none';
     }
   }
+}
+
+
+// =================== 토스트 ===================
+function showToast(msg, type, duration){
+  type=type||'success'; duration=duration||2000;
+  var wrap=document.getElementById('toastWrap');
+  if(!wrap) return;
+  var t=document.createElement('div');
+  t.className='toast '+type;
+  t.textContent=msg;
+  wrap.appendChild(t);
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ t.classList.add('show'); });
+  });
+  setTimeout(function(){
+    t.classList.remove('show');
+    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 300);
+  }, duration);
 }
 
 </script>
