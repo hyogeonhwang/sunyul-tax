@@ -1447,6 +1447,8 @@ function init(){
   loadCalEvents();
   updateTxPeriod();
   loadBizDataFromDB();
+  // 자동 스냅샷 저장 (매일 첫 로그인 시)
+  sunyulTaxAutoSnapshot();
   // 신고체크 탭 초기값 all로
   openTabs=['dashboard']; curPage='dashboard';
   renderTabs();
@@ -1585,6 +1587,30 @@ function closeTab(page){
 }
 
 // =================== CLIENTS ===================
+async function sunyulTaxAutoSnapshot(){
+  try{
+    const now=new Date();
+    const key='sunyul_tax_snapshot_'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    if(localStorage.getItem(key))return; // 오늘 이미 저장됨
+    // 주요 컬렉션 읽기
+    const [clients,templates,calEvents]=await Promise.all([
+      db.collection('clients').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))),
+      db.collection('templates').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))).catch(()=>[]),
+      db.collection('calEvents').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))).catch(()=>[])
+    ]);
+    localStorage.setItem(key,JSON.stringify({clients,templates,calEvents,savedAt:now.toISOString()}));
+    // 7일 이전 스냅샷 삭제
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('sunyul_tax_snapshot_')){
+        const d=new Date(k.replace('sunyul_tax_snapshot_',''));
+        if((now-d)>7*24*60*60*1000){localStorage.removeItem(k);i--;}
+      }
+    }
+    console.log('선율택스 스냅샷 저장 완료:', key);
+  }catch(e){console.warn('선율택스 스냅샷 저장 실패:',e);}
+}
+
 function loadClients(){
   db.collection('clients').orderBy('no').onSnapshot(snap=>{
     ALL=snap.docs.map(d=>({id:d.id,...d.data()}));
