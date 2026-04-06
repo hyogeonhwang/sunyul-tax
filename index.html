@@ -3770,23 +3770,30 @@ async function saveTaxRecv(key, cid, val){
 var _crossAlerts=[];
 
 async function runCrossCheck(){
-  var yr=new Date().getFullYear().toString();
-  var curM=new Date().getMonth()+1;
-  var isSemiM=curM===1||curM===7; // 반기 신고월
+  var now=new Date();
+  var yr=now.getFullYear().toString();
+  var curM=now.getMonth()+1;
+  var isSemiM=curM===1||curM===7;
 
-  // 데이터 병렬 로드
-  var [whtDoc,pyMonDoc,pySemiDoc,pyAnnDoc,salDoc]=await Promise.all([
+  // 전달 계산 (지급명세서는 익월말일까지)
+  var prevM=curM===1?12:curM-1;
+  var prevYr=curM===1?(parseInt(yr)-1).toString():yr;
+
+  // 데이터 병렬 로드 (이번달 + 전달 급여 + 이번달 지급명세서)
+  var [whtDoc,pyMonDoc,pySemiDoc,pyAnnDoc,salDoc,prevSalDoc]=await Promise.all([
     db.collection('taxChecks').doc('tax_'+yr+'_wht_'+curM).get(),
     db.collection('payrollChecks').doc(yr+'_monthly').get(),
     db.collection('payrollChecks').doc(yr+'_semi').get(),
     db.collection('payrollChecks').doc(yr+'_annual').get(),
-    db.collection('salaryChecks').doc('salary_'+yr+'_'+curM).get()
+    db.collection('salaryChecks').doc('salary_'+yr+'_'+curM).get(),
+    db.collection('salaryChecks').doc('salary_'+prevYr+'_'+prevM).get()
   ]);
   var whtChk=whtDoc.exists?whtDoc.data():{};
   var pyMon=pyMonDoc.exists?pyMonDoc.data():{};
   var pySemi=pySemiDoc.exists?pySemiDoc.data():{};
   var pyAnn=pyAnnDoc.exists?pyAnnDoc.data():{};
   var salChk=salDoc.exists?salDoc.data():{};
+  var prevSalChk=prevSalDoc.exists?prevSalDoc.data():{};
 
   _crossAlerts=[];
 
@@ -3794,42 +3801,52 @@ async function runCrossCheck(){
     var ps=c.payrollSettings||{};
     var alerts=[];
 
-    // 급여 있는 업체 기준 (whtYn=Y)
     if(c.whtYn==='Y'){
-      var salDone=salChk[c.id+'_done'];
+      var salDone=salChk[c.id+'_done'];       // 이번달 급여완료
+      var prevSalDone=prevSalChk[c.id+'_done']; // 전달 급여완료
       var whtDone=whtChk[c.id]&&whtChk[c.id].done;
 
-      // ① 급여작성 미완료
+      // ① 이번달 급여작성 미완료
       if(!salDone){
-        alerts.push('급여작성 미완료 (급여일: '+(c.salaryDay||'미설정')+')');
+        alerts.push(curM+'월 급여작성 미완료 (급여일: '+(c.salaryDay||'미설정')+')');
       }
 
-      // ② 급여작성 완료인데 원천세 신고 누락
+      // ② 이번달 급여완료 → 원천세 신고 누락
       if(salDone&&!whtDone){
-        alerts.push('급여작성 완료 → 원천세 신고 누락');
+        alerts.push(curM+'월 급여완료 → 원천세 신고 누락');
       }
 
-      // ③ 일용직: 급여작성 완료인데 지급명세서 미제출
+      // ③ 이번달 급여완료 → 이번달 지급명세서 미제출 (일용직)
       if(salDone&&ps.daily){
-        var pyDone=pyMon[c.id+'_일용직_'+curM];
-        if(!pyDone) alerts.push('일용직 지급명세서 미제출 ('+curM+'월)');
+        if(!pyMon[c.id+'_일용직_'+curM])
+          alerts.push(curM+'월 일용직 지급명세서 미제출');
       }
 
-      // ④ 사업소득: 급여작성 완료인데 지급명세서 미제출
+      // ④ 이번달 급여완료 → 이번달 지급명세서 미제출 (사업소득)
       if(salDone&&ps.biz){
-        var pyDone=pyMon[c.id+'_사업소득_'+curM];
-        if(!pyDone) alerts.push('사업소득 지급명세서 미제출 ('+curM+'월)');
+        if(!pyMon[c.id+'_사업소득_'+curM])
+          alerts.push(curM+'월 사업소득 지급명세서 미제출');
       }
 
-      // ⑤ 근로소득 반기: 반기 신고월인데 지급명세서 미제출
+      // ⑤ 전달 급여완료 → 전달 지급명세서 미제출 (제출기한: 이번달 말일)
+      if(prevSalDone&&ps.daily){
+        if(!pyMon[c.id+'_일용직_'+prevM])
+          alerts.push(prevM+'월 일용직 지급명세서 미제출 ('+curM+'월 말일까지)');
+      }
+      if(prevSalDone&&ps.biz){
+        if(!pyMon[c.id+'_사업소득_'+prevM])
+          alerts.push(prevM+'월 사업소득 지급명세서 미제출 ('+curM+'월 말일까지)');
+      }
+
+      // ⑥ 근로소득 반기: 반기 신고월인데 지급명세서 미제출
       if(isSemiM&&ps.labor){
         var semiIdx=curM===7?'1':'2';
-        var semiDone=pySemi[c.id+'_'+semiIdx];
-        if(!semiDone) alerts.push('근로소득 반기 지급명세서 미제출');
+        if(!pySemi[c.id+'_'+semiIdx])
+          alerts.push('근로소득 반기 지급명세서 미제출');
       }
     }
 
-    // 연간 지급명세서 (3월 이전 체크)
+    // 연간 지급명세서 (3월 이전)
     if(curM<=3){
       if(ps.abiz&&!pyAnn[c.id+'_abiz']) alerts.push('사업소득 연간 지급명세서 미제출 (3/10 마감)');
       if(ps.alabor&&!pyAnn[c.id+'_alabor']) alerts.push('근로소득 연간 지급명세서 미제출 (3/10 마감)');
