@@ -1039,6 +1039,15 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </label>
           </div>
         </div>
+        <div class="fr" style="margin-bottom:8px">
+          <div class="fld">
+            <label>원천세 납부방식</label>
+            <select class="fi" id="f-wsemi2">
+              <option value="N">매월 납부</option>
+              <option value="Y">반기 납부 (1/7월)</option>
+            </select>
+          </div>
+        </div>
         <div class="fr" id="whtSepDiv" style="display:none">
           <div class="fld">
             <label>원천세 담당자 <span style="color:#C9A84C;font-size:11px">별도 지정</span></label>
@@ -1049,13 +1058,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <option value="안지윤">안지윤</option>
               <option value="유승희">유승희</option>
               <option value="김희진">김희진</option>
-            </select>
-          </div>
-          <div class="fld">
-            <label>원천세 납부방식</label>
-            <select class="fi" id="f-wsemi2">
-              <option value="N">매월 납부</option>
-              <option value="Y">반기 납부</option>
             </select>
           </div>
         </div>
@@ -1447,8 +1449,6 @@ function init(){
   loadCalEvents();
   updateTxPeriod();
   loadBizDataFromDB();
-  // 자동 스냅샷 저장 (매일 첫 로그인 시)
-  sunyulTaxAutoSnapshot();
   // 신고체크 탭 초기값 all로
   openTabs=['dashboard']; curPage='dashboard';
   renderTabs();
@@ -1587,30 +1587,6 @@ function closeTab(page){
 }
 
 // =================== CLIENTS ===================
-async function sunyulTaxAutoSnapshot(){
-  try{
-    const now=new Date();
-    const key='sunyul_tax_snapshot_'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-    if(localStorage.getItem(key))return; // 오늘 이미 저장됨
-    // 주요 컬렉션 읽기
-    const [clients,templates,calEvents]=await Promise.all([
-      db.collection('clients').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))),
-      db.collection('templates').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))).catch(()=>[]),
-      db.collection('calEvents').get().then(s=>s.docs.map(d=>({id:d.id,...d.data()}))).catch(()=>[])
-    ]);
-    localStorage.setItem(key,JSON.stringify({clients,templates,calEvents,savedAt:now.toISOString()}));
-    // 7일 이전 스냅샷 삭제
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&k.startsWith('sunyul_tax_snapshot_')){
-        const d=new Date(k.replace('sunyul_tax_snapshot_',''));
-        if((now-d)>7*24*60*60*1000){localStorage.removeItem(k);i--;}
-      }
-    }
-    console.log('선율택스 스냅샷 저장 완료:', key);
-  }catch(e){console.warn('선율택스 스냅샷 저장 실패:',e);}
-}
-
 function loadClients(){
   db.collection('clients').orderBy('no').onSnapshot(snap=>{
     ALL=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1787,16 +1763,28 @@ async function saveClient(){
   ['daily','biz','labor','abiz','alabor','retire','int','div','other'].forEach(k=>{
     const el=document.getElementById('ps-'+k); if(el) ps[k]=el.checked;
   });
+  // 업종코드
+  var bizCodeVal=v('f-bizcode')||'';
+  // 급여일 (기타면 숫자 입력값 사용)
+  var salDaySel=v('f-salary-day');
+  var salDayVal=salDaySel==='기타'?(v('f-salary-day-other')+'일'):salDaySel;
+
   const data={
     name,type:v('f-type'),rep:v('f-rep'),bizNo:v('f-biz'),ssn:v('f-ssn'),
     contract:v('f-ct'),manager:v('f-mgr'),fee:v('f-fee')||0,
     phone:v('f-phone'),mobile:v('f-mobile'),email:v('f-email'),
     status:v('f-stat'),addr:v('f-addr'),ntsId:v('f-nid'),ntsPw:v('f-npw'),
-    posContact:v('f-pos'),bizStart:v('f-bst'),vatType:v('f-vtype'),
+    posContact:v('f-pos'),bizStart:v('f-bst'),
+    bizCode:bizCodeVal,
+    endDate:v('f-enddate')||'',
+    vatType:v('f-vtype'),
     vatCycle:v('f-vcycle'),
     whtSep:document.getElementById('f-wht-sep')?.checked||false,
     whtManager:document.getElementById('f-wht-sep')?.checked?v('f-wm2'):'',
-    whtSemi:document.getElementById('f-wht-sep')?.checked?v('f-wsemi2'):'N',
+    whtSemi:v('f-wsemi2')||'N',
+    whtYn:v('f-wht-yn')||'N',
+    salaryDay:salDayVal||'',
+    salaryFixed:document.getElementById('f-salary-fixed')?.checked||false,
     payrollSettings:ps,platforms:platRows,memo:v('f-memo'),
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()
   };
