@@ -495,6 +495,43 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <!-- ===== DASHBOARD ===== -->
     <div id="pg-dashboard" class="pg">
       <div class="stats-row" id="dashStats"></div>
+
+      <!-- 오늘 급여처리 알림 -->
+      <div id="today-salary-wrap" style="margin-bottom:12px;display:none">
+        <div class="card" style="border-left:4px solid #1A3169;padding:14px 18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:15px">💰</span>
+            <span style="font-weight:700;color:#1A3169;font-size:14px">오늘 급여처리 대상 업체</span>
+          </div>
+          <div id="today-salary-body" style="font-size:13px"></div>
+        </div>
+      </div>
+
+      <!-- 전달 미처리 알림 -->
+      <div id="prev-salary-wrap" style="margin-bottom:12px;display:none">
+        <div class="card" style="border-left:4px solid #e67e22;padding:14px 18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:15px">⏰</span>
+            <span style="font-weight:700;color:#e67e22;font-size:14px">전달 급여 미처리 업체</span>
+          </div>
+          <div id="prev-salary-body" style="font-size:13px"></div>
+        </div>
+      </div>
+
+      <!-- 누락 위험 알림 -->
+      <div id="cross-alert-wrap" style="margin-bottom:12px;display:none">
+        <div class="card" style="border-left:4px solid #e74c3c;padding:14px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px">⚠️</span>
+              <span style="font-weight:700;color:#e74c3c;font-size:14px">누락 위험 항목</span>
+            </div>
+            <button class="btn btn-s btn-sm" onclick="runCrossCheck();checkSalaryAlerts()">🔄 다시 확인</button>
+          </div>
+          <div id="cross-alert-body" style="font-size:13px"></div>
+        </div>
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="card">
           <div class="card-hdr"><div class="card-ttl">📅 이번달 주요 마감</div></div>
@@ -1546,7 +1583,7 @@ function go(page){
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
   if(page==='calendar') renderCal();
-  if(page==='dashboard'){renderDash();runCrossCheck();checkSalaryAlerts();}
+  if(page==='dashboard'){renderDash();if(ALL.length){runCrossCheck();checkSalaryAlerts();}}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='staff'){loadStaffPage();}
@@ -1595,6 +1632,11 @@ function loadClients(){
     fillKkSelect();
     renderDash();
     document.getElementById('cLd').style.display='none';
+    // ALL 로드 완료 후 크로스체크 실행
+    if(curPage==='dashboard'){
+      runCrossCheck();
+      checkSalaryAlerts();
+    }
   });
 }
 
@@ -3801,14 +3843,22 @@ async function runCrossCheck(){
     var ps=c.payrollSettings||{};
     var alerts=[];
 
-    if(c.whtYn==='Y'){
-      var salDone=salChk[c.id+'_done'];       // 이번달 급여완료
-      var prevSalDone=prevSalChk[c.id+'_done']; // 전달 급여완료
+    // whtYn=Y 이거나 payrollSettings에 항목이 있으면 급여 업체로 간주
+    var hasPayroll=c.whtYn==='Y'||(ps.daily||ps.biz||ps.labor);
+    if(hasPayroll){
+      var salDone=salChk[c.id+'_done'];
+      var prevSalDone=prevSalChk[c.id+'_done'];
       var whtDone=whtChk[c.id]&&whtChk[c.id].done;
 
-      // ① 이번달 급여작성 미완료
-      if(!salDone){
-        alerts.push(curM+'월 급여작성 미완료 (급여일: '+(c.salaryDay||'미설정')+')');
+      // ① 이번달 급여작성 미완료 - 급여일이 지난 후에만 경고
+      if(c.whtYn==='Y'&&!salDone){
+        var salDay=c.salaryDay||'';
+        var dueDay=0;
+        if(salDay==='말일') dueDay=new Date(now.getFullYear(),curM,0).getDate(); // 이번달 말일
+        else dueDay=parseInt(salDay)||0;
+        if(dueDay>0&&now.getDate()>dueDay){
+          alerts.push(curM+'월 급여작성 미완료 (급여일 '+salDay+' 경과)');
+        }
       }
 
       // ② 이번달 급여완료 → 원천세 신고 누락
