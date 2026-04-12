@@ -505,18 +505,35 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
     <!-- ===== DASHBOARD ===== -->
     <div id="pg-dashboard" class="pg">
+      <!-- 상단 요약 카드 -->
       <div class="stats-row" id="dashStats"></div>
+
+      <!-- 메인 2컬럼 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="card">
-          <div class="card-hdr"><div class="card-ttl">📅 이번달 주요 마감</div></div>
-          <div id="dashDL"></div>
-        </div>
-        <div class="card">
-          <div class="card-hdr">
-            <div class="card-ttl">📌 내 담당 거래처</div>
-            <button class="btn btn-s btn-sm" onclick="go('clients')">전체보기</button>
+        <!-- 왼쪽: 긴급처리 + 마감일정 -->
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-hdr"><div class="card-ttl">⚡ 긴급 처리</div></div>
+            <div id="dashUrgent"><div style="text-align:center;padding:16px"><div class="sp"></div></div></div>
           </div>
-          <div id="dashMy"></div>
+          <div class="card">
+            <div class="card-hdr"><div class="card-ttl">📅 이번달 마감</div></div>
+            <div id="dashDL"></div>
+          </div>
+        </div>
+        <!-- 오른쪽: 처리현황 + 담당자별 -->
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-hdr">
+              <div class="card-ttl">📊 처리 현황</div>
+              <span id="dash-month-lbl" style="font-size:12px;color:#889"></span>
+            </div>
+            <div id="dashStatus"></div>
+          </div>
+          <div class="card" id="dashMgrCard">
+            <div class="card-hdr"><div class="card-ttl">👥 담당자별 현황</div></div>
+            <div id="dashMgr"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1870,9 +1887,7 @@ function resetAllState(){
 
   // ⑧ 크로스체크 초기화
   _crossAlerts=[];
-  var caw=document.getElementById('cross-alert-wrap'); if(caw) caw.style.display='none';
-  var tsw=document.getElementById('today-salary-wrap'); if(tsw) tsw.style.display='none';
-  var psw=document.getElementById('prev-salary-wrap'); if(psw) psw.style.display='none';
+
 
   // ⑨ 캘린더 현재 월로 리셋
   var now=new Date();
