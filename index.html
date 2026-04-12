@@ -5294,4 +5294,188 @@ function initSendCenter(){
   }
 }
 
+
+// =================== 예정고지 ===================
+var GOJI_DATA = {};
+var GOJI_YEAR = '2026';
+var GOJI_TYPE = 'vat1';
+
+function initGoji(){
+  var yr = document.getElementById('goji-year');
+  if(yr) GOJI_YEAR = yr.value;
+  var tp = document.getElementById('goji-type');
+  if(tp) GOJI_TYPE = tp.value;
+  var mgrSel = document.getElementById('goji-mgr');
+  if(mgrSel) mgrSel.style.display = ROLE==='admin'?'block':'none';
+  if(ROLE==='admin' && mgrSel){
+    mgrSel.innerHTML = '<option value="">전체 담당자</option>'
+      + STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+  }
+}
+
+async function loadGoji(){
+  GOJI_YEAR = document.getElementById('goji-year')?.value || '2026';
+  GOJI_TYPE = document.getElementById('goji-type')?.value || 'vat1';
+  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  var tmplDoc = await db.collection('gojiData').doc('_tmpl').get();
+  if(tmplDoc.exists && tmplDoc.data().smsTmpl){
+    var el = document.getElementById('goji-tmpl');
+    if(el && !el.value) el.value = tmplDoc.data().smsTmpl;
+  }
+  var doc = await db.collection('gojiData').doc(key).get();
+  GOJI_DATA = doc.exists ? doc.data() : {};
+  renderGoji();
+}
+
+function renderGoji(){
+  var q = (document.getElementById('goji-search')?.value||'').toLowerCase();
+  var mgrF = document.getElementById('goji-mgr')?.value||'';
+  var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var clrBtn = document.getElementById('goji-search-clr');
+  if(clrBtn) clrBtn.style.display = q?'block':'none';
+
+  // 매칭된 업체 (GOJI_DATA에 amt가 있는 업체)
+  var matched = ALL.filter(function(c){
+    if(!GOJI_DATA[c.id]?.amt) return false;
+    if(myName&&c.manager!==myName) return false;
+    if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
+    if(q&&!(c.name||'').toLowerCase().includes(q)&&!(c.bizNo||'').includes(q)) return false;
+    return true;
+  });
+
+  // 미매칭 (GOJI_DATA에 있는데 ALL에 없는 것)
+  var unmatched = Object.keys(GOJI_DATA).filter(function(k){
+    if(k==='_tmpl') return false;
+    if(!GOJI_DATA[k].amt) return false;
+    if(GOJI_DATA[k]._unmatched) return true;
+    return false;
+  });
+
+  var sent = matched.filter(function(c){return GOJI_DATA[c.id]?.sent;}).length;
+  var sumEl = document.getElementById('goji-summary');
+  if(sumEl) sumEl.innerHTML =
+    '<span style="background:#E6F1FB;border-radius:20px;padding:3px 8px;font-size:10px;color:#185FA5">매칭 <b>'+matched.length+'개</b></span>'
+    +(unmatched.length?'<span style="background:#FCEBEB;border-radius:20px;padding:3px 8px;font-size:10px;color:#A32D2D">미매칭 <b>'+unmatched.length+'개</b></span>':'')
+    +'<span style="background:#EAF3DE;border-radius:20px;padding:3px 8px;font-size:10px;color:#3B6D11">발송완료 <b>'+sent+'개</b></span>'
+    +'<span style="background:#FAEEDA;border-radius:20px;padding:3px 8px;font-size:10px;color:#854F0B">미발송 <b>'+(matched.length-sent)+'개</b></span>';
+
+  var el = document.getElementById('goji-body');
+  if(!el) return;
+
+  if(!matched.length && !unmatched.length){
+    el.innerHTML = '<div class="es"><div class="es-ic">📨</div><div>엑셀을 업로드하면 매칭된 업체가 표시됩니다</div></div>';
+    updateGojiCount();
+    return;
+  }
+
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f7f8fb">'
+    +'<th style="padding:8px 14px;width:36px"><input type="checkbox" id="goji-all-chk" onchange="gojiSelectAll(this.checked)"></th>'
+    +'<th style="padding:8px 10px;text-align:left;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">상호</th>'
+    +'<th style="padding:8px 10px;text-align:left;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">담당자</th>'
+    +'<th style="padding:8px 10px;text-align:left;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">사업자번호</th>'
+    +'<th style="padding:8px 10px;text-align:right;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">고지금액</th>'
+    +'<th style="padding:8px 10px;text-align:center;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">발송완료</th>'
+    +'<th style="padding:8px 10px;text-align:center;font-size:11px;color:#889;font-weight:500;border-bottom:0.5px solid #f0f2f7">상태</th>'
+    +'</tr></thead><tbody>';
+
+  matched.forEach(function(c){
+    var d = GOJI_DATA[c.id]||{};
+    var amt = d.amt ? Number(d.amt).toLocaleString() : '';
+    var sentStyle = d.sent ? 'opacity:0.55' : '';
+    html += '<tr style="border-bottom:0.5px solid #f5f6fa;'+sentStyle+'">'
+      +'<td style="padding:8px 14px"><input type="checkbox" class="goji-chk" data-cid="'+c.id+'" '+(d.sent?'':'checked')+' onchange="updateGojiCount()"></td>'
+      +'<td style="padding:8px 10px"><div style="font-weight:600;color:#1A3169;font-size:13px">'+c.name+'</div></td>'
+      +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.manager||'-')+'</td>'
+      +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.bizNo||'-')+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-weight:600;color:#185FA5">'+amt+'원</td>'
+      +'<td style="padding:8px 10px;text-align:center"><input type="checkbox" data-goji-sent="'+c.id+'" '+(d.sent?'checked':'')+' onchange="gojiSentChange(this)"></td>'
+      +'<td style="padding:8px 10px;text-align:center">'
+      +(d.sent
+        ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11">발송완료</span>'
+        : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B">미발송</span>')
+      +'</td></tr>';
+  });
+
+  unmatched.forEach(function(k){
+    var d = GOJI_DATA[k]||{};
+    var amt = d.amt ? Number(d.amt).toLocaleString() : '';
+    html += '<tr style="border-bottom:0.5px solid #f5f6fa;background:#FCEBEB18">'
+      +'<td style="padding:8px 14px"></td>'
+      +'<td style="padding:8px 10px;color:#A32D2D;font-size:12px">미매칭 업체</td>'
+      +'<td style="padding:8px 10px;color:#A32D2D;font-size:11px">-</td>'
+      +'<td style="padding:8px 10px;color:#A32D2D;font-size:11px">'+(d.bizNo||k)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;color:#A32D2D">'+amt+'원</td>'
+      +'<td style="padding:8px 10px;text-align:center">-</td>'
+      +'<td style="padding:8px 10px;text-align:center"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FCEBEB;color:#A32D2D">미매칭</span></td>'
+      +'</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+  updateGojiCount();
+}
+
+async function gojiSentChange(el){
+  var cid = el.getAttribute('data-goji-sent');
+  var checked = el.checked;
+  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  await db.collection('gojiData').doc(key).set({[cid]:{...GOJI_DATA[cid],sent:checked}},{merge:true});
+  GOJI_DATA[cid] = {...(GOJI_DATA[cid]||{}), sent:checked};
+  renderGoji();
+}
+
+async function uploadGojiExcel(input){
+  var file = input.files[0];
+  if(!file) return;
+  showToast('📥 엑셀 분석 중...');
+  var data = await file.arrayBuffer();
+  var wb = XLSX.read(data, {type:'array'});
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+  var matched = 0, unmatched = 0;
+  var saveData = {};
+  var deadlines = {vat1:'4월 25일', vat2:'10월 25일', corp:'8월 31일', income:'11월 30일'};
+  var deadline = deadlines[GOJI_TYPE]||'';
+
+  rows.forEach(function(row){
+    // 사업자번호 형태 찾기 (숫자 10자리)
+    var bizNo = '', amt = 0;
+    row.forEach(function(cell){
+      var s = String(cell).replace(/[^0-9]/g,'');
+      if(s.length===10 && !bizNo) bizNo = s;
+      var n = parseFloat(String(cell).replace(/,/g,''));
+      if(!isNaN(n) && n>0 && n<100000000000 && n>1000) amt = Math.max(amt, n);
+    });
+    if(!bizNo || !amt) return;
+
+    // 앱 거래처 매칭
+    var client = ALL.find(function(c){
+      var cn = String(c.bizNo||'').replace(/[^0-9]/g,'');
+      return cn === bizNo;
+    });
+
+    if(client){
+      saveData[client.id] = {amt: amt, bizNo: bizNo, sent: false};
+      matched++;
+    } else {
+      saveData['_unmatched_'+bizNo] = {amt: amt, bizNo: bizNo, _unmatched: true};
+      unmatched++;
+    }
+  });
+
+  if(Object.keys(saveData).length === 0){
+    showToast('매칭된 업체가 없습니다. 엑셀 형식을 확인하세요.','warn');
+    return;
+  }
+
+  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  await db.collection('gojiData').doc(key).set(saveData, {merge:true});
+  GOJI_DATA = {...GOJI_DATA, ...saveData};
+  showToast('✅ 업로드 완료! 매칭 '+matched+'개'+(unmatched?' / 미매칭 '+unmatched+'개':''));
+  renderGoji();
+  input.value = '';
+}
+
 </script>
