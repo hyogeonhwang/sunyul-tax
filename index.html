@@ -487,7 +487,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <span class="nav-icon">🏖️</span> 연차관리
     </div>
     <div class="nav-item" id="nav-kakao" onclick="go('kakao')">
-      <span class="nav-icon">💬</span> 카톡 센터
+      <span class="nav-icon">📤</span> 발송 센터
     </div>
     <div class="nav-item" id="nav-calendar" onclick="go('calendar')">
       <span class="nav-icon">📅</span> 마감 캘린더
@@ -682,19 +682,122 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
     <!-- ===== KAKAO ===== -->
     <div id="pg-kakao" class="pg" style="display:none">
-      <div style="display:grid;grid-template-columns:300px 1fr;gap:16px">
-        <div class="card">
-          <div class="card-hdr">
-            <div class="card-ttl">💬 템플릿</div>
+      <div style="font-size:14px;font-weight:500;color:#1A3169;margin-bottom:14px">📤 발송 센터</div>
+
+      <!-- 탭 -->
+      <div style="display:flex;gap:0;border-bottom:0.5px solid #e8ecf4;margin-bottom:14px">
+        <div id="send-tab-general" onclick="switchSendTab('general')"
+          style="padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px">일반 안내</div>
+        <div id="send-tab-deadline" onclick="switchSendTab('deadline')"
+          style="padding:9px 18px;font-size:13px;cursor:pointer;color:#aab;border-bottom:2px solid transparent;margin-bottom:-0.5px">납부마감 안내</div>
+      </div>
+
+      <!-- 일반 안내 탭 -->
+      <div id="send-panel-general" style="display:grid;grid-template-columns:260px 1fr;gap:12px;min-height:480px">
+        <!-- 왼쪽: 템플릿 목록 -->
+        <div style="background:#f7f8fb;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:10px 12px;font-size:11px;font-weight:500;color:#889;border-bottom:0.5px solid #e8ecf4;display:flex;justify-content:space-between;align-items:center">
+            템플릿 목록
             <button class="btn btn-p btn-sm" onclick="openTmpl()">+ 추가</button>
           </div>
-          <div id="tmplList"></div>
+          <div id="tmplList" style="flex:1;overflow-y:auto"></div>
         </div>
-        <div class="card">
-          <div class="card-hdr"><div class="card-ttl">메시지 미리보기</div></div>
-          <div class="msg-pre" id="msgPre" style="min-height:200px">← 왼쪽에서 템플릿을 선택하세요.</div>
-          <button class="copy-btn" id="copyBtn" onclick="copyMsg()" style="margin-top:12px">📋 복사하기</button>
-          <div id="copyOk" style="text-align:center;font-size:12px;color:#27ae60;margin-top:6px;display:none">✅ 클립보드에 복사됐습니다!</div>
+
+        <!-- 오른쪽: 발송 설정 -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <!-- 문구 미리보기 -->
+          <div>
+            <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">문구 미리보기</div>
+            <div style="background:#FAE100;border-radius:10px;padding:14px;font-size:12px;line-height:1.8;color:#3A1D00;white-space:pre-wrap;position:relative;min-height:100px">
+              <span style="position:absolute;top:-8px;left:12px;font-size:14px">💬</span>
+              <div id="msgPre" style="margin-top:4px">← 왼쪽에서 템플릿을 선택하세요.</div>
+            </div>
+          </div>
+
+          <!-- 발송 대상 필터 -->
+          <div>
+            <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">발송 대상</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+              <select class="sel" id="send-mgr-filter" onchange="renderSendList()">
+                <option value="">전체 담당자</option>
+              </select>
+              <select class="sel" id="send-type-filter" onchange="renderSendList()">
+                <option value="">전체 업체</option>
+                <option value="법인">법인만</option>
+                <option value="개인">개인만</option>
+                <option value="vat">부가세 업체</option>
+                <option value="wht">원천세 업체</option>
+              </select>
+              <span style="font-size:11px;color:#889">→ 총 <b id="send-count" style="color:#1A3169">0</b>개 업체</span>
+              <label style="font-size:11px;color:#889;margin-left:auto;cursor:pointer;display:flex;align-items:center;gap:4px">
+                <input type="checkbox" id="send-select-all" onchange="sendSelectAll(this.checked)"> 전체선택
+              </label>
+            </div>
+            <!-- 업체 목록 -->
+            <div id="send-client-list" style="border:0.5px solid #e8ecf4;border-radius:8px;max-height:180px;overflow-y:auto"></div>
+          </div>
+
+          <!-- 발송 버튼 영역 -->
+          <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;background:#f7f8fb;border-radius:10px">
+            <div style="flex:1;font-size:11px;color:#889">
+              <span id="send-final-count" style="font-weight:600;color:#1A3169">0</span>개 업체에 문자 발송 예정<br>
+              <span style="font-size:10px">발신번호: 02-2038-6632 (세무법인 선율)</span>
+            </div>
+            <button class="btn btn-p btn-sm" style="background:#27ae60;border-color:#27ae60" onclick="sendGeneralSMS()">📱 문자 일괄 발송</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 납부마감 안내 탭 -->
+      <div id="send-panel-deadline" style="display:none;grid-template-columns:260px 1fr;gap:12px;min-height:480px">
+        <!-- 왼쪽: 신고 유형 -->
+        <div style="background:#f7f8fb;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:10px 12px;font-size:11px;font-weight:500;color:#889;border-bottom:0.5px solid #e8ecf4">신고 유형 선택</div>
+          <div id="deadline-type-list"></div>
+        </div>
+
+        <!-- 오른쪽 -->
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <!-- 문구 미리보기 + 수정 -->
+          <div>
+            <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              문구 미리보기
+              <button class="btn btn-s btn-sm" onclick="toggleDeadlineTmpl()">✏️ 문구 수정</button>
+            </div>
+            <div style="background:#FAE100;border-radius:10px;padding:14px;font-size:12px;line-height:1.8;color:#3A1D00;white-space:pre-wrap;position:relative;min-height:80px">
+              <span style="position:absolute;top:-8px;left:12px;font-size:14px">💬</span>
+              <div id="deadline-msg-pre" style="margin-top:4px">← 왼쪽에서 신고 유형을 선택하세요.</div>
+            </div>
+            <div id="deadline-tmpl-edit" style="display:none;margin-top:8px">
+              <textarea id="deadline-tmpl-txt" class="fi" rows="5" style="font-size:12px;line-height:1.7;resize:vertical;margin-bottom:6px"></textarea>
+              <div style="display:flex;gap:6px;justify-content:flex-end">
+                <button class="btn btn-s btn-sm" onclick="saveDeadlineTmpl()">💾 저장</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 업체 선택 -->
+          <div>
+            <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              <span>발송 대상 업체 <span style="color:#1A3169">(납부 있는 업체 선택)</span></span>
+              <label style="font-size:11px;color:#889;cursor:pointer;display:flex;align-items:center;gap:4px">
+                <input type="checkbox" id="deadline-select-all" onchange="deadlineSelectAll(this.checked)"> 전체선택
+              </label>
+            </div>
+            <div id="deadline-client-list" style="border:0.5px solid #e8ecf4;border-radius:8px;max-height:200px;overflow-y:auto">
+              <div style="text-align:center;padding:20px;color:#aab;font-size:12px">← 왼쪽에서 신고 유형을 선택하세요</div>
+            </div>
+            <div style="font-size:10px;color:#aab;margin-top:5px">체크 해제된 업체는 발송 제외됩니다</div>
+          </div>
+
+          <!-- 발송 버튼 -->
+          <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;background:#f7f8fb;border-radius:10px">
+            <div style="flex:1;font-size:11px;color:#889">
+              <span id="deadline-final-count" style="font-weight:600;color:#1A3169">0</span>개 업체에 문자 발송 예정<br>
+              <span style="font-size:10px">발신번호: 02-2038-6632 (세무법인 선율)</span>
+            </div>
+            <button class="btn btn-p btn-sm" style="background:#27ae60;border-color:#27ae60" onclick="sendDeadlineSMS()">📱 문자 일괄 발송</button>
+          </div>
         </div>
       </div>
     </div>
@@ -880,7 +983,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
     <!-- ===== 예정고지 ===== -->
     <div id="pg-goji" class="pg" style="display:none">
-      <div class="card">
+      <!-- 상단 필터 -->
+      <div class="card" style="margin-bottom:10px">
         <div class="card-hdr">
           <div class="card-ttl">📨 예정고지 관리</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -901,16 +1005,54 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <input type="file" id="gojiExcel" accept=".xlsx,.xls" style="display:none" onchange="uploadGojiExcel(this)">
           </div>
         </div>
-        <div style="position:relative;margin-bottom:12px">
-          <input class="si" id="goji-search" placeholder="🔍 업체명 검색..." oninput="renderGoji()" style="width:100%;padding-right:32px">
-          <span id="goji-search-clr" onclick="document.getElementById('goji-search').value='';renderGoji();this.style.display='none'"
-            style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
+      </div>
+
+      <!-- 문자 템플릿 설정 (접기/펼치기) -->
+      <div style="margin-bottom:10px;border:0.5px solid #e8ecf4;border-radius:10px;overflow:hidden">
+        <div onclick="toggleGojiTmpl()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f7f8fb;cursor:pointer">
+          <span style="font-size:12px;font-weight:600;color:#1A3169">📱 문자 템플릿 설정</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:10px;color:#aab">사용 가능 변수: {업체명} {금액} {납부기한}</span>
+            <span id="goji-tmpl-arrow" style="color:#aab;font-size:12px">▼</span>
+          </div>
         </div>
-        <div id="goji-summary" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap"></div>
-        <div style="margin-bottom:12px;padding:10px 14px;background:#f7f8fb;border-radius:8px">
-          <div style="font-size:11px;color:#889;margin-bottom:6px;font-weight:500">카톡 문구 템플릿 <span style="font-weight:400">(업체명·금액·납부기한 자동 치환)</span></div>
-          <textarea id="goji-tmpl" class="fi" rows="3" style="font-size:12px;line-height:1.6;resize:vertical" placeholder="문구 템플릿..."></textarea>
+        <div id="goji-tmpl-wrap" style="display:none;padding:12px 14px;background:#fff">
+          <textarea id="goji-tmpl" class="fi" rows="5" style="font-size:12px;line-height:1.7;resize:vertical;margin-bottom:8px"
+            placeholder="문자 템플릿을 입력하세요...">[세무법인 선율] 안녕하세요 {업체명} 대표님^^
+
+예정고지 금액은 {금액}원입니다.
+{납부기한}까지 납부 부탁드립니다 :)
+
+문의: 02-2038-6632</textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-s btn-sm" onclick="resetGojiTmpl()">기본값으로 초기화</button>
+            <button class="btn btn-p btn-sm" onclick="saveGojiTmpl()">💾 템플릿 저장</button>
+          </div>
         </div>
+      </div>
+
+      <!-- 요약 + 발송 버튼 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div id="goji-summary" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:11px;color:#889;display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="goji-select-all" onchange="gojiSelectAll(this.checked)"> 전체선택
+          </label>
+          <button class="btn btn-p btn-sm" id="goji-send-btn" onclick="sendGojiSMS()" style="background:#27ae60;border-color:#27ae60">
+            📱 선택 업체 문자 발송 (<span id="goji-selected-count">0</span>개)
+          </button>
+        </div>
+      </div>
+
+      <!-- 검색 -->
+      <div style="position:relative;margin-bottom:10px">
+        <input class="si" id="goji-search" placeholder="🔍 업체명 검색..." oninput="renderGoji()" style="width:100%;padding-right:32px">
+        <span id="goji-search-clr" onclick="document.getElementById('goji-search').value='';renderGoji();this.style.display='none'"
+          style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
+      </div>
+
+      <!-- 목록 -->
+      <div class="card" style="padding:0">
         <div id="goji-body"></div>
       </div>
     </div>
@@ -1744,7 +1886,7 @@ const PAGE_INFO={
   salary:{icon:'💰',lbl:'급여관리'},
   payroll:{icon:'📋',lbl:'지급명세서'},
   calc:{icon:'🧮',lbl:'세액계산기'},
-  kakao:{icon:'💬',lbl:'카톡 센터'},
+  kakao:{icon:'📤',lbl:'발송 센터'},
   profit:{icon:'📈',lbl:'중간손익'},
   goji:{icon:'📨',lbl:'예정고지'},
   calendar:{icon:'📅',lbl:'마감 캘린더'},
@@ -1769,6 +1911,7 @@ function go(page){
   if(page==='taxcheck'){loadTax();updateCrossWarnIcons();}
   if(page==='salary'){initSalaryMonth();renderSalary();}
   if(page==='goji'){initGoji();loadGoji();}
+  if(page==='kakao'){initSendCenter();}
   if(page==='profit'){initProfit();}
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
@@ -4773,6 +4916,282 @@ function toggleProfitLeft(){
     // 버튼을 오른쪽 패널에 붙이기
     var right=document.getElementById('profit-right-panel');
     if(right) right.appendChild(btn);
+  }
+}
+
+
+function toggleGojiTmpl(){
+  var wrap=document.getElementById('goji-tmpl-wrap');
+  var arrow=document.getElementById('goji-tmpl-arrow');
+  if(!wrap) return;
+  var open=wrap.style.display==='none';
+  wrap.style.display=open?'block':'none';
+  if(arrow) arrow.textContent=open?'▲':'▼';
+}
+
+async function saveGojiTmpl(){
+  var el=document.getElementById('goji-tmpl');
+  if(!el) return;
+  await db.collection('gojiData').doc('_tmpl').set({smsTmpl:el.value},{merge:true});
+  showToast('✅ 문자 템플릿 저장 완료!');
+}
+
+function resetGojiTmpl(){
+  var el=document.getElementById('goji-tmpl');
+  if(el) el.value='[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n\n예정고지 금액은 {금액}원입니다.\n{납부기한}까지 납부 부탁드립니다 :)\n\n문의: 02-2038-6632';
+}
+
+function gojiSelectAll(checked){
+  document.querySelectorAll('.goji-chk').forEach(function(el){el.checked=checked;});
+  var allChk=document.getElementById('goji-all-chk');
+  if(allChk) allChk.checked=checked;
+  updateGojiCount();
+}
+
+function updateGojiCount(){
+  var chks=document.querySelectorAll('.goji-chk:checked');
+  var cnt=chks.length;
+  var el=document.getElementById('goji-selected-count');
+  if(el) el.textContent=cnt;
+}
+
+async function sendGojiSMS(){
+  var chks=document.querySelectorAll('.goji-chk:checked');
+  if(!chks.length){showToast('발송할 업체를 선택하세요.','warn');return;}
+
+  var tmplEl=document.getElementById('goji-tmpl');
+  var tmpl=tmplEl?tmplEl.value:'[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n예정고지 금액은 {금액}원입니다.\n{납부기한}까지 납부 부탁드립니다 :)';
+
+  // 납부기한 자동 설정
+  var tp=document.getElementById('goji-type')?.value||'vat1';
+  var deadlines={vat1:'4월 25일',vat2:'10월 25일',corp:'8월 31일',income:'11월 30일'};
+  var deadline=deadlines[tp]||'';
+
+  // 발송 목록 구성
+  var targets=[];
+  chks.forEach(function(chk){
+    var cid=chk.dataset.cid;
+    var c=ALL.find(function(x){return x.id===cid;});
+    var d=GOJI_DATA[cid]||{};
+    if(c&&d.amt){
+      var amt=Number(d.amt).toLocaleString();
+      var msg=tmpl.replace(/{업체명}/g,c.name||'').replace(/{금액}/g,amt).replace(/{납부기한}/g,deadline);
+      var phone=(c.mobile||c.phone||'').replace(/[^0-9]/g,'');
+      targets.push({name:c.name,phone:phone,msg:msg,cid:cid});
+    }
+  });
+
+  var noPhone=targets.filter(function(t){return !t.phone;});
+  var withPhone=targets.filter(function(t){return t.phone;});
+
+  var confirmMsg='총 '+withPhone.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632 (세무법인 선율)';
+  if(noPhone.length) confirmMsg+='\n\n⚠️ 연락처 없는 업체 '+noPhone.length+'개는 제외됩니다:\n'+noPhone.map(function(t){return '· '+t.name;}).join('\n');
+  if(!confirm(confirmMsg)) return;
+
+  // 실제 발송 (발신번호 등록 후 활성화)
+  showToast('📱 문자 발송 기능은 발신번호 등록 후 활성화됩니다.','warn');
+  // TODO: SENS API 연동
+  // withPhone.forEach(async function(t){ await sendSENS(t.phone, t.msg); });
+}
+
+
+// =================== 발송 센터 ===================
+var SEND_SELECTED_TMPL = null;
+var DEADLINE_TYPES = [
+  {key:'wht', lbl:'원천세 납부마감', deadline:'매월 10일', filter:'wht'},
+  {key:'vatpre1', lbl:'부가세 1기 예정 납부', deadline:'4월 25일', filter:'vat'},
+  {key:'vat1', lbl:'부가세 1기 확정 납부', deadline:'7월 25일', filter:'vat'},
+  {key:'vatpre2', lbl:'부가세 2기 예정 납부', deadline:'10월 25일', filter:'vat'},
+  {key:'vat2', lbl:'부가세 2기 확정 납부', deadline:'1월 25일', filter:'vat'},
+  {key:'corp', lbl:'법인세 납부마감', deadline:'3월 31일', filter:'corp'},
+  {key:'income', lbl:'종합소득세 납부마감', deadline:'5월 31일', filter:'income'},
+];
+var DEADLINE_TMPL_DEFAULT = '[세무법인 선율] 안녕하세요 대표님^^\n\n{신고유형} 납부 마감일은\n{납부기한}입니다.\n\n납부 부탁드립니다 :)\n문의: 02-2038-6632';
+var SELECTED_DEADLINE_TYPE = null;
+var DEADLINE_TMPLS = {};
+
+function switchSendTab(tab){
+  var isGeneral = tab==='general';
+  document.getElementById('send-tab-general').style.cssText = isGeneral
+    ? 'padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px'
+    : 'padding:9px 18px;font-size:13px;cursor:pointer;color:#aab;border-bottom:2px solid transparent;margin-bottom:-0.5px';
+  document.getElementById('send-tab-deadline').style.cssText = !isGeneral
+    ? 'padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px'
+    : 'padding:9px 18px;font-size:13px;cursor:pointer;color:#aab;border-bottom:2px solid transparent;margin-bottom:-0.5px';
+  document.getElementById('send-panel-general').style.display = isGeneral?'grid':'none';
+  document.getElementById('send-panel-deadline').style.display = !isGeneral?'grid':'none';
+  if(!isGeneral) renderDeadlineTypes();
+}
+
+// ---- 일반 안내 ----
+function renderSendList(){
+  var mgrF = document.getElementById('send-mgr-filter')?.value||'';
+  var typeF = document.getElementById('send-type-filter')?.value||'';
+  var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+
+  var clients = ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(myName&&c.manager!==myName) return false;
+    if(mgrF&&c.manager!==mgrF) return false;
+    if(typeF==='법인') return c.type==='법인';
+    if(typeF==='개인') return c.type!=='법인';
+    if(typeF==='vat') return c.vatType==='일반'||c.type==='법인';
+    if(typeF==='wht') return c.whtYn==='Y';
+    return true;
+  });
+
+  var cnt=document.getElementById('send-count');
+  if(cnt) cnt.textContent=clients.length;
+
+  var list=document.getElementById('send-client-list');
+  if(!list) return;
+  list.innerHTML=clients.map(function(c){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
+      +'<input type="checkbox" class="send-chk" data-cid="'+c.id+'" checked onchange="updateSendCount()">'
+      +'<span style="flex:1;font-weight:500;color:#1A3169">'+c.name+'</span>'
+      +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
+      +'</div>';
+  }).join('');
+  updateSendCount();
+}
+
+function sendSelectAll(checked){
+  document.querySelectorAll('.send-chk').forEach(function(el){el.checked=checked;});
+  updateSendCount();
+}
+
+function updateSendCount(){
+  var cnt=document.querySelectorAll('.send-chk:checked').length;
+  var el=document.getElementById('send-final-count');
+  if(el) el.textContent=cnt;
+}
+
+async function sendGeneralSMS(){
+  var chks=document.querySelectorAll('.send-chk:checked');
+  if(!chks.length){showToast('발송할 업체를 선택하세요.','warn');return;}
+  var msg=document.getElementById('msgPre')?.textContent||'';
+  if(!msg||msg.includes('템플릿을 선택')){showToast('템플릿을 먼저 선택하세요.','warn');return;}
+  if(!confirm(chks.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
+  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
+  // TODO: SENS API 연동
+}
+
+// ---- 납부마감 안내 ----
+async function renderDeadlineTypes(){
+  // Firebase에서 저장된 템플릿 로드
+  var doc=await db.collection('sendCenter').doc('deadlineTmpls').get();
+  if(doc.exists) DEADLINE_TMPLS=doc.data();
+
+  var list=document.getElementById('deadline-type-list');
+  if(!list) return;
+  list.innerHTML=DEADLINE_TYPES.map(function(t){
+    return '<div onclick="selectDeadlineType(this.dataset.dtype)" data-dtype="'+t.key+'"'
+      +' style="padding:10px 12px;border-bottom:0.5px solid #e8ecf4;cursor:pointer;font-size:12px">'
+      +'<div style="font-weight:500;color:#1A3169">'+t.lbl+'</div>'
+      +'<div style="font-size:10px;color:#aab;margin-top:2px">마감: '+t.deadline+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function selectDeadlineType(key){
+  SELECTED_DEADLINE_TYPE=key;
+  // 하이라이트
+  document.querySelectorAll('[data-dtype]').forEach(function(el){
+    el.style.background=el.dataset.dtype===key?'#edf1ff':'';
+    el.style.borderLeft=el.dataset.dtype===key?'3px solid #1A3169':'';
+    el.querySelector('div').style.color=el.dataset.dtype===key?'#1A3169':'#1A3169';
+  });
+
+  var t=DEADLINE_TYPES.find(function(x){return x.key===key;});
+  if(!t) return;
+
+  // 문구 미리보기
+  var tmpl=DEADLINE_TMPLS[key]||DEADLINE_TMPL_DEFAULT;
+  var msg=tmpl.replace(/{신고유형}/g,t.lbl).replace(/{납부기한}/g,t.deadline);
+  var pre=document.getElementById('deadline-msg-pre');
+  if(pre) pre.textContent=msg;
+
+  // 템플릿 수정창에도 반영
+  var txt=document.getElementById('deadline-tmpl-txt');
+  if(txt) txt.value=tmpl;
+
+  // 업체 목록
+  renderDeadlineClients(t);
+}
+
+function renderDeadlineClients(t){
+  var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var clients=ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(myName&&c.manager!==myName) return false;
+    if(t.filter==='wht') return c.whtYn==='Y';
+    if(t.filter==='vat') return c.vatType==='일반'||c.type==='법인';
+    if(t.filter==='corp') return c.type==='법인';
+    if(t.filter==='income') return c.type!=='법인';
+    return true;
+  });
+
+  var list=document.getElementById('deadline-client-list');
+  if(!list) return;
+  list.innerHTML=clients.map(function(c){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
+      +'<input type="checkbox" class="deadline-chk" data-cid="'+c.id+'" checked onchange="updateDeadlineCount()">'
+      +'<span style="flex:1;font-weight:500;color:#1A3169">'+c.name+'</span>'
+      +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
+      +'</div>';
+  }).join('');
+  updateDeadlineCount();
+}
+
+function deadlineSelectAll(checked){
+  document.querySelectorAll('.deadline-chk').forEach(function(el){el.checked=checked;});
+  updateDeadlineCount();
+}
+
+function updateDeadlineCount(){
+  var cnt=document.querySelectorAll('.deadline-chk:checked').length;
+  var el=document.getElementById('deadline-final-count');
+  if(el) el.textContent=cnt;
+}
+
+function toggleDeadlineTmpl(){
+  var el=document.getElementById('deadline-tmpl-edit');
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function saveDeadlineTmpl(){
+  if(!SELECTED_DEADLINE_TYPE) return;
+  var txt=document.getElementById('deadline-tmpl-txt')?.value||'';
+  DEADLINE_TMPLS[SELECTED_DEADLINE_TYPE]=txt;
+  await db.collection('sendCenter').doc('deadlineTmpls').set(DEADLINE_TMPLS,{merge:true});
+  // 미리보기 업데이트
+  var t=DEADLINE_TYPES.find(function(x){return x.key===SELECTED_DEADLINE_TYPE;});
+  if(t){
+    var msg=txt.replace(/{신고유형}/g,t.lbl).replace(/{납부기한}/g,t.deadline);
+    var pre=document.getElementById('deadline-msg-pre');
+    if(pre) pre.textContent=msg;
+  }
+  document.getElementById('deadline-tmpl-edit').style.display='none';
+  showToast('✅ 문구 저장 완료!');
+}
+
+async function sendDeadlineSMS(){
+  var chks=document.querySelectorAll('.deadline-chk:checked');
+  if(!chks.length){showToast('발송할 업체를 선택하세요.','warn');return;}
+  if(!SELECTED_DEADLINE_TYPE){showToast('신고 유형을 선택하세요.','warn');return;}
+  if(!confirm(chks.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
+  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
+  // TODO: SENS API 연동
+}
+
+// 발송센터 초기화 시 담당자 필터 동적 로드
+function initSendCenter(){
+  renderSendList();
+  // 담당자 필터
+  var mgrSel=document.getElementById('send-mgr-filter');
+  if(mgrSel&&ROLE==='admin'){
+    mgrSel.innerHTML='<option value="">전체 담당자</option>'
+      +STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
   }
 }
 
