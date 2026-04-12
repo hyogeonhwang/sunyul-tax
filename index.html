@@ -395,15 +395,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 .tbtn.act{background:#fff;color:#1A3169;border-color:#c8d4ff;border-bottom-color:#fff;position:relative;top:1px}
 .tbtn .tclose{opacity:.45;font-size:12px;padding:0 2px;border-radius:3px}
 .tbtn .tclose:hover{opacity:1;color:#e74c3c}
-
-.toast-wrap{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{background:#1A3169;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;
-  box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transform:translateY(10px);
-  transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1;transform:translateY(0)}
-.toast.success{background:#27ae60}
-.toast.error{background:#e74c3c}
-.toast.warn{background:#e67e22}
 </style>
 </head>
 <body>
@@ -480,6 +471,9 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <div class="nav-item" id="nav-kakao" onclick="go('kakao')">
       <span class="nav-icon">💬</span> 카톡 센터
     </div>
+    <div class="nav-item" id="nav-goji" onclick="go('goji')">
+      <span class="nav-icon">📨</span> 예정고지
+    </div>
     <div class="nav-item" id="nav-calendar" onclick="go('calendar')">
       <span class="nav-icon">📅</span> 마감 캘린더
     </div>
@@ -494,55 +488,40 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
     <!-- ===== DASHBOARD ===== -->
     <div id="pg-dashboard" class="pg">
+      <!-- 상단 요약 카드 -->
       <div class="stats-row" id="dashStats"></div>
 
-      <!-- 오늘 급여처리 알림 -->
-      <div id="today-salary-wrap" style="margin-bottom:12px;display:none">
-        <div class="card" style="border-left:4px solid #1A3169;padding:14px 18px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-size:15px">💰</span>
-            <span style="font-weight:700;color:#1A3169;font-size:14px">오늘 급여처리 대상 업체</span>
-          </div>
-          <div id="today-salary-body" style="font-size:13px"></div>
-        </div>
-      </div>
+      <!-- 알림 위젯 (긴급/경고/안내) -->
+      <div id="today-salary-wrap" style="display:none;margin-bottom:8px"></div>
+      <div id="prev-salary-wrap" style="display:none;margin-bottom:8px"></div>
+      <div id="cross-alert-wrap" style="display:none;margin-bottom:12px"></div>
 
-      <!-- 전달 미처리 알림 -->
-      <div id="prev-salary-wrap" style="margin-bottom:12px;display:none">
-        <div class="card" style="border-left:4px solid #e67e22;padding:14px 18px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-size:15px">⏰</span>
-            <span style="font-weight:700;color:#e67e22;font-size:14px">전달 급여 미처리 업체</span>
-          </div>
-          <div id="prev-salary-body" style="font-size:13px"></div>
-        </div>
-      </div>
-
-      <!-- 누락 위험 알림 -->
-      <div id="cross-alert-wrap" style="margin-bottom:12px;display:none">
-        <div class="card" style="border-left:4px solid #e74c3c;padding:14px 18px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:15px">⚠️</span>
-              <span style="font-weight:700;color:#e74c3c;font-size:14px">누락 위험 항목</span>
-            </div>
-            <button class="btn btn-s btn-sm" onclick="runCrossCheck();checkSalaryAlerts()">🔄 다시 확인</button>
-          </div>
-          <div id="cross-alert-body" style="font-size:13px"></div>
-        </div>
-      </div>
-
+      <!-- 메인 2컬럼 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="card">
-          <div class="card-hdr"><div class="card-ttl">📅 이번달 주요 마감</div></div>
-          <div id="dashDL"></div>
-        </div>
-        <div class="card">
-          <div class="card-hdr">
-            <div class="card-ttl">📌 내 담당 거래처</div>
-            <button class="btn btn-s btn-sm" onclick="go('clients')">전체보기</button>
+        <!-- 왼쪽: 긴급처리 + 마감일정 -->
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-hdr"><div class="card-ttl">⚡ 긴급 처리</div></div>
+            <div id="dashUrgent"><div class="muted" style="text-align:center;padding:16px;font-size:13px">확인 중...</div></div>
           </div>
-          <div id="dashMy"></div>
+          <div class="card">
+            <div class="card-hdr"><div class="card-ttl">📅 이번달 마감</div></div>
+            <div id="dashDL"></div>
+          </div>
+        </div>
+        <!-- 오른쪽: 처리현황 + 담당자별 -->
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-hdr">
+              <div class="card-ttl">📊 처리 현황</div>
+              <span id="dash-month-lbl" style="font-size:12px;color:#889"></span>
+            </div>
+            <div id="dashStatus"></div>
+          </div>
+          <div class="card" id="dashMgrCard">
+            <div class="card-hdr"><div class="card-ttl">👥 담당자별 현황</div></div>
+            <div id="dashMgr"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -625,9 +604,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <select class="sel" id="txPeriod" onchange="loadTax()"></select>
             <select class="sel" id="txMgrFilter" onchange="loadTax()" style="display:none">
               <option value="">전체 담당자</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="loadTax()">조회</button>
           </div>
@@ -650,9 +626,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
             <select class="sel" id="sal-mgr-filter" onchange="renderSalary()" style="display:none">
               <option value="">전체 담당자</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
             </select>
             <select class="sel" id="sal-day-filter" onchange="renderSalary()">
               <option value="">전체 급여일</option>
@@ -697,9 +670,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
             <select class="sel" id="pyMgrFilter" onchange="renderPayroll()" style="display:none">
               <option value="">전체 담당자</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="renderPayroll()">조회</button>
           </div>
@@ -724,6 +694,48 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <button class="copy-btn" id="copyBtn" onclick="copyMsg()" style="margin-top:12px">📋 복사하기</button>
           <div id="copyOk" style="text-align:center;font-size:12px;color:#27ae60;margin-top:6px;display:none">✅ 클립보드에 복사됐습니다!</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== 예정고지 ===== -->
+    <div id="pg-goji" class="pg" style="display:none">
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-ttl">📨 예정고지 관리</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="sel" id="goji-year" onchange="loadGoji()">
+              <option value="2026">2026년</option>
+              <option value="2025">2025년</option>
+            </select>
+            <select class="sel" id="goji-type" onchange="loadGoji()">
+              <option value="vat1">부가세 1기 예정 (4월)</option>
+              <option value="vat2">부가세 2기 예정 (10월)</option>
+              <option value="corp">법인세 중간예납 (8월)</option>
+              <option value="income">종합소득세 중간예납 (11월)</option>
+            </select>
+            <select class="sel" id="goji-mgr" onchange="renderGoji()" style="display:none">
+              <option value="">전체 담당자</option>
+            </select>
+            <button class="btn btn-s btn-sm" onclick="document.getElementById('gojiExcel').click()">📥 엑셀 업로드</button>
+            <input type="file" id="gojiExcel" accept=".xlsx,.xls" style="display:none" onchange="uploadGojiExcel(this)">
+          </div>
+        </div>
+        <!-- 검색 -->
+        <div style="position:relative;margin-bottom:12px">
+          <input class="si" id="goji-search" placeholder="🔍 업체명 검색..." oninput="renderGoji()" style="width:100%;padding-right:32px">
+          <span id="goji-search-clr" onclick="document.getElementById('goji-search').value='';renderGoji();this.style.display='none'"
+            style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
+        </div>
+        <!-- 요약 -->
+        <div id="goji-summary" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap"></div>
+        <!-- 카톡 문구 템플릿 수정 -->
+        <div style="margin-bottom:12px;padding:10px 14px;background:#f7f8fb;border-radius:8px">
+          <div style="font-size:11px;color:#889;margin-bottom:6px;font-weight:500">카톡 문구 템플릿 <span style="font-weight:400">(업체명·금액·납부기한 자동 치환)</span></div>
+          <textarea id="goji-tmpl" class="fi" rows="3" style="font-size:12px;line-height:1.6;resize:vertical"
+            placeholder="문구 템플릿..."></textarea>
+        </div>
+        <!-- 목록 -->
+        <div id="goji-body"></div>
       </div>
     </div>
 
@@ -1076,25 +1088,18 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </label>
           </div>
         </div>
-        <div class="fr" style="margin-bottom:8px">
-          <div class="fld">
-            <label>원천세 납부방식</label>
-            <select class="fi" id="f-wsemi2">
-              <option value="N">매월 납부</option>
-              <option value="Y">반기 납부 (1/7월)</option>
-            </select>
-          </div>
-        </div>
         <div class="fr" id="whtSepDiv" style="display:none">
           <div class="fld">
             <label>원천세 담당자 <span style="color:#C9A84C;font-size:11px">별도 지정</span></label>
             <select class="fi" id="f-wm2">
               <option value="">선택 안함</option>
-              <option value="황효건">황효건</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
-              <option value="김희진">김희진</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label>원천세 납부방식</label>
+            <select class="fi" id="f-wsemi2">
+              <option value="N">매월 납부</option>
+              <option value="Y">반기 납부</option>
             </select>
           </div>
         </div>
@@ -1559,6 +1564,7 @@ const PAGE_INFO={
   payroll:{icon:'📋',lbl:'지급명세서'},
   calc:{icon:'🧮',lbl:'세액계산기'},
   kakao:{icon:'💬',lbl:'카톡 센터'},
+  goji:{icon:'📨',lbl:'예정고지'},
   calendar:{icon:'📅',lbl:'마감 캘린더'},
   leave:{icon:'📅',lbl:'연차관리'},
   staff:{icon:'👥',lbl:'직원관리'},
@@ -1580,10 +1586,11 @@ function go(page){
   renderTabs();
   if(page==='taxcheck'){loadTax();updateCrossWarnIcons();}
   if(page==='salary'){initSalaryMonth();renderSalary();}
+  if(page==='goji'){initGoji();loadGoji();}
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
   if(page==='calendar') renderCal();
-  if(page==='dashboard'){renderDash();if(ALL.length){runCrossCheck();checkSalaryAlerts();}}
+  if(page==='dashboard'){renderDash();runCrossCheck();checkSalaryAlerts();}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='staff'){loadStaffPage();}
@@ -1632,11 +1639,6 @@ function loadClients(){
     fillKkSelect();
     renderDash();
     document.getElementById('cLd').style.display='none';
-    // ALL 로드 완료 후 크로스체크 실행
-    if(curPage==='dashboard'){
-      runCrossCheck();
-      checkSalaryAlerts();
-    }
   });
 }
 
@@ -1805,28 +1807,16 @@ async function saveClient(){
   ['daily','biz','labor','abiz','alabor','retire','int','div','other'].forEach(k=>{
     const el=document.getElementById('ps-'+k); if(el) ps[k]=el.checked;
   });
-  // 업종코드
-  var bizCodeVal=v('f-bizcode')||'';
-  // 급여일 (기타면 숫자 입력값 사용)
-  var salDaySel=v('f-salary-day');
-  var salDayVal=salDaySel==='기타'?(v('f-salary-day-other')+'일'):salDaySel;
-
   const data={
     name,type:v('f-type'),rep:v('f-rep'),bizNo:v('f-biz'),ssn:v('f-ssn'),
     contract:v('f-ct'),manager:v('f-mgr'),fee:v('f-fee')||0,
     phone:v('f-phone'),mobile:v('f-mobile'),email:v('f-email'),
     status:v('f-stat'),addr:v('f-addr'),ntsId:v('f-nid'),ntsPw:v('f-npw'),
-    posContact:v('f-pos'),bizStart:v('f-bst'),
-    bizCode:bizCodeVal,
-    endDate:v('f-enddate')||'',
-    vatType:v('f-vtype'),
+    posContact:v('f-pos'),bizStart:v('f-bst'),vatType:v('f-vtype'),
     vatCycle:v('f-vcycle'),
     whtSep:document.getElementById('f-wht-sep')?.checked||false,
     whtManager:document.getElementById('f-wht-sep')?.checked?v('f-wm2'):'',
-    whtSemi:v('f-wsemi2')||'N',
-    whtYn:v('f-wht-yn')||'N',
-    salaryDay:salDayVal||'',
-    salaryFixed:document.getElementById('f-salary-fixed')?.checked||false,
+    whtSemi:document.getElementById('f-wht-sep')?.checked?v('f-wsemi2'):'N',
     payrollSettings:ps,platforms:platRows,memo:v('f-memo'),
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -2110,7 +2100,7 @@ async function loadTax(){
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
                   <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
                     <option value="">배정 안함</option>
-                    ${['황효건','김서지','안지윤','유승희','김희진'].map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
+                    ${(['황효건'].concat(STAFF_LIST)).map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
                   </select>
                 </td>`:''}
                 <td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:140px" value="${esc(chk[c.id]?.memo||'')}" placeholder="메모..." onblur="saveTax('${key}','${c.id}','memo',this.value)"></td>
@@ -2192,7 +2182,7 @@ async function saveTax(key,cid,field,val){
 }
 
 function bulkAssign(key,mgr){
-  const name=prompt('배부할 담당자 이름을 입력하세요\n(황효건/김서지/안지윤/유승희/김희진)');
+  const name=prompt('배부할 담당자 이름을 입력하세요\n('+(['황효건'].concat(STAFF_LIST)).join('/')+')');
   if(!name) return;
   const list=ALL.filter(c=>c.manager===mgr);
   const batch=db.batch();
@@ -2384,7 +2374,6 @@ async function savePyInstant(docId,key,val,cbEl){
 
 async function savePy(docId,key,val){
   await db.collection('payrollChecks').doc(docId).set({[key]:val},{merge:true});
-  if(val===true) showToast('✅ 지급명세서 체크 저장!');
 }
 
 // =================== KAKAO ===================
@@ -2614,13 +2603,11 @@ async function saveCalEvent(){
   const data={date,lbl,type:calType,color:calColor};
   if(editCalId) await db.collection('calEvents').doc(editCalId).update(data);
   else await db.collection('calEvents').add(data);
-  showToast('✅ 일정 저장 완료!');
   closeCalModal();
 }
 async function delCalEvent(){
   if(!editCalId||!confirm('이 일정을 삭제하시겠습니까?')) return;
   await db.collection('calEvents').doc(editCalId).delete();
-  showToast('🗑️ 일정 삭제 완료!', 'warn');
   closeCalModal();
 }
 
@@ -2669,45 +2656,38 @@ function renderCal(){
 
 // =================== DASHBOARD ===================
 function renderDash(){
-  const tot=ALL.filter(c=>c.status==='활성').length;
-  const corp=ALL.filter(c=>c.type==='법인').length;
-  const info=USERS[ME?.email]||{};
-  const myC=ROLE==='admin'?tot:ALL.filter(c=>c.manager===info.name&&c.status==='활성').length;
-  const td=new Date(), m=td.getMonth()+1, d=td.getDate();
-  const mDL=DL.filter(e=>e.m===m);
+  var tot=ALL.filter(function(c){return c.status==='활성';}).length;
+  var corp=ALL.filter(function(c){return c.type==='법인';}).length;
+  var info=USERS[ME?.email]||{};
+  var myC=ROLE==='admin'?tot:ALL.filter(function(c){return c.manager===info.name&&c.status==='활성';}).length;
+  var td=new Date(), m=td.getMonth()+1, d=td.getDate();
+  var mDL=DL.filter(function(e){return e.m===m;});
+  var urgentCount=_crossAlerts.length;
 
-  const se=document.getElementById('dashStats');
-  if(se) se.innerHTML=`
-    <div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">${tot}</div><div class="stat-sub">활성 기준</div></div>
-    <div class="stat"><div class="stat-lbl">법인 거래처</div><div class="stat-val">${corp}</div><div class="stat-sub">대표 직접 관리</div></div>
-    <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${info.name||''} 담당</div></div>
-    <div class="stat"><div class="stat-lbl">이번달 마감</div><div class="stat-val">${mDL.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
+  // 상단 요약 카드
+  var se=document.getElementById('dashStats');
+  if(se) se.innerHTML=
+    '<div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">'+tot+'</div><div class="stat-sub">활성 기준</div></div>'
+    +'<div class="stat"><div class="stat-lbl">법인 거래처</div><div class="stat-val">'+corp+'</div><div class="stat-sub">대표 직접 관리</div></div>'
+    +'<div class="stat"><div class="stat-lbl">이번달 마감</div><div class="stat-val">'+mDL.length+'</div><div class="stat-sub">'+m+'월 세무 일정</div></div>'
+    +'<div class="stat"><div class="stat-lbl">누락 위험</div><div class="stat-val" style="color:'+(urgentCount>0?'#E24B4A':'#27ae60')+'">'+urgentCount+'</div><div class="stat-sub">'+(urgentCount>0?'즉시 확인':'이상 없음')+'</div></div>';
 
-  const de=document.getElementById('dashDL');
+  // 마감일정
+  var de=document.getElementById('dashDL');
   if(de){
-    const upcoming=mDL.filter(e=>e.d>=d).slice(0,6);
-    de.innerHTML=upcoming.length?upcoming.map(e=>{
-      const dl=e.d-d;
-      const cl=dl<=3?'td-err':dl<=7?'td-warn':'';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f6fa">
-        <span style="font-size:13px">${e.lbl}</span>
-        <span class="${cl}" style="font-size:12px;font-weight:700">${m}/${e.d} (D-${dl})</span>
-      </div>`;
+    var upcoming=mDL.filter(function(e){return e.d>=d;}).slice(0,6);
+    de.innerHTML=upcoming.length?upcoming.map(function(e){
+      var dl=e.d-d;
+      var cl=dl<=3?'td-err':dl<=7?'td-warn':'';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f6fa">'
+        +'<span style="font-size:13px">'+e.lbl+'</span>'
+        +'<span class="'+cl+'" style="font-size:12px;font-weight:700">'+m+'/'+e.d+' (D-'+dl+')</span>'
+        +'</div>';
     }).join(''):'<div class="muted" style="text-align:center;padding:22px">이번달 남은 마감일이 없습니다</div>';
-  
   }
 
-  const me=document.getElementById('dashMy');
-  if(me){
-    const myList=ROLE==='admin'
-      ?ALL.filter(c=>c.status==='활성').slice(0,6)
-      :ALL.filter(c=>c.manager===info.name&&c.status==='활성').slice(0,6);
-    me.innerHTML=myList.length?myList.map(c=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f6fa;cursor:pointer" onclick="go('clients')">
-        <span style="font-size:13px;font-weight:600">${c.name}</span>
-        ${tb_type(c.type)}
-      </div>`).join(''):'<div class="muted" style="text-align:center;padding:22px">담당 거래처가 없습니다</div>';
-  }
+  // 처리현황 + 담당자 렌더링
+  renderDashStatus();
 }
 
 // =================== CALCULATOR ===================
@@ -3742,9 +3722,8 @@ function delClientFromModal(){
   if(!confirm('⚠️ "'+name+'" 거래처를 삭제하시겠습니까?\n\n삭제하면 복구할 수 없습니다.')) return;
   if(!confirm('정말로 삭제하시겠습니까?\n\n[ '+name+' ]')) return;
   db.collection('clients').doc(editCId).delete().then(function(){
-    showToast('🗑️ 거래처 삭제 완료!', 'warn');
     closeClient();
-  }).catch(function(e){ showToast('❌ 삭제 실패: '+e.message,'error'); });
+  }).catch(function(e){ alert('삭제 실패: '+e.message); });
 }
 
 
@@ -3812,30 +3791,23 @@ async function saveTaxRecv(key, cid, val){
 var _crossAlerts=[];
 
 async function runCrossCheck(){
-  var now=new Date();
-  var yr=now.getFullYear().toString();
-  var curM=now.getMonth()+1;
-  var isSemiM=curM===1||curM===7;
+  var yr=new Date().getFullYear().toString();
+  var curM=new Date().getMonth()+1;
+  var isSemiM=curM===1||curM===7; // 반기 신고월
 
-  // 전달 계산 (지급명세서는 익월말일까지)
-  var prevM=curM===1?12:curM-1;
-  var prevYr=curM===1?(parseInt(yr)-1).toString():yr;
-
-  // 데이터 병렬 로드 (이번달 + 전달 급여 + 이번달 지급명세서)
-  var [whtDoc,pyMonDoc,pySemiDoc,pyAnnDoc,salDoc,prevSalDoc]=await Promise.all([
+  // 데이터 병렬 로드
+  var [whtDoc,pyMonDoc,pySemiDoc,pyAnnDoc,salDoc]=await Promise.all([
     db.collection('taxChecks').doc('tax_'+yr+'_wht_'+curM).get(),
     db.collection('payrollChecks').doc(yr+'_monthly').get(),
     db.collection('payrollChecks').doc(yr+'_semi').get(),
     db.collection('payrollChecks').doc(yr+'_annual').get(),
-    db.collection('salaryChecks').doc('salary_'+yr+'_'+curM).get(),
-    db.collection('salaryChecks').doc('salary_'+prevYr+'_'+prevM).get()
+    db.collection('salaryChecks').doc('salary_'+yr+'_'+curM).get()
   ]);
   var whtChk=whtDoc.exists?whtDoc.data():{};
   var pyMon=pyMonDoc.exists?pyMonDoc.data():{};
   var pySemi=pySemiDoc.exists?pySemiDoc.data():{};
   var pyAnn=pyAnnDoc.exists?pyAnnDoc.data():{};
   var salChk=salDoc.exists?salDoc.data():{};
-  var prevSalChk=prevSalDoc.exists?prevSalDoc.data():{};
 
   _crossAlerts=[];
 
@@ -3843,60 +3815,42 @@ async function runCrossCheck(){
     var ps=c.payrollSettings||{};
     var alerts=[];
 
-    // whtYn=Y 이거나 payrollSettings에 항목이 있으면 급여 업체로 간주
-    var hasPayroll=c.whtYn==='Y'||(ps.daily||ps.biz||ps.labor);
-    if(hasPayroll){
+    // 급여 있는 업체 기준 (whtYn=Y)
+    if(c.whtYn==='Y'){
       var salDone=salChk[c.id+'_done'];
-      var prevSalDone=prevSalChk[c.id+'_done'];
       var whtDone=whtChk[c.id]&&whtChk[c.id].done;
 
-      // ① 이번달 급여작성 미완료 - 급여일이 지난 후에만 경고
-      if(c.whtYn==='Y'&&!salDone){
-        var salDay=c.salaryDay||'';
-        var dueDay=0;
-        if(salDay==='말일') dueDay=new Date(now.getFullYear(),curM,0).getDate(); // 이번달 말일
-        else dueDay=parseInt(salDay)||0;
-        if(dueDay>0&&now.getDate()>dueDay){
-          alerts.push(curM+'월 급여작성 미완료 (급여일 '+salDay+' 경과)');
-        }
+      // ① 급여작성 미완료
+      if(!salDone){
+        alerts.push('급여작성 미완료 (급여일: '+(c.salaryDay||'미설정')+')');
       }
 
-      // ② 이번달 급여완료 → 원천세 신고 누락
+      // ② 급여작성 완료인데 원천세 신고 누락
       if(salDone&&!whtDone){
-        alerts.push(curM+'월 급여완료 → 원천세 신고 누락');
+        alerts.push('급여작성 완료 → 원천세 신고 누락');
       }
 
-      // ③ 이번달 급여완료 → 이번달 지급명세서 미제출 (일용직)
+      // ③ 일용직: 급여작성 완료인데 지급명세서 미제출
       if(salDone&&ps.daily){
-        if(!pyMon[c.id+'_일용직_'+curM])
-          alerts.push(curM+'월 일용직 지급명세서 미제출');
+        var pyDone=pyMon[c.id+'_일용직_'+curM];
+        if(!pyDone) alerts.push('일용직 지급명세서 미제출 ('+curM+'월)');
       }
 
-      // ④ 이번달 급여완료 → 이번달 지급명세서 미제출 (사업소득)
+      // ④ 사업소득: 급여작성 완료인데 지급명세서 미제출
       if(salDone&&ps.biz){
-        if(!pyMon[c.id+'_사업소득_'+curM])
-          alerts.push(curM+'월 사업소득 지급명세서 미제출');
+        var pyDone=pyMon[c.id+'_사업소득_'+curM];
+        if(!pyDone) alerts.push('사업소득 지급명세서 미제출 ('+curM+'월)');
       }
 
-      // ⑤ 전달 급여완료 → 전달 지급명세서 미제출 (제출기한: 이번달 말일)
-      if(prevSalDone&&ps.daily){
-        if(!pyMon[c.id+'_일용직_'+prevM])
-          alerts.push(prevM+'월 일용직 지급명세서 미제출 ('+curM+'월 말일까지)');
-      }
-      if(prevSalDone&&ps.biz){
-        if(!pyMon[c.id+'_사업소득_'+prevM])
-          alerts.push(prevM+'월 사업소득 지급명세서 미제출 ('+curM+'월 말일까지)');
-      }
-
-      // ⑥ 근로소득 반기: 반기 신고월인데 지급명세서 미제출
+      // ⑤ 근로소득 반기: 반기 신고월인데 지급명세서 미제출
       if(isSemiM&&ps.labor){
         var semiIdx=curM===7?'1':'2';
-        if(!pySemi[c.id+'_'+semiIdx])
-          alerts.push('근로소득 반기 지급명세서 미제출');
+        var semiDone=pySemi[c.id+'_'+semiIdx];
+        if(!semiDone) alerts.push('근로소득 반기 지급명세서 미제출');
       }
     }
 
-    // 연간 지급명세서 (3월 이전)
+    // 연간 지급명세서 (3월 이전 체크)
     if(curM<=3){
       if(ps.abiz&&!pyAnn[c.id+'_abiz']) alerts.push('사업소득 연간 지급명세서 미제출 (3/10 마감)');
       if(ps.alabor&&!pyAnn[c.id+'_alabor']) alerts.push('근로소득 연간 지급명세서 미제출 (3/10 마감)');
@@ -3927,7 +3881,7 @@ function renderCrossAlerts(){
     return;
   }
   wrap.style.display='block';
-  body.innerHTML='<div style="margin-bottom:8px;color:#667;font-size:12px">크로스체크 결과 — 총 '+_crossAlerts.length+'개 업체 누락 위험</div>'
+  body.innerHTML='<div style="margin-bottom:8px;color:#667;font-size:12px">'+new Date().getMonth()+1+'월 기준 크로스체크 결과 — 총 '+_crossAlerts.length+'개 업체 누락 위험</div>'
     +_crossAlerts.map(function(a){
       return '<div style="padding:8px 10px;margin-bottom:6px;background:#fff5f5;border-radius:7px;border:1px solid #fcc">'
         +'<span style="font-weight:700;color:#c0392b">'+a.name+'</span>'
@@ -4105,7 +4059,6 @@ async function saveSalaryInstant(docId,key,val,cbEl){
 
 async function saveSalary(docId,key,val){
   await db.collection('salaryChecks').doc(docId).set({[key]:val},{merge:true});
-  if(key&&key.endsWith('_done')&&val) showToast('✅ 급여작성 완료 저장!');
 }
 
 
@@ -4162,62 +4115,453 @@ async function checkSalaryAlerts(){
     return false;
   }).filter(function(c){return !curChk[c.id+'_done'];}); // 미처리만
 
-  var todayWrap=document.getElementById('today-salary-wrap');
-  var todayBody=document.getElementById('today-salary-body');
-  if(todayWrap&&todayBody){
-    if(todayTargets.length){
-      todayWrap.style.display='block';
-      todayBody.innerHTML='<div style="color:#667;font-size:12px;margin-bottom:8px">오늘('+m+'월 '+day+'일) 급여처리 대상 '+todayTargets.length+'개 업체</div>'
-        +todayTargets.map(function(c){
-          return '<div style="padding:6px 10px;margin-bottom:4px;background:#edf1ff;border-radius:6px;display:flex;align-items:center;gap:10px">'
-            +'<span style="font-weight:700;color:#1A3169">'+c.name+'</span>'
-            +'<span style="font-size:11px;color:#aab">담당: '+(c.manager||'-')+'</span>'
-            +'<span class="bdg" style="background:'+(c.salaryFixed?'#e0f0ff':'#fff0dc')+';color:'+(c.salaryFixed?'#1A3169':'#a05500')+'">'+(c.salaryFixed?'고정':'변동')+'</span>'
-            +'</div>';
-        }).join('');
-    } else {
-      todayWrap.style.display='none';
-    }
+  // 긴급처리 박스에 오늘급여 + 전달미처리 추가
+  var urgentEl=document.getElementById('dashUrgent');
+  var prevTargets=salClients.filter(function(c){return !prevChk[c.id+'_done'];});
+
+  var extraHtml='';
+  if(todayTargets.length){
+    extraHtml+='<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:0.5px solid #f5f6fa">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:#e67e22;flex-shrink:0;margin-top:5px"></div>'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:700;color:#1A3169">오늘 급여처리 대상 '+todayTargets.length+'개 업체</div>'
+      +todayTargets.map(function(c){return '<div style="font-size:11px;color:#e67e22;margin-top:2px">· '+c.name+' ('+c.manager+'/'+(c.salaryDay||'-')+')</div>';}).join('')
+      +'</div></div>';
+  }
+  if(prevTargets.length){
+    extraHtml+='<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:0.5px solid #f5f6fa">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:#378ADD;flex-shrink:0;margin-top:5px"></div>'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:700;color:#1A3169">전달 급여 미처리 '+prevTargets.length+'개 업체</div>'
+      +prevTargets.map(function(c){return '<div style="font-size:11px;color:#378ADD;margin-top:2px">· '+c.name+' ('+c.manager+')</div>';}).join('')
+      +'</div></div>';
   }
 
-  // 전달 미처리 업체
-  var prevTargets=salClients.filter(function(c){return !prevChk[c.id+'_done'];});
-  var prevWrap=document.getElementById('prev-salary-wrap');
-  var prevBody=document.getElementById('prev-salary-body');
-  if(prevWrap&&prevBody){
-    if(prevTargets.length){
-      prevWrap.style.display='block';
-      prevBody.innerHTML='<div style="color:#667;font-size:12px;margin-bottom:8px">'+prevYr+'년 '+prevM+'월 급여작성 미완료 '+prevTargets.length+'개 업체</div>'
-        +prevTargets.map(function(c){
-          return '<div style="padding:6px 10px;margin-bottom:4px;background:#fff8f0;border-radius:6px;display:flex;align-items:center;gap:10px">'
-            +'<span style="font-weight:700;color:#e67e22">'+c.name+'</span>'
-            +'<span style="font-size:11px;color:#aab">담당: '+(c.manager||'-')+'</span>'
-            +'<span style="font-size:11px;color:#e67e22">급여일: '+(c.salaryDay||'미설정')+'</span>'
-            +'</div>';
-        }).join('');
+  if(urgentEl&&extraHtml){
+    // 기존 "이상없음" 텍스트 있으면 교체, 아니면 앞에 추가
+    if(urgentEl.innerHTML.includes('이상 없음')||urgentEl.innerHTML.includes('확인 중')){
+      urgentEl.innerHTML=extraHtml+'<div style="display:flex;align-items:center;gap:8px;padding:12px 0;color:#27ae60;font-size:13px"><span>✓</span> 누락 위험 없음</div>';
     } else {
-      prevWrap.style.display='none';
+      urgentEl.innerHTML=extraHtml+urgentEl.innerHTML;
     }
+  } else if(urgentEl&&!extraHtml&&urgentEl.innerHTML.includes('확인 중')){
+    urgentEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px;color:#27ae60;font-size:13px"><span>✓</span> 처리 필요 항목이 없습니다</div>';
   }
 }
 
 
-// =================== 토스트 ===================
-function showToast(msg, type, duration){
-  type=type||'success'; duration=duration||2000;
-  var wrap=document.getElementById('toastWrap');
-  if(!wrap) return;
-  var t=document.createElement('div');
-  t.className='toast '+type;
-  t.textContent=msg;
-  wrap.appendChild(t);
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){ t.classList.add('show'); });
+// =================== 대시보드 처리현황 ===================
+// 월별 신고 스케줄
+function getThisMonthTaxTypes(m){
+  var types=[];
+  // 항상 원천세
+  types.push({key:'wht',lbl:'원천세',pd:m,color:'#e67e22',bg:'#fff8f0'});
+  // 부가세 확정신고: 1월(2기확정), 7월(1기확정)
+  if(m===1) types.push({key:'vat',lbl:'부가세 2기 확정',pd:4,color:'#1A3169',bg:'#edf1ff'});
+  if(m===7) types.push({key:'vat',lbl:'부가세 1기 확정',pd:2,color:'#1A3169',bg:'#edf1ff'});
+  // 부가세 예정신고: 4월(1기예정), 10월(2기예정)
+  if(m===4) types.push({key:'vat',lbl:'부가세 1기 예정',pd:1,color:'#1A3169',bg:'#edf1ff'});
+  if(m===10) types.push({key:'vat',lbl:'부가세 2기 예정',pd:3,color:'#1A3169',bg:'#edf1ff'});
+  // 간이과세 연간신고: 1월
+  if(m===1) types.push({key:'simp',lbl:'부가세(간이 연간)',pd:1,color:'#3c7dd4',bg:'#e8f0fc'});
+  // 법인세 신고: 3월(31일까지), 중간예납: 8월(31일까지)
+  if(m===3) types.push({key:'corp',lbl:'법인세 신고',pd:1,color:'#27ae60',bg:'#eafaf1'});
+  if(m===8) types.push({key:'corp',lbl:'법인세 중간예납',pd:2,color:'#27ae60',bg:'#eafaf1'});
+  // 종합소득세: 5월
+  if(m===5) types.push({key:'income',lbl:'종합소득세',pd:1,color:'#8e44ad',bg:'#f5eef8'});
+  // 근로소득 간이(반기): 1월(하반기), 7월(상반기)
+  if(m===1) types.push({key:'semi_py',lbl:'근로소득 간이(하반기)',pd:2,color:'#5c1a9a',bg:'#f0e4ff'});
+  if(m===7) types.push({key:'semi_py',lbl:'근로소득 간이(상반기)',pd:1,color:'#5c1a9a',bg:'#f0e4ff'});
+  // 연간 지급명세서: 2월(이자·배당·기타 2/28), 3월(근로·사업·퇴직 3/10)
+  if(m===2) types.push({key:'ann_py_feb',lbl:'지급명세서 (이자·배당·기타)',pd:0,color:'#5c1a9a',bg:'#f0e4ff'});
+  if(m===3) types.push({key:'ann_py_mar',lbl:'지급명세서 (근로·사업·퇴직)',pd:0,color:'#5c1a9a',bg:'#f0e4ff'});
+  // 종합소득세 중간예납: 11월 (11/30)
+  if(m===11) types.push({key:'income_mid',lbl:'종합소득세 중간예납',pd:0,color:'#8e44ad',bg:'#f5eef8'});
+  return types;
+}
+
+async function renderDashStatus(){
+  var el=document.getElementById('dashStatus'); if(!el) return;
+  var lbl=document.getElementById('dash-month-lbl');
+  var now=new Date();
+  var yr=now.getFullYear().toString();
+  var m=now.getMonth()+1;
+  var info=USERS[ME?.email]||{};
+  var myName=ROLE==='admin'?null:info.name;
+  if(lbl) lbl.textContent=yr+'년 '+m+'월 기준';
+
+  var types=getThisMonthTaxTypes(m);
+
+  // 각 신고 유형별 체크 데이터 로드
+  var docIds=types.map(function(t){
+    if(t.key==='semi_py') return 'payrollChecks/'+yr+'_semi';
+    return 'taxChecks/tax_'+yr+'_'+t.key+'_'+t.pd;
   });
-  setTimeout(function(){
-    t.classList.remove('show');
-    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 300);
-  }, duration);
+
+  var docs=await Promise.all(types.map(function(t){
+    if(t.key==='semi_py') return db.collection('payrollChecks').doc(yr+'_semi').get();
+    if(t.key==='ann_py_feb'||t.key==='ann_py_mar') return db.collection('payrollChecks').doc(yr+'_annual').get();
+    if(t.key==='income_mid') return db.collection('taxChecks').doc('tax_'+yr+'_income_1').get();
+    return db.collection('taxChecks').doc('tax_'+yr+'_'+t.key+'_'+t.pd).get();
+  }));
+
+  // 급여관리 + 지급명세서 이번달
+  var salDoc=await db.collection('salaryChecks').doc('salary_'+yr+'_'+m).get();
+  var pyMonDoc2=await db.collection('payrollChecks').doc(yr+'_monthly').get();
+  var salChk=salDoc.exists?salDoc.data():{};
+  var pyMonChk=pyMonDoc2.exists?pyMonDoc2.data():{};
+
+  var html='';
+
+  // 신고 유형별 진행률 카드
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
+
+  // 급여관리 카드
+  var salClients=ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(c.whtYn!=='Y'&&!(c.payrollSettings&&(c.payrollSettings.daily||c.payrollSettings.biz||c.payrollSettings.labor))) return false;
+    if(myName&&c.manager!==myName) return false;
+    return true;
+  });
+  var salDone=salClients.filter(function(c){return salChk[c.id+'_done'];}).length;
+  var salPct=salClients.length?Math.round(salDone/salClients.length*100):0;
+  html+=statusCard('💰 급여관리','#1A3169','#edf1ff',salDone,salClients.length,salPct);
+
+  // 일용직 지급명세서 (매월)
+  var dailyClients=ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(!(c.payrollSettings&&c.payrollSettings.daily)) return false;
+    if(myName&&c.manager!==myName) return false;
+    return true;
+  });
+  if(dailyClients.length){
+    var dailyDone=dailyClients.filter(function(c){return pyMonChk[c.id+'_일용직_'+m];}).length;
+    var dailyPct=Math.round(dailyDone/dailyClients.length*100);
+    html+=statusCard('📋 일용직 지급명세서','#5c1a9a','#f0e4ff',dailyDone,dailyClients.length,dailyPct);
+  }
+
+  // 사업소득 지급명세서 (매월)
+  var bizPyClients=ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(!(c.payrollSettings&&c.payrollSettings.biz)) return false;
+    if(myName&&c.manager!==myName) return false;
+    return true;
+  });
+  if(bizPyClients.length){
+    var bizPyDone=bizPyClients.filter(function(c){return pyMonChk[c.id+'_사업소득_'+m];}).length;
+    var bizPyPct=Math.round(bizPyDone/bizPyClients.length*100);
+    html+=statusCard('📋 사업소득 지급명세서','#5c1a9a','#f0e4ff',bizPyDone,bizPyClients.length,bizPyPct);
+  }
+
+  // 신고 유형별 카드
+  types.forEach(function(t,i){
+    var chk=docs[i].exists?docs[i].data():{};
+    var clients=ALL.filter(function(c){
+      if(c.status!=='활성'&&c.status!=='기장중지') return false;
+      if(myName&&c.manager!==myName) return false;
+      if(t.key==='vat') return c.vatType==='일반'||c.type==='법인';
+      if(t.key==='simp') return c.vatType==='간이';
+      if(t.key==='corp') return c.type==='법인';
+      if(t.key==='income'||t.key==='income_mid') return c.type!=='법인';
+      if(t.key==='wht') return c.manager&&c.manager!=='미배정';
+      if(t.key==='semi_py') return !!(c.payrollSettings&&c.payrollSettings.labor);
+      if(t.key==='ann_py_feb') return !!(c.payrollSettings&&(c.payrollSettings.int||c.payrollSettings.div||c.payrollSettings.other));
+      if(t.key==='ann_py_mar') return !!(c.payrollSettings&&(c.payrollSettings.abiz||c.payrollSettings.alabor||c.payrollSettings.retire));
+      return true;
+    });
+    var semiIdx=m===7?'1':'2';
+    var done=clients.filter(function(c){
+      if(t.key==='semi_py') return !!(chk[c.id+'_'+semiIdx]);
+      if(t.key==='ann_py_feb'){
+        var ps=c.payrollSettings||{};
+        return !!(chk[c.id+'_int']||chk[c.id+'_div']||chk[c.id+'_other']);
+      }
+      if(t.key==='ann_py_mar'){
+        var ps=c.payrollSettings||{};
+        return !!(chk[c.id+'_abiz']||chk[c.id+'_alabor']||chk[c.id+'_retire']);
+      }
+      return chk[c.id]&&chk[c.id].done;
+    }).length;
+    var pct=clients.length?Math.round(done/clients.length*100):0;
+    html+=statusCard(t.lbl,t.color,t.bg,done,clients.length,pct);
+  });
+
+  html+='</div>';
+
+  el.innerHTML=html;
+
+  // 담당자별 현황 (별도 div)
+  var mgrEl=document.getElementById('dashMgr');
+  var mgrCard=document.getElementById('dashMgrCard');
+  if(mgrEl){
+    if(ROLE!=='admin'){ if(mgrCard) mgrCard.style.display='none'; return; }
+    var staffNames=STAFF_LIST;
+    var whtChkData=docs[0]&&docs[0].exists?docs[0].data():{};
+    var mgrHtml='';
+    staffNames.forEach(function(name){
+      var myCl=ALL.filter(function(c){return c.status==='활성'&&c.manager===name;});
+      if(!myCl.length) return;
+      var whtDone=myCl.filter(function(c){return whtChkData[c.id]&&whtChkData[c.id].done;}).length;
+      var salCl=myCl.filter(function(c){return c.whtYn==='Y'||(c.payrollSettings&&(c.payrollSettings.daily||c.payrollSettings.biz||c.payrollSettings.labor));});
+      var salD=salCl.filter(function(c){return salChk[c.id+'_done'];}).length;
+      var total=myCl.length>0?Math.round((whtDone+salD)/Math.max(myCl.length+salCl.length,1)*100):0;
+      var barColor=total>=80?'#27ae60':total>=50?'#e67e22':'#E24B4A';
+      var badge=total>=80?'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11">양호</span>'
+        :total>=50?'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B">진행중</span>'
+        :'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:#FCEBEB;color:#A32D2D">지연</span>';
+      mgrHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #f5f6fa">'
+        +'<span style="font-size:12px;font-weight:500;min-width:44px">'+name+'</span>'
+        +'<div style="flex:1;background:#e8ecf4;border-radius:3px;height:5px;overflow:hidden"><div style="background:'+barColor+';width:'+total+'%;height:100%;border-radius:3px"></div></div>'
+        +'<span style="font-size:12px;font-weight:500;color:'+barColor+';min-width:32px;text-align:right">'+total+'%</span>'
+        +badge
+        +'</div>';
+    });
+    mgrEl.innerHTML=mgrHtml||'<div class="muted" style="text-align:center;padding:16px;font-size:13px">담당자 데이터 없음</div>';
+  }
+}
+
+function statusCard(lbl,color,bg,done,total,pct){
+  var barColor=pct>=80?'#27ae60':pct>=50?'#e67e22':'#e74c3c';
+  return '<div style="background:'+bg+';border-radius:8px;padding:12px 14px">'
+    +'<div style="font-size:11px;color:'+color+';font-weight:500;margin-bottom:6px">'+lbl+'</div>'
+    +'<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">'
+    +'<span style="font-size:20px;font-weight:500;color:#1A3169">'+done+'</span>'
+    +'<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:'+barColor+';color:#fff">'+pct+'%</span>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#889;margin-bottom:6px">전체 '+total+'개 중 완료</div>'
+    +'<div style="background:rgba(0,0,0,0.1);border-radius:3px;height:4px;overflow:hidden">'
+    +'<div style="background:'+barColor+';width:'+pct+'%;height:100%;border-radius:3px"></div>'
+    +'</div></div>';
+}
+
+
+// =================== 예정고지 ===================
+var GOJI_DATA={};
+var GOJI_KEY='';
+
+const GOJI_TMPLS={
+  vat1:'[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n\n이번 부가세 1기 예정고지 금액은 {금액}원입니다.\n4월 25일까지 납부 부탁드립니다.\n\n감사합니다.',
+  vat2:'[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n\n이번 부가세 2기 예정고지 금액은 {금액}원입니다.\n10월 25일까지 납부 부탁드립니다.\n\n감사합니다.',
+  corp:'[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n\n이번 법인세 중간예납 금액은 {금액}원입니다.\n8월 31일까지 납부 부탁드립니다.\n\n감사합니다.',
+  income:'[세무법인 선율] 안녕하세요 {업체명} 대표님^^\n\n이번 종합소득세 중간예납 금액은 {금액}원입니다.\n11월 30일까지 납부 부탁드립니다.\n\n감사합니다.'
+};
+
+function initGoji(){
+  // 관리자면 담당자 필터 표시
+  var mgrSel=document.getElementById('goji-mgr');
+  if(mgrSel){
+    mgrSel.style.display=ROLE==='admin'?'block':'none';
+    // 직원목록 동적 로드
+    // 동적 로드 - updateAllStaffDropdowns에서 처리
+  }
+}
+
+async function loadGoji(){
+  var yr=document.getElementById('goji-year')?.value||'2026';
+  var tp=document.getElementById('goji-type')?.value||'vat1';
+  GOJI_KEY='goji_'+yr+'_'+tp;
+  // 템플릿 세팅
+  var tmpl=document.getElementById('goji-tmpl');
+  if(tmpl) tmpl.value=GOJI_TMPLS[tp]||'';
+  // Firebase 로드
+  var doc=await db.collection('gojiData').doc(GOJI_KEY).get();
+  GOJI_DATA=doc.exists?doc.data():{};
+  renderGoji();
+}
+
+function renderGoji(){
+  var q=(document.getElementById('goji-search')?.value||'').toLowerCase();
+  var mgrF=document.getElementById('goji-mgr')?.value||'';
+  var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var clrBtn=document.getElementById('goji-search-clr');
+  if(clrBtn) clrBtn.style.display=q?'block':'none';
+
+  // 대상 업체 필터
+  var tp=document.getElementById('goji-type')?.value||'vat1';
+  var clients=ALL.filter(function(c){
+    if(c.status!=='활성'&&c.status!=='기장중지') return false;
+    if(myName&&c.manager!==myName) return false;
+    if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
+    // 고지유형별 대상
+    if(tp==='vat1'||tp==='vat2') return c.vatType==='일반'||c.type==='법인';
+    if(tp==='corp') return c.type==='법인';
+    if(tp==='income') return c.type!=='법인';
+    return true;
+  });
+
+  // 검색 필터
+  if(q) clients=clients.filter(function(c){
+    return (c.name||'').toLowerCase().includes(q)||(c.bizNo||'').includes(q);
+  });
+
+  // 요약
+  var total=clients.length;
+  var withAmt=clients.filter(function(c){return GOJI_DATA[c.id]?.amt;}).length;
+  var sent=clients.filter(function(c){return GOJI_DATA[c.id]?.sent;}).length;
+  var sumEl=document.getElementById('goji-summary');
+  if(sumEl) sumEl.innerHTML=
+    '<div style="background:#f7f8fb;border-radius:6px;padding:6px 12px;font-size:11px;color:#667">전체 <b style="color:#1A3169">'+total+'개</b></div>'
+    +'<div style="background:#EAF3DE;border-radius:6px;padding:6px 12px;font-size:11px;color:#3B6D11">발송완료 <b>'+sent+'개</b></div>'
+    +'<div style="background:#FAEEDA;border-radius:6px;padding:6px 12px;font-size:11px;color:#854F0B">미발송 <b>'+(withAmt-sent)+'개</b></div>'
+    +'<div style="background:#f7f8fb;border-radius:6px;padding:6px 12px;font-size:11px;color:#667">금액미입력 <b style="color:#aab">'+(total-withAmt)+'개</b></div>';
+
+  // 담당자별 그룹
+  var mgrs={};
+  clients.forEach(function(c){
+    var m=c.manager||'미배정';
+    if(!mgrs[m]) mgrs[m]=[];
+    mgrs[m].push(c);
+  });
+
+  var el=document.getElementById('goji-body');
+  if(!el) return;
+  if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">📨</div><div>해당 업체가 없습니다</div></div>';return;}
+
+  var html='';
+  Object.entries(mgrs).forEach(function([mgr,list]){
+    var mgrSent=list.filter(function(c){return GOJI_DATA[c.id]?.sent;}).length;
+    var allDone=mgrSent===list.length&&list.length>0;
+    var mgrId='goji-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+    html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:'+(allDone?'#f0faf4':'#f7f8fb')+';cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
+    html+='<span id="arr-'+mgrId+'" style="color:#889;width:16px">▼</span>';
+    html+='<span style="font-size:13px;font-weight:500;min-width:60px">'+mgr+'</span>';
+    html+='<span style="font-size:12px;color:#889">('+mgrSent+'/'+list.length+' 발송완료)</span>';
+    html+='<div style="flex:1;background:#e8ecf4;border-radius:3px;height:4px;overflow:hidden"><div style="background:'+(allDone?'#27ae60':'#1A3169')+';width:'+(list.length?Math.round(mgrSent/list.length*100):0)+'%;height:100%;border-radius:3px"></div></div>';
+    html+='</div>';
+    html+='<div id="'+mgrId+'">';
+    // 테이블 헤더
+    html+='<div style="display:grid;grid-template-columns:1fr 110px 1fr 80px 70px;gap:6px;padding:7px 14px;font-size:11px;color:#889;border-bottom:0.5px solid #f0f2f7;background:#fafafa">';
+    html+='<span>상호</span><span style="text-align:right">고지금액</span><span>카톡 문구</span><span style="text-align:center">발송완료</span><span></span></div>';
+    list.forEach(function(c){
+      var d=GOJI_DATA[c.id]||{};
+      var tmpl=document.getElementById('goji-tmpl')?.value||'';
+      var amt=d.amt?Number(d.amt).toLocaleString():'';
+      var msg=d.msg||(amt?tmpl.replace('{업체명}',c.name||'').replace('{금액}',amt):'');
+      var rowStyle='display:grid;grid-template-columns:1fr 110px 1fr 80px 70px;gap:6px;padding:9px 14px;border-bottom:0.5px solid #f0f2f7;align-items:start;'+(d.sent?'opacity:0.5':'');
+      html+='<div style="'+rowStyle+'">';
+      html+='<div><div style="font-size:13px;font-weight:600;color:#1A3169">'+c.name+'</div><div style="font-size:11px;color:#aab;margin-top:2px">'+(c.bizNo||'-')+'</div></div>';
+      // 금액 입력
+      html+='<div><input type="text" value="'+amt+'" placeholder="금액 입력" data-goji-amt="'+c.id+'" '
+        +'style="border:1px solid #dde;border-radius:6px;padding:4px 8px;font-size:12px;width:100%;text-align:right;color:#185FA5;font-weight:500" '
+        +'onchange="gojiAmtChange(this)" '
+        +'onblur="var n=Number(this.value.replace(/,/g,\'\'));if(n)this.value=n.toLocaleString()"></div>';
+      // 문구 textarea
+      html+='<textarea data-goji-msg="'+c.id+'" style="border:1px solid #dde;border-radius:6px;padding:5px 8px;font-size:11px;width:100%;resize:vertical;line-height:1.5;min-height:60px;color:#445" '
+        +'onblur="saveGojiField(this.getAttribute(\'data-goji-msg\'),\'msg\',this.value)">'+esc(msg)+'</textarea>';
+      // 발송완료 체크
+      html+='<div style="text-align:center;padding-top:6px"><input type="checkbox" data-goji-sent="'+c.id+'" '+(d.sent?'checked':'')+' onchange="gojiSentChange(this)"></div>';
+      // 복사 버튼
+      html+='<div style="padding-top:4px"><button style="font-size:11px;padding:4px 10px;border:0.5px solid #dde;border-radius:6px;cursor:pointer;background:#fff;width:100%" '
+        +'data-goji-copy="'+c.id+'" onclick="copyGojiMsg(this.getAttribute(&quot;data-goji-copy&quot;))">복사</button></div>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+function updateGojiMsg(cid, amtStr){
+  var amt=Number(amtStr.replace(/,/g,''))||0;
+  if(!amt) return;
+  var tmpl=document.getElementById('goji-tmpl')?.value||'';
+  var c=ALL.find(function(x){return x.id===cid;});
+  if(!c) return;
+  var msg=tmpl.replace('{업체명}',c.name||'').replace('{금액}',amt.toLocaleString());
+  var ta=document.querySelector('[data-goji-msg="'+cid+'"]');
+  if(ta) ta.value=msg;
+  // 자동 저장
+  if(!GOJI_DATA[cid]) GOJI_DATA[cid]={};
+  GOJI_DATA[cid].msg=msg;
+}
+
+async function saveGojiField(cid,field,val){
+  if(!GOJI_DATA[cid]) GOJI_DATA[cid]={};
+  GOJI_DATA[cid][field]=val;
+  await db.collection('gojiData').doc(GOJI_KEY).set({[cid]:{[field]:val}},{merge:true});
+  if(field==='sent') showToast(val?'✅ 발송완료 처리!':'발송완료 취소');
+}
+
+function copyGojiMsg(cid){
+  var ta=document.querySelector('[data-goji-msg="'+cid+'"]');
+  var msg=ta?ta.value:(GOJI_DATA[cid]?.msg||'');
+  if(!msg){showToast('문구가 없습니다. 금액을 먼저 입력하세요.','warn');return;}
+  navigator.clipboard.writeText(msg).then(function(){
+    showToast('✅ 카톡 문구 복사 완료!');
+  });
+}
+
+async function uploadGojiExcel(input){
+  var file=input.files[0]; if(!file) return;
+  showToast('📥 엑셀 분석 중...','');
+  
+  var reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      
+      // 사업자번호 컬럼 찾기 (다양한 컬럼명 대응)
+      var bizCol=null, amtCol=null;
+      var sample=rows[0]||{};
+      Object.keys(sample).forEach(function(k){
+        var kl=k.replace(/ /g,'').toLowerCase();
+        if(kl.includes('사업자')||kl.includes('bizno')||kl.includes('사업자번호')) bizCol=k;
+        if(kl.includes('고지')||kl.includes('금액')||kl.includes('amt')||kl.includes('amount')) amtCol=k;
+      });
+
+      if(!bizCol){showToast('사업자번호 컬럼을 찾을 수 없습니다.','error');return;}
+      if(!amtCol){showToast('금액 컬럼을 찾을 수 없습니다.','error');return;}
+
+      var matched=0, unmatched=0;
+      var batch=db.batch();
+      var ref=db.collection('gojiData').doc(GOJI_KEY);
+
+      rows.forEach(function(row){
+        var bizNo=String(row[bizCol]||'').replace(/[-\s]/g,'');
+        var amt=Number(String(row[amtCol]||'').replace(/[,원\s]/g,''))||0;
+        if(!bizNo||!amt) return;
+
+        var client=ALL.find(function(c){return (c.bizNo||'').replace(/-/g,'')=== bizNo;});
+        if(client){
+          var tmpl=document.getElementById('goji-tmpl')?.value||'';
+          var msg=tmpl.replace('{업체명}',client.name||'').replace('{금액}',amt.toLocaleString());
+          if(!GOJI_DATA[client.id]) GOJI_DATA[client.id]={};
+          GOJI_DATA[client.id].amt=amt;
+          GOJI_DATA[client.id].msg=msg;
+          batch.set(ref,{[client.id]:{amt:amt,msg:msg}},{merge:true});
+          matched++;
+        } else {
+          unmatched++;
+        }
+      });
+
+      await batch.commit();
+      input.value='';
+      renderGoji();
+      showToast('✅ 업로드 완료 — 매칭 '+matched+'개 / 미매칭 '+unmatched+'개'+(unmatched>0?' (사업자번호 확인 필요)':''));
+    } catch(err){
+      showToast('❌ 엑셀 읽기 실패: '+err.message,'error');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+
+function gojiAmtChange(el){
+  var cid=el.getAttribute('data-goji-amt');
+  var raw=el.value.replace(/,/g,'');
+  var amt=Number(raw)||0;
+  saveGojiField(cid,'amt',amt);
+  updateGojiMsg(cid,el.value);
+}
+
+
+function gojiSentChange(el){
+  var cid=el.getAttribute('data-goji-sent');
+  saveGojiField(cid,'sent',el.checked);
+  renderGoji();
 }
 
 </script>
