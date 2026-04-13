@@ -2356,6 +2356,14 @@ async function loadTax(){
   _taxChkCache=Object.assign({},chk);
   _taxChkKey=key;
 
+  // 부가세 예정(1기=pd1, 2기=pd3)이면 예정고지 데이터 로드
+  var _gojiMap={};
+  if(tp==='vat'&&(pd==='1'||pd==='3')){
+    var gojiKey='goji_'+yr+'_vat'+(pd==='1'?'1':'2');
+    var gojiDoc=await db.collection('gojiData').doc(gojiKey).get();
+    _gojiMap=gojiDoc.exists?gojiDoc.data():{};
+  }
+
   let clients=ALL.filter(c=>c.status==='활성'||c.status==='기장중지');
   clients=myClientsFilter(clients,'txMgrFilter');
   if(tp==='vat'){
@@ -2444,8 +2452,24 @@ async function loadTax(){
           </tr></thead>
           <tbody>
             ${list.map(c=>`
-              <tr data-cid="${c.id}" style="border-top:1px solid #f0f2f7;${chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent'};transition:background .2s">
-                <td style="padding:8px 10px"><strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}<span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span></td>
+              <tr data-cid="${c.id}" style="border-top:1px solid #f0f2f7;
+                ${_gojiMap[c.id]?.status==='goji'?'background:#EAF3DE22;border-left:3px solid #27ae60;opacity:0.75':
+                  _gojiMap[c.id]?.status==='none'?'background:#f7f8fb;border-left:3px solid #e0e2e8;opacity:0.6':
+                  chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':
+                  'border-left:3px solid transparent'};transition:background .2s">
+                <td style="padding:8px 10px">
+                  <strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>
+                  ${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}
+                  ${_gojiMap[c.id]?.status==='goji'
+                    ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11;margin-left:6px">예정고지</span>'
+                    : _gojiMap[c.id]?.status==='none'
+                      ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#f0f2f7;color:#888;margin-left:6px">신고불필요'+((_gojiMap[c.id]?.reason&&_gojiMap[c.id].reason!=='없음')?'('+_gojiMap[c.id].reason+')':'')+'</span>'
+                      : _gojiMap[c.id]?.status==='duty'
+                        ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B;margin-left:6px">직접신고</span>'
+                        : ''
+                  }
+                  <span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span>
+                </td>
                 <td style="padding:8px 10px;font-family:monospace;font-size:11.5px">${c.bizNo||'-'}</td>
                 <td style="padding:8px 10px;text-align:center">${tb_type(c.type)}</td>
                 ${tp==='wht'?'':(`<td class="cc" style="padding:8px 10px">
@@ -2455,8 +2479,13 @@ async function loadTax(){
                     <option value="N" ${chk[c.id]?.recv==='N'?'selected':''}>자료없음</option>
                   </select>
                 </td>`)}
-                <td class="cc" style="padding:8px 10px"><input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)"></td>
-                ${(tp!=='wht'&&tp!=='biz')?`
+                <td class="cc" style="padding:8px 10px">
+                  ${(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none')
+                    ? '<input type="checkbox" checked disabled style="opacity:0.4" title="'+((_gojiMap[c.id]?.status==='goji')?'예정고지 납부':'신고불필요')+'">'
+                    : `<input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)">`
+                  }
+                </td>
+                ${(tp!=='wht'&&tp!=='biz'&&_gojiMap[c.id]?.status!=='goji'&&_gojiMap[c.id]?.status!=='none')?`
                 <td style="padding:6px 10px;text-align:right">
                   <input type="text" value="${chk[c.id]?.payAmt?Number(chk[c.id].payAmt).toLocaleString():''}" 
                     placeholder="납부금액" 
@@ -2470,9 +2499,9 @@ async function loadTax(){
                     
                     onchange="updateSmsCount()"
                     style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">
-                </td>`:''}
+                </td>`:(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none'?'<td></td><td></td>':'')}
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
-                  <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
+                  <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value);showToast('배부담당 저장됨','ok');setTimeout(()=>loadTax(),800)">
                     <option value="">배정 안함</option>
                     ${['황효건','김서지','안지윤','유승희','김희진'].map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
                   </select>
@@ -2499,7 +2528,15 @@ async function saveTax(key,cid,field,val){
   // 행 스타일 즉시 반영
   updateTaxRow(cid, _taxChkCache[cid]);
   // Firebase 저장 (비동기)
-  db.collection('taxChecks').doc(key).set({[cid]:{[field]:val}},{merge:true});
+  await db.collection('taxChecks').doc(key).set({[cid]:{[field]:val}},{merge:true});
+  if(field==='assignee'){
+    showToast('✅ 배부담당 저장 완료!');
+    // 캐시 업데이트 후 리렌더링
+    if(!_taxChkCache[cid]) _taxChkCache[cid]={};
+    _taxChkCache[cid][field]=val;
+    // 담당자 그룹이 바뀌므로 재조회
+    setTimeout(function(){loadTax();},300);
+  }
   const chk=_taxChkCache;
   const tp=document.getElementById('txType')?.value;
   let clients=ALL.filter(c=>c.status==='활성'||c.status==='기장중지');
@@ -5483,6 +5520,7 @@ async function uploadGojiExcel(input){
   // 국세청 예정고지 엑셀 컬럼명 파악
   // A:대상여부, E:사업자등록번호, F:상호, H:예정고지세액
   var colBizNo = null, colAmt = null, colTarget = null;
+  var colDuty = null, colReason = null;
   if(rows.length > 0){
     var keys = Object.keys(rows[0]);
     keys.forEach(function(k){
@@ -5490,9 +5528,10 @@ async function uploadGojiExcel(input){
       if(kk.includes('사업자') && kk.includes('번호')) colBizNo = k;
       if(kk.includes('세액') && !colAmt) colAmt = k;
       if(kk.includes('대상여부')) colTarget = k;
+      if(kk.includes('신고의무')) colDuty = k;
+      if(kk.includes('제외사유')) colReason = k;
     });
   }
-  console.log('컬럼 매핑:', {colBizNo:colBizNo, colAmt:colAmt, colTarget:colTarget});
 
   rows.forEach(function(row){
     // 대상여부 '여'인 것만
@@ -5515,6 +5554,16 @@ async function uploadGojiExcel(input){
     }
 
     // 컬럼 못 찾으면 기존 방식으로 폴백
+    var isTarget = colTarget ? String(row[colTarget]||'').trim()==='여' : false;
+    var dutyYn = colDuty ? String(row[colDuty]||'').trim() : '';
+    var reason = colReason ? String(row[colReason]||'').trim() : '';
+
+    // 상태 분류
+    var gojiStatus = '';
+    if(isTarget) gojiStatus = 'goji';          // 예정고지 납부
+    else if(dutyYn==='여') gojiStatus = 'duty'; // 직접 신고납부
+    else gojiStatus = 'none';                   // 신고불필요
+
     if(!colBizNo || !colAmt){
       var vals = Object.values(row);
       vals.forEach(function(cell){
@@ -5534,10 +5583,11 @@ async function uploadGojiExcel(input){
     });
 
     if(client){
-      saveData[client.id] = {amt: amt, bizNo: bizNo, sent: false};
-      matched++;
+      saveData[client.id] = {amt: amt, bizNo: bizNo, sent: false, status: gojiStatus, reason: reason};
+      if(gojiStatus==='duty') matched++;  // 신고납부 대상만 카운트
+      else matched++;
     } else {
-      saveData['_unmatched_'+bizNo] = {amt: amt, bizNo: bizNo, _unmatched: true};
+      saveData['_unmatched_'+bizNo] = {amt: amt, bizNo: bizNo, _unmatched: true, status: gojiStatus, reason: reason};
       unmatched++;
     }
   });
