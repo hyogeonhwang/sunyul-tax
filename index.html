@@ -370,6 +370,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
   <div id="toast-wrap" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
 
 <!-- ==================== LOGIN ==================== -->
+<!-- 배부변경 fixed 드롭다운 -->
+<div id="reassign-menu" style="display:none;position:fixed;background:#fff;border:0.5px solid #dde;border-radius:8px;padding:4px 0;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.15);min-width:140px">
+  <div style="padding:5px 16px;font-size:11px;color:#aab;border-bottom:0.5px solid #f0f2f7;">배부담당 변경</div>
+  <div id="reassign-list"></div>
+</div>
 <div id="loginScreen" style="display:none">
   <div class="login-box">
     <div class="login-logo">
@@ -2554,7 +2559,7 @@ async function loadTax(){
                   _gojiMap[c.id]?.status==='none'?'background:#f7f8fb;border-left:3px solid #e0e2e8;opacity:0.6':
                   chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':
                   'border-left:3px solid transparent'};transition:background .2s">
-                <td style="padding:8px 10px">
+                <td style="padding:8px 10px" onmouseenter="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='inline-block'" onmouseleave="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='none'">
                   <strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>
                   ${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}
                   ${_gojiMap[c.id]?.status==='goji'
@@ -2564,6 +2569,9 @@ async function loadTax(){
                       : ''
                   }
                   <span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span>
+                  ${ROLE==='admin'&&mgr!=='미배정'?`<span class="reassign-btn" style="display:none;margin-left:8px;">
+                    <button onclick="event.stopPropagation();openReassignMenu(event,'${key}','${c.id}','${mgr}')" style="padding:1px 7px;font-size:11px;background:#f0f2f7;border:0.5px solid #dde;border-radius:4px;cursor:pointer;color:#667">↻ 배부변경</button>
+                  </span>`:''}
                 </td>
                 <td style="padding:8px 10px;font-family:monospace;font-size:11.5px">${c.bizNo||'-'}</td>
                 <td style="padding:8px 10px;text-align:center">${tb_type(c.type)}</td>
@@ -2612,6 +2620,41 @@ async function loadTax(){
   el.innerHTML=html;
 }
 
+// 배부변경 fixed 드롭다운
+var _raMenu={key:'',cid:'',mgr:''};
+function openReassignMenu(e,key,cid,mgr){
+  e.stopPropagation();
+  _raMenu={key,cid,mgr};
+  var menu=document.getElementById('reassign-menu');
+  if(!menu) return;
+  // 담당자 목록 채우기
+  var list=document.getElementById('reassign-list');
+  var names=['황효건','김서지','안지윤','유승희','김희진'];
+  list.innerHTML='<div onclick="doReassign(\'\')" style="padding:7px 16px;font-size:12px;cursor:pointer;color:#e74c3c;border-bottom:0.5px solid #f0f2f7" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">미배정으로 원복</div>'
+    +names.filter(function(n){return n!==mgr;}).map(function(n){
+      return '<div onclick="doReassign(\''+n+'\')" style="padding:7px 16px;font-size:12px;cursor:pointer" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">'+n+'</div>';
+    }).join('');
+  // 위치 계산 (버튼 기준)
+  var rect=e.currentTarget.getBoundingClientRect();
+  var top=rect.bottom+4;
+  var left=rect.left;
+  // 화면 하단 넘치면 위로
+  if(top+180>window.innerHeight) top=rect.top-180;
+  menu.style.top=top+'px';
+  menu.style.left=left+'px';
+  menu.style.display='block';
+}
+
+async function doReassign(name){
+  document.getElementById('reassign-menu').style.display='none';
+  await saveTax(_raMenu.key,_raMenu.cid,'assignee',name);
+}
+
+document.addEventListener('click',function(e){
+  var menu=document.getElementById('reassign-menu');
+  if(menu&&!menu.contains(e.target)) menu.style.display='none';
+});
+
 // 현재 로드된 신고체크 데이터 캐시
 var _taxChkCache={};
 var _taxChkKey='';
@@ -2625,26 +2668,31 @@ async function saveTax(key,cid,field,val){
   // Firebase 저장 (비동기)
   await db.collection('taxChecks').doc(key).set({[cid]:{[field]:val}},{merge:true});
   if(field==='assignee'){
-    showToast('✅ 배부담당 저장 완료!');
-    // 캐시 업데이트 후 리렌더링
-    if(!_taxChkCache[cid]) _taxChkCache[cid]={};
-    _taxChkCache[cid][field]=val;
+    // 배정 안함 선택 시 assignee 필드 삭제
+    if(!val){
+      await db.collection('taxChecks').doc(key).update({[cid+'.assignee']:firebase.firestore.FieldValue.delete()});
+      if(_taxChkCache[cid]) delete _taxChkCache[cid].assignee;
+    } else {
+      if(!_taxChkCache[cid]) _taxChkCache[cid]={};
+      _taxChkCache[cid][field]=val;
+    }
+    showToast(val?'✅ 배부담당 저장 완료!':'↩️ 미배정으로 원복 완료!');
     // 담당자 그룹이 바뀌므로 재조회
     setTimeout(function(){loadTax();},300);
+    return;
   }
   const chk=_taxChkCache;
   const tp=document.getElementById('txType')?.value;
+  const pd=document.getElementById('txPeriod')?.value||'1';
   let clients=ALL.filter(c=>c.status==='활성');
   if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter');
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
-    const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
+    const isJunggan=pdNum===1||pdNum===3;
     clients=clients.filter(c=>{
       if(isJunggan){
-        // 예정: 법인 + 분기신고 일반과세 개인
         return c.type==='법인' || (c.vatType==='일반' && c.vatCycle==='분기');
       } else {
-        // 확정: 법인 + 일반과세자
         if(c.type==='법인') return true;
         if(c.vatType!=='일반') return false;
         return true;
@@ -2659,6 +2707,7 @@ async function saveTax(key,cid,field,val){
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>c.whtYn==='Y'&&c._whtMgr&&c._whtMgr!=='미배정');
   }
+  if(!clients.length) return;
   const done=clients.filter(c=>chk[c.id]?.done).length;
   const pct=Math.round(done/clients.length*100);
   // 전체 진행바 업데이트
@@ -2666,13 +2715,16 @@ async function saveTax(key,cid,field,val){
   if(pb) pb.style.width=pct+'%';
   const pt=document.querySelector('#txContent .pct-text');
   if(pt) pt.textContent=done+'/'+clients.length+' 완료 ('+pct+'%)';
-  // 담당자별 미니바도 업데이트
+  // 담당자별 진행바 업데이트
   const mgrGroups={};
   clients.forEach(c=>{
-    const m=tp==='wht'?(c._whtMgr||c.manager||'미배정'):(c.manager||'미배정');
-    if(!mgrGroups[m]) mgrGroups[m]={total:0,done:0};
-    mgrGroups[m].total++;
-    if(chk[c.id]?.done) mgrGroups[m].done++;
+    var assignee=chk[c.id]?.assignee;
+    var effM=tp==='wht'
+      ?(c._whtMgr||c.manager||'미배정')
+      :((assignee&&assignee!=='미배정'&&assignee!=='배정 안함')?assignee:(c.manager||'미배정'));
+    if(!mgrGroups[effM]) mgrGroups[effM]={total:0,done:0};
+    mgrGroups[effM].total++;
+    if(chk[c.id]?.done) mgrGroups[effM].done++;
   });
   Object.entries(mgrGroups).forEach(function([mgr,stat]){
     const mgrId='mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
@@ -2680,8 +2732,8 @@ async function saveTax(key,cid,field,val){
     if(!mgrEl) return;
     const hdr=mgrEl.previousElementSibling;
     if(!hdr) return;
-    // 미니바
-    const miniBar=hdr.querySelector('.mini-pgfill');
+    // 진행바 (pgfill 클래스)
+    const miniBar=hdr.querySelector('.pgfill');
     if(miniBar) miniBar.style.width=(stat.total?Math.round(stat.done/stat.total*100):0)+'%';
     // 완료 텍스트
     const cntEl=hdr.querySelector('.mgr-cnt');
@@ -2798,12 +2850,12 @@ async function renderPayroll(){
         var chkMark='<span style="color:#27ae60;font-size:16px">✅</span>';
         var dash='<span style="color:#dde;font-size:13px">-</span>';
         html+='<tr style="border-top:1px solid #f0f2f7">';
-        closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-        closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasDa?chkMark:dash)+'</td>';
-        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
-        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
-        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        html+='<td class="cc" style="padding:8px 10px">'+(hasDa?chkMark:dash)+'</td>';
+        html+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
+        html+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
+        html+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -2845,11 +2897,11 @@ async function renderPayroll(){
       list.forEach(function(c){
         var k=c.id+'_'+lbl+'_'+pd;
         var isDone=chk[k];
-        closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-        closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-        closeHtml+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
-        closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
+        html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -2878,14 +2930,14 @@ async function renderPayroll(){
     clients.forEach(function(c){
       var k=c.id+'_'+pd;
       var isDone=chk[k];
-      closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      closeHtml+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
     });
-    closeHtml+='</tbody></table>';
-    el.innerHTML=closeHtml;
+    html+='</tbody></table>';
+    el.innerHTML=html;
 
   // 연간
   } else {
@@ -2912,14 +2964,14 @@ async function renderPayroll(){
     clients.forEach(function(c){
       var k=c.id+'_'+tp;
       var isDone=chk[k];
-      closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      closeHtml+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
     });
-    closeHtml+='</tbody></table>';
-    el.innerHTML=closeHtml;
+    html+='</tbody></table>';
+    el.innerHTML=html;
   }
 }
 
@@ -3676,10 +3728,10 @@ function searchBiz(q){
       var b1=d[5]?d[5]+'%':'-';
       html+='<tr style="border-bottom:1px solid #f7f8fb;cursor:pointer" onclick="copyBizCode(\''+d[0]+'\')" title="클릭하면 업종코드 복사"'
         +' onmouseover="this.style.background=\'#f7f9ff\'" onmouseout="this.style.background=\'\'">';
-      closeHtml+='<td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#1A3169;font-size:13px;white-space:nowrap">'+d[0]+'</td>';
-      closeHtml+='<td style="padding:7px 10px;font-size:13px">'+hl+'</td>';
-      closeHtml+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#27ae60;font-weight:600">'+s1+s2+'</td>';
-      closeHtml+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#a05500;font-weight:600">'+b1+'</td>';
+      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#1A3169;font-size:13px;white-space:nowrap">'+d[0]+'</td>';
+      html+='<td style="padding:7px 10px;font-size:13px">'+hl+'</td>';
+      html+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#27ae60;font-weight:600">'+s1+s2+'</td>';
+      html+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#a05500;font-weight:600">'+b1+'</td>';
       html+='</tr>';
     });
   });
@@ -4572,6 +4624,18 @@ async function renderSalary(){
   var el=document.getElementById('sal-body'); if(!el) return;
   el.innerHTML='<div class="ld"><div class="sp"></div></div>';
 
+  try{
+  // ALL이 아직 로드 안됐으면 최대 5초 대기
+  if(!ALL.length){
+    var waited=0;
+    await new Promise(function(resolve){
+      var t=setInterval(function(){
+        waited+=200;
+        if(ALL.length||waited>=5000){clearInterval(t);resolve();}
+      },200);
+    });
+  }
+
   var mgrF=document.getElementById('sal-mgr-filter')?.value||'';
   var myName=ROLE==='admin'?'':(USERS[ME?.email]?.name||'');
 
@@ -4651,28 +4715,51 @@ async function renderSalary(){
       var allDone=isSalDone(chk,c.id);
       var rowStyle='border-top:1px solid #f0f2f7;'+(allDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent');
       html+='<tr style="'+rowStyle+'">';
-      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-      closeHtml+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
-      closeHtml+='<td style="padding:8px 10px;text-align:center">'
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+      html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
+      html+='<td style="padding:8px 10px;text-align:center">'
         +(isFixed?'<span class="bdg" style="background:#e0f0ff;color:#1A3169">고정</span>'
                 :'<span class="bdg" style="background:#fff0dc;color:#a05500">변동</span>')+'</td>';
 
       // 유형별 완료 체크박스
       function typeChk(key){ return '<input type="checkbox" '+(chk[key]?'checked':'')+' onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+key+'&quot;,this.checked,this)">'; }
-      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(chk[c.id+'_no_salary']?'checked':'')+' style="accent-color:#aab" title="이달 급여없음" onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+c.id+'_no_salary&quot;,this.checked,this)"></td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_daily_done')+'</td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
-      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(chk[c.id+'_no_salary']?'checked':'')+' style="accent-color:#aab" title="이달 급여없음" onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+c.id+'_no_salary&quot;,this.checked,this)"></td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_daily_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
       // 메모
-      closeHtml+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
+      html+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
       html+='</tr>';
     });
+    // 합계 행 계산
+    var sumDaily=0, sumBiz=0, sumLabor=0, sumRetire=0;
+    list.forEach(function(c){
+      if(chk[c.id+'_daily_done']) sumDaily++;
+      if(chk[c.id+'_biz_done']) sumBiz++;
+      if(chk[c.id+'_labor_done']) sumLabor++;
+      if(chk[c.id+'_retire_done']) sumRetire++;
+    });
+    html+='<tfoot>'
+      +'<tr style="background:#EAF3DE;border-top:1.5px solid #C0DD97">'
+      +'<td colspan="4" style="padding:7px 10px;font-size:12px;font-weight:500;color:#3B6D11">이달 합계</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;color:#aab;">-</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumDaily?'#3B6D11':'#aab')+'">'+sumDaily+'개</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumBiz?'#3B6D11':'#aab')+'">'+sumBiz+'개</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumLabor?'#3B6D11':'#aab')+'">'+sumLabor+'개</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumRetire?'#3B6D11':'#aab')+'">'+sumRetire+'개</td>'
+      +'<td></td>'
+      +'</tr>'
+      +'</tfoot>';
     html+='</tbody></table></div></div>';
   });
 
   el.innerHTML=html;
+  } catch(e){
+    console.error('renderSalary error:', e);
+    el.innerHTML='<div style="padding:20px;color:#e74c3c;font-size:13px">⚠️ 오류: '+e.message+'</div>';
+  }
 }
 
 async function saveSalaryInstant(docId,key,val,cbEl){
@@ -4705,16 +4792,21 @@ async function saveSalaryInstant(docId,key,val,cbEl){
   if(pb) pb.style.width=pct2+'%';
   if(pt) pt.textContent=stat.done+'/'+stat.total+' 완료 ('+pct2+'%)';
 
-  // 그룹 카운터 업데이트
+  // 그룹 카운터 + 합계 업데이트
   if(row){
     var grpDiv=row.closest('[id^="sal-mgr-"]');
     if(grpDiv){
       var grpRows=grpDiv.querySelectorAll('tbody tr');
       var grpDone=0;
+      var sumD=0,sumB=0,sumL=0,sumR=0;
       grpRows.forEach(function(r){
         var noSalEl=r.querySelector('input[onchange*="_no_salary"]');
         var typeDoneEls=r.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])');
         if((noSalEl&&noSalEl.checked)||Array.from(typeDoneEls).some(function(el){return el.checked;})) grpDone++;
+        if(r.querySelector('input[onchange*="_daily_done"]')?.checked) sumD++;
+        if(r.querySelector('input[onchange*="_biz_done"]')?.checked) sumB++;
+        if(r.querySelector('input[onchange*="_labor_done"]')?.checked) sumL++;
+        if(r.querySelector('input[onchange*="_retire_done"]')?.checked) sumR++;
       });
       var grpTotal=grpRows.length;
       var grpHdr=grpDiv.previousElementSibling;
@@ -4724,6 +4816,16 @@ async function saveSalaryInstant(docId,key,val,cbEl){
         var grpBar=grpHdr.querySelector('div div div');
         if(grpBar) grpBar.style.width=(grpTotal?Math.round(grpDone/grpTotal*100):0)+'%';
         grpHdr.style.background=(grpDone===grpTotal&&grpTotal>0)?'#f0faf4':'#f7f8fb';
+      }
+      // tfoot 합계 업데이트
+      var tfoot=grpDiv.querySelector('tfoot tr');
+      if(tfoot){
+        var cells=tfoot.querySelectorAll('td');
+        var types=[sumD,sumB,sumL,sumR];
+        for(var ti=0;ti<4;ti++){
+          var cell=cells[ti+5];
+          if(cell){cell.textContent=types[ti]+'개';cell.style.color=types[ti]?'#3B6D11':'#aab';}
+        }
       }
     }
   }
