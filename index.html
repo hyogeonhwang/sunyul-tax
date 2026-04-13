@@ -5394,25 +5394,53 @@ async function uploadGojiExcel(input){
   var data = await file.arrayBuffer();
   var wb = XLSX.read(data, {type:'array'});
   var ws = wb.Sheets[wb.SheetNames[0]];
-  var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  // header:1로 읽어서 첫행을 헤더로 사용
+  var rows = XLSX.utils.sheet_to_json(ws, {defval:''});
 
   var matched = 0, unmatched = 0;
   var saveData = {};
-  var deadlines = {vat1:'4월 25일', vat2:'10월 25일', corp:'8월 31일', income:'11월 30일'};
-  var deadline = deadlines[GOJI_TYPE]||'';
+
+  // 국세청 예정고지 엑셀 컬럼명 파악
+  // A:대상여부, E:사업자등록번호, F:상호, H:예정고지세액
+  var colBizNo = null, colAmt = null, colTarget = null;
+  if(rows.length > 0){
+    var keys = Object.keys(rows[0]);
+    keys.forEach(function(k){
+      var kk = k.replace(/\n/g,' ');
+      if(kk.includes('사업자') && kk.includes('번호')) colBizNo = k;
+      if(kk.includes('세액')) colAmt = k;
+      if(kk.includes('대상여부')) colTarget = k;
+    });
+  }
 
   rows.forEach(function(row){
-    // 사업자번호 형태 찾기 (숫자 10자리)
+    // 대상여부 '여'인 것만
+    if(colTarget && row[colTarget] !== '여') return;
+
     var bizNo = '', amt = 0;
-    row.forEach(function(cell){
-      var s = String(cell).replace(/[^0-9]/g,'');
-      if(s.length===10 && !bizNo) bizNo = s;
-      var n = parseFloat(String(cell).replace(/,/g,''));
-      if(!isNaN(n) && n>0 && n<100000000000 && n>1000) amt = Math.max(amt, n);
-    });
+
+    if(colBizNo){
+      bizNo = String(row[colBizNo]||'').replace(/[^0-9]/g,'');
+    }
+    if(colAmt){
+      var amtStr = String(row[colAmt]||'').replace(/[^0-9]/g,'');
+      amt = parseInt(amtStr)||0;
+    }
+
+    // 컬럼 못 찾으면 기존 방식으로 폴백
+    if(!colBizNo || !colAmt){
+      var vals = Object.values(row);
+      vals.forEach(function(cell){
+        var s = String(cell).replace(/[^0-9]/g,'');
+        if(s.length===10 && !bizNo) bizNo = s;
+        var n = parseFloat(String(cell).replace(/,/g,''));
+        if(!isNaN(n) && n>1000 && n<100000000000) amt = Math.max(amt, n);
+      });
+    }
+
     if(!bizNo || !amt) return;
 
-    // 앱 거래처 매칭
+    // 앱 거래처 매칭 (사업자번호 숫자만 비교)
     var client = ALL.find(function(c){
       var cn = String(c.bizNo||'').replace(/[^0-9]/g,'');
       return cn === bizNo;
@@ -5434,7 +5462,7 @@ async function uploadGojiExcel(input){
 
   var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
   await db.collection('gojiData').doc(key).set(saveData, {merge:true});
-  GOJI_DATA = {...GOJI_DATA, ...saveData};
+  GOJI_DATA = Object.assign({}, GOJI_DATA, saveData);
   showToast('✅ 업로드 완료! 매칭 '+matched+'개'+(unmatched?' / 미매칭 '+unmatched+'개':''));
   renderGoji();
   input.value = '';
