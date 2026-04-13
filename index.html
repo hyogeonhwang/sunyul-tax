@@ -6,151 +6,6 @@
 <title>세무법인 선율 업무관리</title>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 
-  <!-- 업종코드 검색 팝업 -->
-  <div id="bizPopup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,.45)" onclick="if(event.target===this)closeBizPopup()">
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;width:min(640px,94vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.18)">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f0f2f7">
-        <div style="font-size:15px;font-weight:700;color:#1A3169">🔍 업종코드 검색</div>
-        <button onclick="closeBizPopup()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#aab">✕</button>
-      </div>
-      <div style="padding:14px 20px 10px">
-        <input class="fi" type="text" id="bizPopupSearch" placeholder="업종명 또는 코드 6자리 (예: 학원, 809007)"
-          oninput="searchBizPopup(this.value)"
-          style="font-size:14px" autocomplete="off">
-      </div>
-      <div id="bizPopupResult" style="overflow-y:auto;padding:0 20px 16px;flex:1"></div>
-      <div id="bizPopupEmpty" style="display:none;text-align:center;padding:30px;color:#aab">검색 결과가 없습니다</div>
-    </div>
-  </div>
-
-  <!-- 연차 부여 모달 -->
-  <div id="moLeaveGrant" class="mo" style="display:none">
-    <div class="mo-box" style="width:360px">
-      <div class="mo-hdr"><div class="mo-ttl">➕ 연차 부여</div><button class="mo-cls" onclick="closeMo('moLeaveGrant')">✕</button></div>
-      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
-        <div class="fld"><label>직원</label>
-          <select class="fi" id="lg-user">
-            <option value="황효건">황효건</option>
-            <option value="김서지">김서지</option>
-            <option value="안지윤">안지윤</option>
-            <option value="유승희">유승희</option>
-            <option value="김희진">김희진</option>
-          </select>
-        </div>
-        <div class="fld"><label>연도</label>
-          <select class="fi" id="lg-year">
-            <option value="2025">2025년</option>
-            <option value="2026" selected>2026년</option>
-            <option value="2027">2027년</option>
-          </select>
-        </div>
-        <div class="fld"><label>부여 연차 (일)</label>
-          <input class="fi" type="number" id="lg-days" placeholder="15" min="1" max="30">
-        </div>
-        <div class="fld"><label>메모</label>
-          <input class="fi" id="lg-memo" placeholder="입사 2년차 법정연차">
-        </div>
-        <button class="btn btn-p" onclick="saveLeaveGrant()">저장</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 연차 사용 등록 모달 -->
-  <div id="moLeaveUse" class="mo" style="display:none">
-    <div class="mo-box" style="width:380px">
-      <div class="mo-hdr"><div class="mo-ttl" id="moLeaveUseTtl">📝 연차 사용 등록</div><button class="mo-cls" onclick="closeMo('moLeaveUse')">✕</button></div>
-      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
-        <div class="fld" id="lu-user-row"><label>직원</label>
-          <select class="fi" id="lu-user">
-            <option value="황효건">황효건</option>
-            <option value="김서지">김서지</option>
-            <option value="안지윤">안지윤</option>
-            <option value="유승희">유승희</option>
-            <option value="김희진">김희진</option>
-          </select>
-        </div>
-        <div class="fld"><label>날짜</label>
-          <div class="date-wrap">
-            <input class="fi" type="text" id="lu-date" placeholder="2026-01-01" maxlength="10" oninput="fmtDateInput(this)">
-            <button type="button" class="date-cal-btn" onclick="openDatePicker('lu-date-h','lu-date')">📅</button>
-            <input type="date" id="lu-date-h" class="date-hidden" onchange="syncDateFromPicker('lu-date-h','lu-date')">
-          </div>
-        </div>
-        <div class="fld"><label>사용 일수</label>
-          <select class="fi" id="lu-days">
-            <option value="1">1일</option>
-            <option value="0.5">0.5일 (반차)</option>
-            <option value="2">2일</option>
-            <option value="3">3일</option>
-            <option value="4">4일</option>
-            <option value="5">5일</option>
-          </select>
-        </div>
-        <div class="fld"><label>사유</label>
-          <input class="fi" id="lu-reason" placeholder="개인 사유">
-        </div>
-        <button class="btn btn-p" onclick="saveLeaveUse()">저장</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 직원 등록/수정 모달 -->
-  <div id="moStaff" class="mo" style="display:none">
-    <div class="mo-box" style="width:400px">
-      <div class="mo-hdr"><div class="mo-ttl" id="moStaffTtl">직원 추가</div><button class="mo-cls" onclick="closeMo('moStaff')">✕</button></div>
-      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
-        <div class="fr">
-          <div class="fld"><label>이름</label><input class="fi" id="sf-name" placeholder="홍길동"></div>
-          <div class="fld"><label>이메일</label><input class="fi" id="sf-email" placeholder="hong@sunyul.com"></div>
-        </div>
-        <div class="fr">
-          <div class="fld"><label>입사일</label>
-            <div class="date-wrap">
-              <input class="fi" type="text" id="sf-join" placeholder="2024-01-01" maxlength="10" oninput="fmtDateInput(this)">
-              <button type="button" class="date-cal-btn" onclick="openDatePicker('sf-join-h','sf-join')">📅</button>
-              <input type="date" id="sf-join-h" class="date-hidden" onchange="syncDateFromPicker('sf-join-h','sf-join')">
-            </div>
-          </div>
-          <div class="fld"><label>상태</label>
-            <select class="fi" id="sf-status" onchange="toggleLeaveDate(this.value)">
-              <option value="재직">재직</option>
-              <option value="퇴사">퇴사</option>
-            </select>
-          </div>
-        </div>
-        <div class="fld" id="sf-leavedate-div" style="display:none">
-          <label>퇴사일</label>
-          <div class="date-wrap">
-            <input class="fi" type="text" id="sf-leave" placeholder="2026-01-01" maxlength="10" oninput="fmtDateInput(this)">
-            <button type="button" class="date-cal-btn" onclick="openDatePicker('sf-leave-h','sf-leave')">📅</button>
-            <input type="date" id="sf-leave-h" class="date-hidden" onchange="syncDateFromPicker('sf-leave-h','sf-leave')">
-          </div>
-        </div>
-        <div class="fld"><label>메모</label><input class="fi" id="sf-memo" placeholder="메모 (선택사항)"></div>
-        <input type="hidden" id="sf-id">
-        <button class="btn btn-p" onclick="saveStaff()">저장</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 업무 인수인계 모달 -->
-  <div id="moHandover" class="mo" style="display:none">
-    <div class="mo-box" style="width:420px">
-      <div class="mo-hdr"><div class="mo-ttl">🔄 업무 인수인계</div><button class="mo-cls" onclick="closeMo('moHandover')">✕</button></div>
-      <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
-        <div class="al al-w" id="handover-info"></div>
-        <div class="fld"><label>인수인계 담당자</label>
-          <select class="fi" id="ho-target"></select>
-        </div>
-        <div id="handover-clients" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:10px;font-size:13px"></div>
-        <button class="btn btn-p" onclick="doHandover()">인수인계 실행</button>
-      </div>
-    </div>
-  </div>
-  <!-- Toast 알림 -->
-  <div id="toast-wrap" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
-</body>
-</html>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
   <!-- 업종코드 검색 팝업 -->
@@ -370,6 +225,149 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 </style>
 </head>
 <body>
+  <!-- 업종코드 검색 팝업 -->
+  <div id="bizPopup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,.45)" onclick="if(event.target===this)closeBizPopup()">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;width:min(640px,94vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f0f2f7">
+        <div style="font-size:15px;font-weight:700;color:#1A3169">🔍 업종코드 검색</div>
+        <button onclick="closeBizPopup()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#aab">✕</button>
+      </div>
+      <div style="padding:14px 20px 10px">
+        <input class="fi" type="text" id="bizPopupSearch" placeholder="업종명 또는 코드 6자리 (예: 학원, 809007)"
+          oninput="searchBizPopup(this.value)"
+          style="font-size:14px" autocomplete="off">
+      </div>
+      <div id="bizPopupResult" style="overflow-y:auto;padding:0 20px 16px;flex:1"></div>
+      <div id="bizPopupEmpty" style="display:none;text-align:center;padding:30px;color:#aab">검색 결과가 없습니다</div>
+    </div>
+  </div>
+
+  <!-- 연차 부여 모달 -->
+  <div id="moLeaveGrant" class="mo" style="display:none">
+    <div class="mo-box" style="width:360px">
+      <div class="mo-hdr"><div class="mo-ttl">➕ 연차 부여</div><button class="mo-cls" onclick="closeMo('moLeaveGrant')">✕</button></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div class="fld"><label>직원</label>
+          <select class="fi" id="lg-user">
+            <option value="황효건">황효건</option>
+            <option value="김서지">김서지</option>
+            <option value="안지윤">안지윤</option>
+            <option value="유승희">유승희</option>
+            <option value="김희진">김희진</option>
+          </select>
+        </div>
+        <div class="fld"><label>연도</label>
+          <select class="fi" id="lg-year">
+            <option value="2025">2025년</option>
+            <option value="2026" selected>2026년</option>
+            <option value="2027">2027년</option>
+          </select>
+        </div>
+        <div class="fld"><label>부여 연차 (일)</label>
+          <input class="fi" type="number" id="lg-days" placeholder="15" min="1" max="30">
+        </div>
+        <div class="fld"><label>메모</label>
+          <input class="fi" id="lg-memo" placeholder="입사 2년차 법정연차">
+        </div>
+        <button class="btn btn-p" onclick="saveLeaveGrant()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 연차 사용 등록 모달 -->
+  <div id="moLeaveUse" class="mo" style="display:none">
+    <div class="mo-box" style="width:380px">
+      <div class="mo-hdr"><div class="mo-ttl" id="moLeaveUseTtl">📝 연차 사용 등록</div><button class="mo-cls" onclick="closeMo('moLeaveUse')">✕</button></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div class="fld" id="lu-user-row"><label>직원</label>
+          <select class="fi" id="lu-user">
+            <option value="황효건">황효건</option>
+            <option value="김서지">김서지</option>
+            <option value="안지윤">안지윤</option>
+            <option value="유승희">유승희</option>
+            <option value="김희진">김희진</option>
+          </select>
+        </div>
+        <div class="fld"><label>날짜</label>
+          <div class="date-wrap">
+            <input class="fi" type="text" id="lu-date" placeholder="2026-01-01" maxlength="10" oninput="fmtDateInput(this)">
+            <button type="button" class="date-cal-btn" onclick="openDatePicker('lu-date-h','lu-date')">📅</button>
+            <input type="date" id="lu-date-h" class="date-hidden" onchange="syncDateFromPicker('lu-date-h','lu-date')">
+          </div>
+        </div>
+        <div class="fld"><label>사용 일수</label>
+          <select class="fi" id="lu-days">
+            <option value="1">1일</option>
+            <option value="0.5">0.5일 (반차)</option>
+            <option value="2">2일</option>
+            <option value="3">3일</option>
+            <option value="4">4일</option>
+            <option value="5">5일</option>
+          </select>
+        </div>
+        <div class="fld"><label>사유</label>
+          <input class="fi" id="lu-reason" placeholder="개인 사유">
+        </div>
+        <button class="btn btn-p" onclick="saveLeaveUse()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 직원 등록/수정 모달 -->
+  <div id="moStaff" class="mo" style="display:none">
+    <div class="mo-box" style="width:400px">
+      <div class="mo-hdr"><div class="mo-ttl" id="moStaffTtl">직원 추가</div><button class="mo-cls" onclick="closeMo('moStaff')">✕</button></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div class="fr">
+          <div class="fld"><label>이름</label><input class="fi" id="sf-name" placeholder="홍길동"></div>
+          <div class="fld"><label>이메일</label><input class="fi" id="sf-email" placeholder="hong@sunyul.com"></div>
+        </div>
+        <div class="fr">
+          <div class="fld"><label>입사일</label>
+            <div class="date-wrap">
+              <input class="fi" type="text" id="sf-join" placeholder="2024-01-01" maxlength="10" oninput="fmtDateInput(this)">
+              <button type="button" class="date-cal-btn" onclick="openDatePicker('sf-join-h','sf-join')">📅</button>
+              <input type="date" id="sf-join-h" class="date-hidden" onchange="syncDateFromPicker('sf-join-h','sf-join')">
+            </div>
+          </div>
+          <div class="fld"><label>상태</label>
+            <select class="fi" id="sf-status" onchange="toggleLeaveDate(this.value)">
+              <option value="재직">재직</option>
+              <option value="퇴사">퇴사</option>
+            </select>
+          </div>
+        </div>
+        <div class="fld" id="sf-leavedate-div" style="display:none">
+          <label>퇴사일</label>
+          <div class="date-wrap">
+            <input class="fi" type="text" id="sf-leave" placeholder="2026-01-01" maxlength="10" oninput="fmtDateInput(this)">
+            <button type="button" class="date-cal-btn" onclick="openDatePicker('sf-leave-h','sf-leave')">📅</button>
+            <input type="date" id="sf-leave-h" class="date-hidden" onchange="syncDateFromPicker('sf-leave-h','sf-leave')">
+          </div>
+        </div>
+        <div class="fld"><label>메모</label><input class="fi" id="sf-memo" placeholder="메모 (선택사항)"></div>
+        <input type="hidden" id="sf-id">
+        <button class="btn btn-p" onclick="saveStaff()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 업무 인수인계 모달 -->
+  <div id="moHandover" class="mo" style="display:none">
+    <div class="mo-box" style="width:420px">
+      <div class="mo-hdr"><div class="mo-ttl">🔄 업무 인수인계</div><button class="mo-cls" onclick="closeMo('moHandover')">✕</button></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+        <div class="al al-w" id="handover-info"></div>
+        <div class="fld"><label>인수인계 담당자</label>
+          <select class="fi" id="ho-target"></select>
+        </div>
+        <div id="handover-clients" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:10px;font-size:13px"></div>
+        <button class="btn btn-p" onclick="doHandover()">인수인계 실행</button>
+      </div>
+    </div>
+  </div>
+  <!-- Toast 알림 -->
+  <div id="toast-wrap" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
 
 <!-- ==================== LOGIN ==================== -->
 <div id="loginScreen" style="display:none">
@@ -1026,9 +1024,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <div id="goji-summary" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
         <div style="display:flex;gap:6px;align-items:center">
-          <label style="font-size:11px;color:#889;display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="goji-select-all" onchange="gojiSelectAll(this.checked)"> 전체선택
-          </label>
+
           <button class="btn btn-p btn-sm" id="goji-send-btn" onclick="sendGojiSMS()" style="background:#27ae60;border-color:#27ae60">
             📱 선택 업체 문자 발송 (<span id="goji-selected-count">0</span>개)
           </button>
@@ -1967,6 +1963,11 @@ function loadClients(){
     fillKkSelect();
     renderDash();
     document.getElementById('cLd').style.display='none';
+  }, err=>{
+    console.error('clients onSnapshot error:', err);
+    document.getElementById('cLd').style.display='none';
+    var ds=document.getElementById('dashStats');
+    if(ds) ds.innerHTML='<div style="color:#e74c3c;padding:12px;font-size:13px">⚠️ 데이터 로드 실패: '+err.message+'</div>';
   });
 }
 
@@ -2399,7 +2400,8 @@ async function loadTax(){
 
   const mgrs={};
   clients.forEach(c=>{
-    const m=tp==='wht'?(c._whtMgr||c.manager||'미배정'):(c.manager||'미배정');
+    // 원천세: whtManager 우선, 나머지: 배부담당(assignee) → 없으면 거래처 담당자 → 없으면 미배정
+    const m=tp==='wht'?(c._whtMgr||c.manager||'미배정'):(chk[c.id]?.assignee||'미배정');
     if(!mgrs[m]) mgrs[m]=[];
     mgrs[m].push(c);
   });
@@ -2501,7 +2503,7 @@ async function loadTax(){
                     style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">
                 </td>`:(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none'?'<td></td><td></td>':'')}
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
-                  <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value);showToast('배부담당 저장됨','ok');setTimeout(()=>loadTax(),800)">
+                  <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
                     <option value="">배정 안함</option>
                     ${['황효건','김서지','안지윤','유승희','김희진'].map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
                   </select>
@@ -5461,7 +5463,7 @@ function renderGoji(){
     var amt = d.amt ? Number(d.amt).toLocaleString() : '';
     var sentStyle = d.sent ? 'opacity:0.55' : '';
     html += '<tr style="border-bottom:0.5px solid #f5f6fa;'+sentStyle+'">'
-      +'<td style="padding:8px 14px"><input type="checkbox" class="goji-chk" data-cid="'+c.id+'" '+(d.sent?'':'checked')+' onchange="updateGojiCount()"></td>'
+      +'<td style="padding:8px 14px"><input type="checkbox" class="goji-chk" data-cid="'+c.id+'" onchange="updateGojiCount()"></td>'
       +'<td style="padding:8px 10px"><div style="font-weight:600;color:#1A3169;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</div></td>'
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.manager||'-')+'</td>'
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.bizNo||'-')+'</td>'
@@ -5534,8 +5536,8 @@ async function uploadGojiExcel(input){
   }
 
   rows.forEach(function(row){
-    // 대상여부 '여'인 것만
-    if(colTarget && String(row[colTarget]||'').trim() !== '여') return;
+    // 대상여부 '부'여도 신고의무 여부 확인 후 none/duty로 저장
+    // (이전: '여'만 처리 → 예정고지=부+신고의무=부 업체가 신고체크에서 일반으로 표시되던 버그 수정)
     // 제외사유가 취소인 경우 제외
     var colExclude = null;
     Object.keys(row).forEach(function(k){
@@ -5574,7 +5576,9 @@ async function uploadGojiExcel(input){
       });
     }
 
-    if(!bizNo || !amt) return;
+    // none/duty는 amt 없어도 저장, goji만 amt 필수
+    if(!bizNo) return;
+    if(gojiStatus==='goji' && !amt) return;
 
     // 앱 거래처 매칭 (사업자번호 숫자만 비교)
     var client = ALL.find(function(c){
@@ -5584,8 +5588,7 @@ async function uploadGojiExcel(input){
 
     if(client){
       saveData[client.id] = {amt: amt, bizNo: bizNo, sent: false, status: gojiStatus, reason: reason};
-      if(gojiStatus==='duty') matched++;  // 신고납부 대상만 카운트
-      else matched++;
+      matched++;
     } else {
       saveData['_unmatched_'+bizNo] = {amt: amt, bizNo: bizNo, _unmatched: true, status: gojiStatus, reason: reason};
       unmatched++;
@@ -5788,14 +5791,7 @@ function fmtSalDay(v){
 }
 
 
-async function saveTaxPayAmt(el){
-  var key = el.dataset.key;
-  var cid = el.dataset.cid;
-  var val = el.value.replace(/[^0-9]/g,'');
-  if(val) el.value = parseInt(val).toLocaleString();
-  await db.collection('taxChecks').doc(key).set({[cid]:{payAmt:val}},{merge:true});
-  if(_taxChkCache) _taxChkCache[cid] = Object.assign({},_taxChkCache[cid]||{},{payAmt:val});
-}
+// (saveTaxPayAmt 3-arg version below)
 
 async function sendTaxSMS(){
   var yr = document.getElementById('txYear')?.value;
@@ -5914,3 +5910,5 @@ function activatePayChk(cid, val){
 }
 
 </script>
+</body>
+</html>
