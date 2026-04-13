@@ -612,13 +612,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
             <select class="sel" id="sal-day-filter" onchange="renderSalary()">
               <option value="">전체 급여일</option>
-              <option value="5">5일</option>
-              <option value="10">10일</option>
-              <option value="15">15일</option>
-              <option value="20">20일</option>
-              <option value="25">25일</option>
+              <option value="5일">5일</option>
+              <option value="10일">10일</option>
+              <option value="15일">15일</option>
+              <option value="20일">20일</option>
+              <option value="25일">25일</option>
               <option value="말일">말일</option>
-              <option value="기타">기타</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="renderSalary()">조회</button>
           </div>
@@ -2051,11 +2050,10 @@ function editClient(id){
   var sdOther=document.getElementById('f-salary-day-other');
   if(sdEl&&c.salaryDay){
     var sd=String(c.salaryDay);
-    // '5일' 또는 '5' 모두 처리
-    var stdNums=['5','10','15','20','25'];
     var cleanNum=sd.replace('일','').trim();
+    var stdNums=['5','10','15','20','25'];
     if(sd==='말일'){sdEl.value='말일';}
-    else if(stdNums.includes(cleanNum)){sdEl.value=cleanNum;}
+    else if(stdNums.includes(cleanNum)){sdEl.value=cleanNum+'일';}  // option value가 '10일' 형식
     else{sdEl.value='기타';if(sdOther){sdOther.style.display='block';sdOther.value=parseInt(sd)||'';}}
   }
   var sfEl=document.getElementById('f-salary-fixed'); if(sfEl) sfEl.checked=!!c.salaryFixed;
