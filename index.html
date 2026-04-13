@@ -576,6 +576,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <option value="corp">법인세</option>
               <option value="income">종합소득세</option>
               <option value="wht">원천세</option>
+              <option value="close">폐업 부가세</option>
             </select>
             <select class="sel" id="txPeriod" onchange="loadTax()"></select>
             <select class="sel" id="txMgrFilter" onchange="loadTax()" style="display:none">
@@ -2415,8 +2416,8 @@ async function loadTax(){
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
     clients=clients.filter(c=>{
       if(isJunggan){
-        // 예정: 법인만
-        return c.type==='법인';
+        // 예정: 법인 + 분기신고 일반과세 개인
+        return c.type==='법인' || (c.vatType==='일반' && c.vatCycle==='분기');
       } else {
         // 확정: 법인 + 일반과세자
         if(c.type==='법인') return true;
@@ -2441,7 +2442,47 @@ async function loadTax(){
     // whtManager 기준으로 역할 필터 적용
     clients=myClientsFilter(clients,'txMgrFilter',true);
   }
-  // tp==='all' 이면 필터 없이 전체
+  // 폐업 부가세: 폐업 업체만, 별도 렌더링
+  if(tp==='close'){
+    var closeClients=ALL.filter(function(c){return c.status==='폐업'&&c.endDate;});
+    closeClients=myClientsFilter(closeClients,'txMgrFilter');
+    if(!closeClients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>폐업 업체가 없습니다</div></div>';return;}
+    var closeHtml='<table style="width:100%;border-collapse:collapse">'
+      +'<th style="padding:8px 10px;text-align:left">상호</th>'
+      +'<th style="padding:8px 10px;text-align:left">사업자번호</th>'
+      +'<th style="padding:8px 10px;text-align:center">유형</th>'
+      +'<th style="padding:8px 10px;text-align:center">폐업일</th>'
+      +'<th style="padding:8px 10px;text-align:center">신고기한</th>'
+      +'<th style="padding:8px 10px;text-align:center">담당자</th>'
+      +'<th style="padding:8px 10px;text-align:center">신고완료</th>'
+      +'<th style="padding:8px 10px">메모</th>'
+      +'</tr></thead><tbody>';
+    closeClients.forEach(function(c){
+      var ed=c.endDate||'';
+      // 신고기한: 폐업일 다음달 25일
+      var deadline='';
+      if(ed){
+        var parts=ed.split('-');
+        var ey=parseInt(parts[0]),em=parseInt(parts[1]);
+        var dm=em===12?1:em+1, dy=em===12?ey+1:ey;
+        deadline=dy+'년 '+dm+'월 25일';
+      }
+      var isDone=chk[c.id]?.done;
+      closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient(\''+c.id+'\')">'+c.name+'</td>';
+      closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center">'+tb_type(c.type)+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center;color:#e74c3c;font-weight:600">'+ed+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:600;color:#1A3169">'+deadline+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center">'+(c.manager||'미배정')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="saveTax(\''+key+'\',\''+c.id+'\',\'done\',this.checked)"></td>';
+      closeHtml+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:140px" value="'+esc(chk[c.id]?.memo||'')+'" placeholder="메모..." onblur="saveTax(\''+key+'\',\''+c.id+'\',\'memo\',this.value)"></td>';
+      closeHtml+='</tr>';
+    });
+    closeHtml+='</tbody></table>';
+    el.innerHTML=closeHtml;
+    return;
+  }
   // 직원도 전체 조회 가능 (삭제·설정·배부만 대표 전용)
 
   if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>해당 조건의 거래처가 없습니다<br><small style="font-size:12px;color:#aab">거래처 등록 시 과세유형·신고주기를 확인해주세요</small></div></div>';return;}
@@ -2451,10 +2492,13 @@ async function loadTax(){
 
   const mgrs={};
   clients.forEach(c=>{
-    // 원천세: whtManager 우선, 나머지: 배부담당(assignee) → 없으면 거래처 담당자 → 없으면 미배정
-    const m=tp==='wht'?(c._whtMgr||c.manager||'미배정'):(chk[c.id]?.assignee||'미배정');
-    if(!mgrs[m]) mgrs[m]=[];
-    mgrs[m].push(c);
+    // 원천세: whtManager 우선, 나머지: 배부담당(assignee) → 없거나 미배정이면 거래처 담당자 → 없으면 미배정
+    var assignee=chk[c.id]?.assignee;
+    var effM=tp==='wht'
+      ?(c._whtMgr||c.manager||'미배정')
+      :((assignee&&assignee!=='미배정'&&assignee!=='배정 안함')?assignee:(c.manager||'미배정'));
+    if(!mgrs[effM]) mgrs[effM]=[];
+    mgrs[effM].push(c);
   });
 
   let html=`
@@ -2496,7 +2540,7 @@ async function loadTax(){
             <th style="padding:7px 10px;text-align:left">상호</th>
             <th style="padding:7px 10px;text-align:left">사업자번호</th>
             <th style="padding:7px 10px;text-align:center">유형</th>
-            ${(tp==='wht'||tp==='biz')?'':'(<th style="padding:7px 10px;text-align:center">자료수취</th>'}
+            ${(tp==='wht'||tp==='biz')?'':'<th style="padding:7px 10px;text-align:center">자료수취</th>'}
             <th style="padding:7px 10px;text-align:center">신고완료</th>
             ${tp!=='wht'?'<th style="padding:7px 10px;text-align:right">납부금액</th>':''}
             ${(tp!=='wht'&&tp!=='biz')?`<th style="padding:7px 10px;text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:5px">발송선택<input type="checkbox" id="pay-all-chk-${mgr}" onchange="paySelectAll(this.checked,'${mgr}')" style="width:13px;height:13px;cursor:pointer"></div></th>`:''}
@@ -2597,8 +2641,8 @@ async function saveTax(key,cid,field,val){
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
     clients=clients.filter(c=>{
       if(isJunggan){
-        // 예정: 법인만
-        return c.type==='법인';
+        // 예정: 법인 + 분기신고 일반과세 개인
+        return c.type==='법인' || (c.vatType==='일반' && c.vatCycle==='분기');
       } else {
         // 확정: 법인 + 일반과세자
         if(c.type==='법인') return true;
@@ -2754,12 +2798,12 @@ async function renderPayroll(){
         var chkMark='<span style="color:#27ae60;font-size:16px">✅</span>';
         var dash='<span style="color:#dde;font-size:13px">-</span>';
         html+='<tr style="border-top:1px solid #f0f2f7">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-        html+='<td class="cc" style="padding:8px 10px">'+(hasDa?chkMark:dash)+'</td>';
-        html+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
-        html+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
-        html+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
+        closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasDa?chkMark:dash)+'</td>';
+        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
+        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
+        closeHtml+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -2801,11 +2845,11 @@ async function renderPayroll(){
       list.forEach(function(c){
         var k=c.id+'_'+lbl+'_'+pd;
         var isDone=chk[k];
-        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-        html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
-        html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+        closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+        closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        closeHtml+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
+        closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -2834,14 +2878,14 @@ async function renderPayroll(){
     clients.forEach(function(c){
       var k=c.id+'_'+pd;
       var isDone=chk[k];
-      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+      closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      closeHtml+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
     });
-    html+='</tbody></table>';
-    el.innerHTML=html;
+    closeHtml+='</tbody></table>';
+    el.innerHTML=closeHtml;
 
   // 연간
   } else {
@@ -2868,14 +2912,14 @@ async function renderPayroll(){
     clients.forEach(function(c){
       var k=c.id+'_'+tp;
       var isDone=chk[k];
-      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+      closeHtml+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      closeHtml+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
     });
-    html+='</tbody></table>';
-    el.innerHTML=html;
+    closeHtml+='</tbody></table>';
+    el.innerHTML=closeHtml;
   }
 }
 
@@ -3632,10 +3676,10 @@ function searchBiz(q){
       var b1=d[5]?d[5]+'%':'-';
       html+='<tr style="border-bottom:1px solid #f7f8fb;cursor:pointer" onclick="copyBizCode(\''+d[0]+'\')" title="클릭하면 업종코드 복사"'
         +' onmouseover="this.style.background=\'#f7f9ff\'" onmouseout="this.style.background=\'\'">';
-      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#1A3169;font-size:13px;white-space:nowrap">'+d[0]+'</td>';
-      html+='<td style="padding:7px 10px;font-size:13px">'+hl+'</td>';
-      html+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#27ae60;font-weight:600">'+s1+s2+'</td>';
-      html+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#a05500;font-weight:600">'+b1+'</td>';
+      closeHtml+='<td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#1A3169;font-size:13px;white-space:nowrap">'+d[0]+'</td>';
+      closeHtml+='<td style="padding:7px 10px;font-size:13px">'+hl+'</td>';
+      closeHtml+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#27ae60;font-weight:600">'+s1+s2+'</td>';
+      closeHtml+='<td style="padding:7px 10px;text-align:center;font-size:13px;color:#a05500;font-weight:600">'+b1+'</td>';
       html+='</tr>';
     });
   });
@@ -4583,7 +4627,7 @@ async function renderSalary(){
     html+='</div>';
     html+='<div id="'+mgrId+'">';
     html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
-    html+='<colgroup><col><col style="width:130px"><col style="width:60px"><col style="width:60px"><col style="width:80px"><col style="width:80px"><col style="width:80px"><col style="width:80px"><col style="width:150px"></colgroup>';
+    html+='<colgroup><col><col style="width:130px"><col style="width:60px"><col style="width:60px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:140px"></colgroup>';
     html+='<thead><tr style="background:#fafafa">'
       +'<th style="padding:7px 10px;text-align:left">상호</th>'
       +'<th style="padding:7px 10px;text-align:left">사업자번호</th>'
@@ -4607,22 +4651,22 @@ async function renderSalary(){
       var allDone=isSalDone(chk,c.id);
       var rowStyle='border-top:1px solid #f0f2f7;'+(allDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent');
       html+='<tr style="'+rowStyle+'">';
-      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-      html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
-      html+='<td style="padding:8px 10px;text-align:center">'
+      closeHtml+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+      closeHtml+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
+      closeHtml+='<td style="padding:8px 10px;text-align:center">'
         +(isFixed?'<span class="bdg" style="background:#e0f0ff;color:#1A3169">고정</span>'
                 :'<span class="bdg" style="background:#fff0dc;color:#a05500">변동</span>')+'</td>';
 
       // 유형별 완료 체크박스
       function typeChk(key){ return '<input type="checkbox" '+(chk[key]?'checked':'')+' onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+key+'&quot;,this.checked,this)">'; }
-      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(chk[c.id+'_no_salary']?'checked':'')+' style="accent-color:#aab" title="이달 급여없음" onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+c.id+'_no_salary&quot;,this.checked,this)"></td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_daily_done')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(chk[c.id+'_no_salary']?'checked':'')+' style="accent-color:#aab" title="이달 급여없음" onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+c.id+'_no_salary&quot;,this.checked,this)"></td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_daily_done')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
+      closeHtml+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
       // 메모
-      html+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
+      closeHtml+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
       html+='</tr>';
     });
     html+='</tbody></table></div></div>';
