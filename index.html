@@ -2715,6 +2715,11 @@ function hasSalaryDone(yr, months, cid, type){
   return months.some(function(m){ return !!(SALARY_CACHE[yr][m] && SALARY_CACHE[yr][m][key]); });
 }
 
+// 급여관리 업체 완료 판단: 이달없음 OR 유형 중 하나라도 체크
+function isSalDone(chk, cid){
+  return !!(chk[cid+'_no_salary']||chk[cid+'_daily_done']||chk[cid+'_biz_done']||chk[cid+'_labor_done']||chk[cid+'_retire_done']);
+}
+
 async function renderPayroll(){
   var yr=document.getElementById('pyYear')?.value||'2026';
   var tp=document.getElementById('pyType')?.value||'all';
@@ -4569,12 +4574,7 @@ async function renderSalary(){
   var chk=doc.exists?doc.data():{};
 
   // 완료 건수: 해당 유형이 모두 완료된 업체
-  var done=clients.filter(function(c){
-    var ps=c.payrollSettings||{};
-    var hasDaily=!!ps.daily, hasBiz=!!ps.biz, hasLabor=!!ps.labor, hasRetire=!!ps.retire;
-    if(!hasDaily&&!hasBiz&&!hasLabor&&!hasRetire) return false;
-    return (!hasDaily||chk[c.id+'_daily_done'])&&(!hasBiz||chk[c.id+'_biz_done'])&&(!hasLabor||chk[c.id+'_labor_done'])&&(!hasRetire||chk[c.id+'_retire_done']);
-  }).length;
+  var done=clients.filter(function(c){return isSalDone(chk,c.id);}).length;
   var pct=Math.round(done/clients.length*100);
 
   var mgrs={};
@@ -4586,12 +4586,7 @@ async function renderSalary(){
     +'</div>';
 
   Object.entries(mgrs).forEach(function([mgr,list]){
-    var mdone=list.filter(function(c){
-      var ps=c.payrollSettings||{};
-      var hasDaily=!!ps.daily, hasBiz=!!ps.biz, hasLabor=!!ps.labor, hasRetire=!!ps.retire;
-      if(!hasDaily&&!hasBiz&&!hasLabor&&!hasRetire) return false;
-      return (!hasDaily||chk[c.id+'_daily_done'])&&(!hasBiz||chk[c.id+'_biz_done'])&&(!hasLabor||chk[c.id+'_labor_done'])&&(!hasRetire||chk[c.id+'_retire_done']);
-    }).length;
+    var mdone=list.filter(function(c){return isSalDone(chk,c.id);}).length;
     var mgrId='sal-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     var allDone=mdone===list.length&&list.length>0;
     html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
@@ -4610,6 +4605,7 @@ async function renderSalary(){
       +'<th style="padding:7px 10px;text-align:center">급여일</th>'
       +'<th style="padding:7px 10px;text-align:center">구분</th>'
       
+      +'<th style="padding:7px 10px;text-align:center;font-size:11px;color:#aab">없음</th>'
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">일용직</th>'
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">사업소득</th>'
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">근로소득</th>'
@@ -4623,10 +4619,7 @@ async function renderSalary(){
       var dailyDone=chk[c.id+'_daily_done'];
       var bizDone=chk[c.id+'_biz_done'];
       var laborDone=chk[c.id+'_labor_done'];
-      // 전체 완료: 해당 유형이 모두 체크된 경우
-      var hasDaily=!!ps.daily, hasBiz=!!ps.biz, hasLabor=!!ps.labor, hasRetire=!!ps.retire;
-      var retireDone=chk[c.id+'_retire_done'];
-      var allDone=(!hasDaily||dailyDone)&&(!hasBiz||bizDone)&&(!hasLabor||laborDone)&&(!hasRetire||retireDone)&&(hasDaily||hasBiz||hasLabor||hasRetire);
+      var allDone=isSalDone(chk,c.id);
       var rowStyle='border-top:1px solid #f0f2f7;'+(allDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent');
       html+='<tr style="'+rowStyle+'">';
       html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
@@ -4637,12 +4630,12 @@ async function renderSalary(){
                 :'<span class="bdg" style="background:#fff0dc;color:#a05500">변동</span>')+'</td>';
 
       // 유형별 완료 체크박스
-      function typeChk(flag, key){ return flag?'<input type="checkbox" '+(chk[key]?'checked':'')+' onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+key+'&quot;,this.checked,this)">':'<span style="color:#dde">-</span>'; }
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(hasDaily, c.id+'_daily_done')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(hasBiz, c.id+'_biz_done')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(hasLabor, c.id+'_labor_done')+'</td>';
-      var hasRetire=!!ps.retire;
-      html+='<td class="cc" style="padding:8px 10px">'+typeChk(hasRetire, c.id+'_retire_done')+'</td>';
+      function typeChk(key){ return '<input type="checkbox" '+(chk[key]?'checked':'')+' onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+key+'&quot;,this.checked,this)">'; }
+      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(chk[c.id+'_no_salary']?'checked':'')+' style="accent-color:#aab" title="이달 급여없음" onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+c.id+'_no_salary&quot;,this.checked,this)"></td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_daily_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
       // 메모
       html+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
       html+='</tr>';
@@ -4655,33 +4648,67 @@ async function renderSalary(){
 
 async function saveSalaryInstant(docId,key,val,cbEl){
   var row=cbEl?cbEl.closest('tr'):null;
-  if(row&&(key.endsWith('_daily_done')||key.endsWith('_biz_done')||key.endsWith('_labor_done'))){
-    // 해당 행의 모든 유형 체크 여부 확인
-    var allChks=row.querySelectorAll('input[type=checkbox][onchange*="_done"]');
-    var allChecked=Array.from(allChks).every(function(el){return el===cbEl?val:el.checked;});
-    row.style.background=allChecked?'#f0faf4':'';
-    row.style.borderLeft=allChecked?'3px solid #27ae60':'3px solid transparent';
+  // 행 스타일 즉시 업데이트
+  if(row){
+    var noSal=row.querySelector('input[onchange*="_no_salary"]');
+    var typeDone=row.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])');
+    var isComplete=(noSal&&(key.endsWith('_no_salary')?val:noSal.checked))
+      ||Array.from(typeDone).some(function(el){return el===cbEl?val:el.checked;});
+    row.style.background=isComplete?'#f0faf4':'';
+    row.style.borderLeft=isComplete?'3px solid #27ae60':'3px solid transparent';
   }
-  // 진행률 업데이트
-  var total=document.querySelectorAll('#sal-body input[type=checkbox][onchange*="_done"]').length;
-  var done2=document.querySelectorAll('#sal-body input[type=checkbox][onchange*="_done"]:checked').length;
-  var pct2=total?Math.round(done2/total*100):0;
+  // 전체 진행률
+  function countSalDone(){
+    var rows=document.querySelectorAll('#sal-body tbody tr');
+    var total=rows.length, done=0;
+    rows.forEach(function(r){
+      var noSalEl=r.querySelector('input[onchange*="_no_salary"]');
+      var typeDoneEls=r.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])');
+      var complete=(noSalEl&&noSalEl.checked)||Array.from(typeDoneEls).some(function(el){return el.checked;});
+      if(complete) done++;
+    });
+    return {total:total,done:done};
+  }
+  var stat=countSalDone();
+  var pct2=stat.total?Math.round(stat.done/stat.total*100):0;
   var pb=document.querySelector('#sal-body .pgfill');
   var pt=document.querySelector('#sal-body .pct-text');
   if(pb) pb.style.width=pct2+'%';
-  if(pt) pt.textContent=done2+'/'+total+' 완료 ('+pct2+'%)';
+  if(pt) pt.textContent=stat.done+'/'+stat.total+' 완료 ('+pct2+'%)';
+
+  // 그룹 카운터 업데이트
+  if(row){
+    var grpDiv=row.closest('[id^="sal-mgr-"]');
+    if(grpDiv){
+      var grpRows=grpDiv.querySelectorAll('tbody tr');
+      var grpDone=0;
+      grpRows.forEach(function(r){
+        var noSalEl=r.querySelector('input[onchange*="_no_salary"]');
+        var typeDoneEls=r.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])');
+        if((noSalEl&&noSalEl.checked)||Array.from(typeDoneEls).some(function(el){return el.checked;})) grpDone++;
+      });
+      var grpTotal=grpRows.length;
+      var grpHdr=grpDiv.previousElementSibling;
+      if(grpHdr){
+        var cntEl=grpHdr.querySelector('span:nth-child(3)');
+        if(cntEl) cntEl.textContent='('+grpDone+'/'+grpTotal+' 완료)'+(grpDone===grpTotal&&grpTotal>0?' ✅':'');
+        var grpBar=grpHdr.querySelector('div div div');
+        if(grpBar) grpBar.style.width=(grpTotal?Math.round(grpDone/grpTotal*100):0)+'%';
+        grpHdr.style.background=(grpDone===grpTotal&&grpTotal>0)?'#f0faf4':'#f7f8fb';
+      }
+    }
+  }
+
   await saveSalary(docId,key,val);
 
-  // 유형별 완료 시 → 원천세 신고체크 자동 연동 (모든 유형 완료 시 done:true)
-  if(key.endsWith('_daily_done')||key.endsWith('_biz_done')||key.endsWith('_labor_done')){
-    var cid=key.replace(/_(?:daily|biz|labor)_done$/,'');
+  // 원천세 신고체크 자동 연동 (이달없음 제외, 유형 완료 시)
+  if(key.endsWith('_daily_done')||key.endsWith('_biz_done')||key.endsWith('_labor_done')||key.endsWith('_retire_done')){
+    var cid=key.replace(/_(?:daily|biz|labor|retire)_done$/,'');
     var parts=docId.split('_');
     if(parts.length>=3){
-      var salYr=parts[1];
-      var salM=parseInt(parts[2]);
+      var salYr=parts[1], salM=parseInt(parts[2]);
       var whtKey='tax_'+salYr+'_wht_'+salM;
-      // 해당 업체 행의 모든 done 체크박스 확인
-      var allDone=row?Array.from(row.querySelectorAll('input[type=checkbox][onchange*="_done"]')).every(function(el){return el===cbEl?val:el.checked;}):val;
+      var allDone=row?Array.from(row.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])')).some(function(el){return el===cbEl?val:el.checked;}):val;
       await db.collection('taxChecks').doc(whtKey).set({[cid]:{done:allDone}},{merge:true});
       if(DASH_TAX_CACHE[whtKey]) DASH_TAX_CACHE[whtKey][cid]={done:allDone};
       if(curPage==='dashboard') renderDashStatus();
