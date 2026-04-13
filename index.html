@@ -147,6 +147,8 @@
       </div>
     </div>
   </div>
+  <!-- Toast 알림 -->
+  <div id="toast-wrap" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
 </body>
 </html>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -5626,6 +5628,18 @@ function renderDashStatus(){
   }).join('');
 
   statusEl.innerHTML=rows||'<div style="text-align:center;padding:22px;color:#aab;font-size:13px">이번달 신고 항목 없음</div>';
+}
+
+
+function showToast(msg, type){
+  var wrap = document.getElementById('toast-wrap');
+  if(!wrap) return;
+  var el = document.createElement('div');
+  var bg = type==='warn' ? '#e67e22' : type==='err' ? '#e74c3c' : '#27ae60';
+  el.style.cssText = 'background:'+bg+';color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.2);opacity:1;transition:opacity .3s;white-space:nowrap';
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(function(){el.style.opacity='0';setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300);}, 2500);
 }
 
 </script>
