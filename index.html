@@ -1503,11 +1503,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <div style="display:flex;gap:6px;align-items:center">
               <select class="fi" id="f-salary-day" onchange="toggleSalaryDayOther(this.value)" style="flex:1">
                 <option value="">선택</option>
-                <option value="5">5일</option>
-                <option value="10">10일</option>
-                <option value="15">15일</option>
-                <option value="20">20일</option>
-                <option value="25">25일</option>
+                <option value="5일">5일</option>
+                <option value="10일">10일</option>
+                <option value="15일">15일</option>
+                <option value="20일">20일</option>
+                <option value="25일">25일</option>
                 <option value="말일">말일</option>
                 <option value="기타">기타 (직접입력)</option>
               </select>
@@ -2050,10 +2050,13 @@ function editClient(id){
   var sdEl=document.getElementById('f-salary-day');
   var sdOther=document.getElementById('f-salary-day-other');
   if(sdEl&&c.salaryDay){
-    var stdDays=['말일','5일','10일','15일','20일','25일'];
-    var matched=stdDays.includes(c.salaryDay)?c.salaryDay.replace('일',''):null;
-    if(matched||c.salaryDay==='말일'){sdEl.value=c.salaryDay==='말일'?'말일':matched;}
-    else{sdEl.value='기타';if(sdOther){sdOther.style.display='block';sdOther.value=parseInt(c.salaryDay)||'';}}
+    var sd=String(c.salaryDay);
+    // '5일' 또는 '5' 모두 처리
+    var stdNums=['5','10','15','20','25'];
+    var cleanNum=sd.replace('일','').trim();
+    if(sd==='말일'){sdEl.value='말일';}
+    else if(stdNums.includes(cleanNum)){sdEl.value=cleanNum;}
+    else{sdEl.value='기타';if(sdOther){sdOther.style.display='block';sdOther.value=parseInt(sd)||'';}}
   }
   var sfEl=document.getElementById('f-salary-fixed'); if(sfEl) sfEl.checked=!!c.salaryFixed;
   setTimeout(function(){updateVatCycle(c.vatType||'일반');if(c.vatCycle){var el=document.getElementById('f-vcycle');if(el)el.value=c.vatCycle;}},50);
@@ -4324,10 +4327,11 @@ async function renderSalary(){
   var clients=ALL.filter(function(c){
     if(c.status!=='활성'&&c.status!=='기장중지') return false;
     if(c.whtYn!=='Y') return false;
-    if(dayF&&c.salaryDay!==dayF) return false;
-    // 직원: 본인 담당만, 관리자: 필터 선택시 해당 담당자만
-    if(ROLE!=='admin'&&c.manager!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
+    if(dayF&&fmtSalDay(c.salaryDay)!==fmtSalDay(dayF)) return false;
+    // 원천담당자: whtSep=true이면 whtManager, 아니면 manager
+    var effMgr = (c.whtSep&&c.whtManager) ? c.whtManager : c.manager;
+    if(ROLE!=='admin'&&effMgr!==myName) return false;
+    if(ROLE==='admin'&&mgrF&&effMgr!==mgrF) return false;
     return true;
   });
 
@@ -4346,7 +4350,7 @@ async function renderSalary(){
   var pct=Math.round(done/clients.length*100);
 
   var mgrs={};
-  clients.forEach(function(c){var mg=c.manager||'미배정';if(!mgrs[mg])mgrs[mg]=[];mgrs[mg].push(c);});
+  clients.forEach(function(c){var mg=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[mg])mgrs[mg]=[];mgrs[mg].push(c);});
 
   var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     +'<div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div>'
@@ -4384,7 +4388,7 @@ async function renderSalary(){
       html+='<tr style="'+rowStyle+'">';
       html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
       html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-      html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+(c.salaryDay||'-')+'</td>';
+      html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
       html+='<td style="padding:8px 10px;text-align:center">'
         +(isFixed?'<span class="bdg" style="background:#e0f0ff;color:#1A3169">고정</span>'
                 :'<span class="bdg" style="background:#fff0dc;color:#a05500">변동</span>')
@@ -5123,7 +5127,7 @@ function renderSendList(){
   list.innerHTML=clients.map(function(c){
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
       +'<input type="checkbox" class="send-chk" data-cid="'+c.id+'" checked onchange="updateSendCount()">'
-      +'<span style="flex:1;font-weight:500;color:#1A3169">'+c.name+'</span>'
+      +'<span style="flex:1;font-weight:500;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'
       +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
       +'</div>';
   }).join('');
@@ -5211,7 +5215,7 @@ function renderDeadlineClients(t){
   list.innerHTML=clients.map(function(c){
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
       +'<input type="checkbox" class="deadline-chk" data-cid="'+c.id+'" checked onchange="updateDeadlineCount()">'
-      +'<span style="flex:1;font-weight:500;color:#1A3169">'+c.name+'</span>'
+      +'<span style="flex:1;font-weight:500;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'
       +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
       +'</div>';
   }).join('');
@@ -5361,7 +5365,7 @@ function renderGoji(){
     var sentStyle = d.sent ? 'opacity:0.55' : '';
     html += '<tr style="border-bottom:0.5px solid #f5f6fa;'+sentStyle+'">'
       +'<td style="padding:8px 14px"><input type="checkbox" class="goji-chk" data-cid="'+c.id+'" '+(d.sent?'':'checked')+' onchange="updateGojiCount()"></td>'
-      +'<td style="padding:8px 10px"><div style="font-weight:600;color:#1A3169;font-size:13px">'+c.name+'</div></td>'
+      +'<td style="padding:8px 10px"><div style="font-weight:600;color:#1A3169;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</div></td>'
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.manager||'-')+'</td>'
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.bizNo||'-')+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-weight:600;color:#185FA5">'+amt+'원</td>'
@@ -5661,6 +5665,16 @@ function showToast(msg, type){
   el.textContent = msg;
   wrap.appendChild(el);
   setTimeout(function(){el.style.opacity='0';setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},300);}, 2500);
+}
+
+
+function fmtSalDay(v){
+  if(!v) return '-';
+  var s = String(v).trim();
+  if(s === '말일') return '말일';
+  var n = s.replace('일','').trim();
+  if(!isNaN(n) && n !== '') return n+'일';
+  return s;
 }
 
 </script>
