@@ -2404,7 +2404,7 @@ async function loadTax(){
           <tbody>
             ${list.map(c=>`
               <tr data-cid="${c.id}" style="border-top:1px solid #f0f2f7;${chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent'};transition:background .2s">
-                <td style="padding:8px 10px"><strong>${c.name}</strong>${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}<span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span></td>
+                <td style="padding:8px 10px"><strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}<span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span></td>
                 <td style="padding:8px 10px;font-family:monospace;font-size:11.5px">${c.bizNo||'-'}</td>
                 <td style="padding:8px 10px;text-align:center">${tb_type(c.type)}</td>
                 ${tp==='wht'?'':(`<td class="cc" style="padding:8px 10px">
@@ -2572,7 +2572,7 @@ async function renderPayroll(){
         var hasDa=ps.daily,hasBz=ps.biz,hasLa=ps.labor||ps.alabor,hasEtc=ps.abiz||ps.retire||ps.int||ps.div||ps.other;
         var kDa=c.id+'_일용직_'+curM,kBz=c.id+'_사업소득_'+curM,kLa=c.id+'_1',kEtc=c.id+'_abiz';
         html+='<tr style="border-top:1px solid #f0f2f7">';
-        html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
             var chkMark='<span style="color:#27ae60;font-size:16px">✅</span>';
         var dash='<span style="color:#dde;font-size:13px">-</span>';
@@ -2615,7 +2615,7 @@ async function renderPayroll(){
         var k=c.id+'_'+lbl+'_'+pd;
         var isDone=chk[k];
         html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
         html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
@@ -2640,7 +2640,7 @@ async function renderPayroll(){
       var k=c.id+'_'+pd;
       var isDone=chk[k];
       html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
       html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
       html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
@@ -2663,7 +2663,7 @@ async function renderPayroll(){
       var k=c.id+'_'+tp;
       var isDone=chk[k];
       html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
       html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
       html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
       html+='</tr>';
@@ -4386,7 +4386,7 @@ async function renderSalary(){
       var workDone=chk[c.id+'_done'];
       var rowStyle='border-top:1px solid #f0f2f7;'+(workDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent');
       html+='<tr style="'+rowStyle+'">';
-      html+='<td style="padding:8px 10px;font-weight:600">'+c.name+'</td>';
+      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
       html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
       html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#1A3169">'+fmtSalDay(c.salaryDay)+'</td>';
       html+='<td style="padding:8px 10px;text-align:center">'
