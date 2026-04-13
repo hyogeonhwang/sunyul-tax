@@ -2730,7 +2730,7 @@ async function renderPayroll(){
   // 전체 업체
   if(tp==='all'){
     var clients=myClientsFilter(ALL.filter(function(c){
-      return c.status==='활성' && (!pyQ||(c.name||'').toLowerCase().includes(pyQ));
+      return c.status==='활성' && c.type!=='신고대리' && (!pyQ||(c.name||'').toLowerCase().includes(pyQ));
     }),'pyMgrFilter',true);
     var doc=await db.collection('payrollChecks').doc(yr+'_monthly').get();
     var chk=doc.exists?doc.data():{};
@@ -2775,6 +2775,7 @@ async function renderPayroll(){
     await ensureSalaryCache(yr);
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
+      if(c.type==='신고대리') return false;
       if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
       if(!hasSalaryDone(yr,[parseInt(pd)],c.id)) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
@@ -2820,6 +2821,7 @@ async function renderPayroll(){
     var laborMonths = pd==='1'?[1,2,3,4,5,6]:[7,8,9,10,11,12];
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
+      if(c.type==='신고대리') return false;
       if(!c.payrollSettings||!c.payrollSettings.labor) return false;
       if(!hasSalaryDone(yr, laborMonths, c.id)) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
@@ -2853,6 +2855,7 @@ async function renderPayroll(){
     var allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
+      if(c.type==='신고대리') return false;
       if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
       if(!hasSalaryDone(prevYr, allMonths, c.id)) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
@@ -4535,6 +4538,7 @@ async function renderSalary(){
   if(salClr) salClr.style.display=salQ?'block':'none';
   var clients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
+    if(c.type==='신고대리') return false;
     if(c.whtYn!=='Y') return false;
     if(salQ&&!(c.name||'').toLowerCase().includes(salQ)) return false;
     if(dayF&&fmtSalDay(c.salaryDay)!==fmtSalDay(dayF)) return false;
@@ -4704,6 +4708,7 @@ async function checkSalaryAlerts(){
   var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
   var salClients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
+    if(c.type==='신고대리') return false;
     if(c.whtYn!=='Y') return false;
     if(myName&&c.manager!==myName) return false;
     return true;
