@@ -1537,18 +1537,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <span>고정급여 <span style="color:#aab;font-size:11px;font-weight:400">(매월 동일 — 자료수취 불필요)</span></span>
           </label>
         </div>
-        <div class="sdiv">지급명세서 해당 항목</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-daily"> 일용직 간이 (매월)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-biz"> 사업소득 간이 (매월)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-labor"> 근로소득 간이 (반기)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-abiz"> 사업소득 연간 (3/10)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-alabor"> 근로소득 연간 (3/10)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-retire"> 퇴직소득 연간 (3/10)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-int"> 이자소득 연간 (2/28)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-div"> 배당소득 연간 (2/28)</label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" id="ps-other"> 기타소득 연간 (2/28)</label>
-        </div>
       </div>
       <!-- 소셜계정 -->
       <div id="ct-plat" style="display:none;min-height:440px">
@@ -2421,7 +2409,7 @@ async function loadTax(){
   }
 
   let clients=ALL.filter(c=>c.status==='활성');
-  clients=myClientsFilter(clients,'txMgrFilter');
+  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter');
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
@@ -2450,6 +2438,8 @@ async function loadTax(){
       if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
       return true;
     });
+    // whtManager 기준으로 역할 필터 적용
+    clients=myClientsFilter(clients,'txMgrFilter',true);
   }
   // tp==='all' 이면 필터 없이 전체
   // 직원도 전체 조회 가능 (삭제·설정·배부만 대표 전용)
@@ -2601,7 +2591,7 @@ async function saveTax(key,cid,field,val){
   const chk=_taxChkCache;
   const tp=document.getElementById('txType')?.value;
   let clients=ALL.filter(c=>c.status==='활성');
-  clients=myClientsFilter(clients,'txMgrFilter');
+  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter');
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
@@ -2737,15 +2727,14 @@ async function renderPayroll(){
 
   // 전체 업체
   if(tp==='all'){
+    await ensureSalaryCache(yr);
+    var allMonthsAll=[1,2,3,4,5,6,7,8,9,10,11,12];
     var clients=myClientsFilter(ALL.filter(function(c){
       return c.status==='활성' && c.type!=='신고대리' && (!pyQ||(c.name||'').toLowerCase().includes(pyQ));
     }),'pyMgrFilter',true);
-    var doc=await db.collection('payrollChecks').doc(yr+'_monthly').get();
-    var chk=doc.exists?doc.data():{};
-    var curM=new Date().getMonth()+1;
     var mgrs={};
     clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
-    var html='<div class="al al-i" style="margin-bottom:12px">✅ = 신고설정에서 해당 항목이 설정된 업체. 세부 제출 확인은 각 항목 선택 후 확인하세요.</div>';
+    var html='<div class="al al-i" style="margin-bottom:12px">✅ = 올해 급여관리에서 해당 유형을 한 번이라도 체크한 업체</div>';
     Object.entries(mgrs).forEach(function([mgr,list]){
       var mgrId='py-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
       html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
@@ -2756,20 +2745,21 @@ async function renderPayroll(){
       html+='</div><div id="'+mgrId+'">';
       html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
       html+='<colgroup><col><col style="width:140px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:70px"></colgroup>';
-      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">일용직</th><th style="padding:7px 10px;text-align:center">사업소득</th><th style="padding:7px 10px;text-align:center">근로소득</th><th style="padding:7px 10px;text-align:center">기타연간</th></tr></thead><tbody>';
+      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">일용직</th><th style="padding:7px 10px;text-align:center">사업소득</th><th style="padding:7px 10px;text-align:center">근로소득</th><th style="padding:7px 10px;text-align:center">퇴직소득</th></tr></thead><tbody>';
       list.forEach(function(c){
-        var ps=c.payrollSettings||{};
-        var hasDa=ps.daily,hasBz=ps.biz,hasLa=ps.labor||ps.alabor,hasEtc=ps.abiz||ps.retire||ps.int||ps.div||ps.other;
-        var kDa=c.id+'_일용직_'+curM,kBz=c.id+'_사업소득_'+curM,kLa=c.id+'_1',kEtc=c.id+'_abiz';
+        var hasDa=hasSalaryDone(yr,allMonthsAll,c.id,'daily');
+        var hasBz=hasSalaryDone(yr,allMonthsAll,c.id,'biz');
+        var hasLa=hasSalaryDone(yr,allMonthsAll,c.id,'labor');
+        var hasRe=hasSalaryDone(yr,allMonthsAll,c.id,'retire');
+        var chkMark='<span style="color:#27ae60;font-size:16px">✅</span>';
+        var dash='<span style="color:#dde;font-size:13px">-</span>';
         html+='<tr style="border-top:1px solid #f0f2f7">';
         html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
-            var chkMark='<span style="color:#27ae60;font-size:16px">✅</span>';
-        var dash='<span style="color:#dde;font-size:13px">-</span>';
         html+='<td class="cc" style="padding:8px 10px">'+(hasDa?chkMark:dash)+'</td>';
         html+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
         html+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
-        html+='<td class="cc" style="padding:8px 10px">'+(hasEtc?chkMark:dash)+'</td>';
+        html+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -2778,17 +2768,13 @@ async function renderPayroll(){
     return;
   }
 
-  // 매월 (일용직 or 사업소득) - 전월 기준 참조
+  // 매월 (일용직 or 사업소득)
   if(tp==='daily'||tp==='biz'){
-    var pdNum=parseInt(pd);
-    var prevM=pdNum===1?12:pdNum-1;
-    var prevMYr=pdNum===1?String(parseInt(yr)-1):yr;
-    await ensureSalaryCache(prevMYr);
+    await ensureSalaryCache(yr);
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
       if(c.type==='신고대리') return false;
-      if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
-      if(!hasSalaryDone(prevMYr,[prevM],c.id)) return false;
+      if(!hasSalaryDone(yr,[parseInt(pd)],c.id,tp)) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
       return true;
     }), 'pyMgrFilter', true);
@@ -2833,7 +2819,6 @@ async function renderPayroll(){
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
       if(c.type==='신고대리') return false;
-      if(!c.payrollSettings||!c.payrollSettings.labor) return false;
       if(!hasSalaryDone(yr, laborMonths, c.id, 'labor')) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
       return true;
@@ -4718,6 +4703,9 @@ async function saveSalaryInstant(docId,key,val,cbEl){
 
 async function saveSalary(docId,key,val){
   await db.collection('salaryChecks').doc(docId).set({[key]:val},{merge:true});
+  // 캐시 무효화 → 지급명세서 재조회 시 최신 데이터 반영
+  var yr=docId.split('_')[1];
+  if(yr&&SALARY_CACHE[yr]) delete SALARY_CACHE[yr];
 }
 
 
