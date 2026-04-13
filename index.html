@@ -570,7 +570,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div style="display:flex;gap:8px;align-items:center">
             <select class="sel" id="txYear" onchange="loadTax()"><option value="2026">2026년</option><option value="2025">2025년</option></select>
             <select class="sel" id="txType" onchange="updateTxPeriod();loadTax()">
-              <option value="">신고 유형 선택</option>
+              <option value="" disabled selected>신고 유형을 선택하세요</option>
               <option value="vat">부가세 (일반과세)</option>
               <option value="simp">부가세 (간이과세)</option>
               <option value="biz">사업장현황신고</option>
@@ -583,7 +583,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <option value="">전체 담당자</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="loadTax()">조회</button>
-            <button class="btn btn-p btn-sm" id="tx-sms-btn" style="display:none;background:#27ae60;border-color:#27ae60" onclick="sendTaxSMS()">📱 납부마감 문자 발송</button>
+
           </div>
         </div>
         <!-- 납부마감 문자 발송 설정 -->
@@ -679,7 +679,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <div style="display:flex;gap:0;border-bottom:0.5px solid #e8ecf4;margin-bottom:14px">
         <div id="send-tab-general" onclick="switchSendTab('general')"
           style="padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px">일반 안내</div>
-
+        <div id="send-tab-deadline" onclick="switchSendTab('deadline')"
+          style="padding:9px 18px;font-size:13px;cursor:pointer;color:#889;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-0.5px">납부마감 안내</div>
       </div>
 
       <!-- 일반 안내 탭 -->
@@ -1904,7 +1905,12 @@ function go(page){
   // 페이지 전환 시 스크롤 맨 위로
   document.querySelector('.main').scrollTop=0;
   renderTabs();
-  if(page==='taxcheck'){loadTax();updateCrossWarnIcons();}
+  if(page==='taxcheck'){
+    var txTypeEl=document.getElementById('txType');
+    if(txTypeEl&&!txTypeEl.value){txTypeEl.value='';updateTxPeriod();}
+    else loadTax();
+    updateCrossWarnIcons();
+  }
   if(page==='salary'){initSalaryMonth();renderSalary();}
   if(page==='goji'){initGoji();loadGoji();}
   if(page==='kakao'){initSendCenter();}
@@ -2297,19 +2303,32 @@ async function doImport(){
 
 // =================== TAX CHECK ===================
 const TX_PERIODS={
-  all:['전체'],
   vat:['1기 예정 (1~3월)','1기 확정 (1~6월)','2기 예정 (7~9월)','2기 확정 (7~12월)'],
-  simp:['연간 신고 (1~12월)'],
-  biz:['사업장현황신고'],
-  corp:['12월 결산법인 (법인세 신고)','12월 결산법인 (중간예납)'],
-  income:['5월 종합소득세'],
+  simp:[],
+  biz:[],
+  corp:['신고 (12월 결산)','중간예납 (8월)'],
+  income:[],
   wht:Array.from({length:12},(_,i)=>`${i+1}월분 원천세`)
 };
+
+// 납부금액 있는 신고 유형
+const TX_HAS_AMT={vat:true,simp:true,corp:true,income:true,wht:true,biz:false};
 
 function updateTxPeriod(){
   const type=document.getElementById('txType')?.value;
   const sel=document.getElementById('txPeriod'); if(!sel) return;
-  sel.innerHTML=(TX_PERIODS[type]||[]).map((v,i)=>`<option value="${i+1}">${v}</option>`).join('');
+  const periods=TX_PERIODS[type]||[];
+  if(!type||periods.length===0){
+    sel.style.display='none';
+    sel.innerHTML='';
+  } else {
+    sel.style.display='';
+    sel.innerHTML=periods.map((v,i)=>`<option value="${i+1}">${v}</option>`).join('');
+  }
+  // 납부금액 칸 표시 여부
+  var smsWrap=document.getElementById('tax-sms-wrap');
+  var hasAmt=TX_HAS_AMT[type];
+  // 납부금액 컬럼은 loadTax에서 처리
 }
 
 async function loadTax(){
@@ -2327,7 +2346,7 @@ async function loadTax(){
     return;
   }
   if(smsBtnEl) smsBtnEl.style.display='flex';
-  if(smsWrapEl) smsWrapEl.style.display='block';
+  if(smsWrapEl) smsWrapEl.style.display=(TX_HAS_AMT[tp]?'block':'none');
 
   const key=`tax_${yr}_${tp}_${pd}`;
   el.innerHTML='<div class="ld"><div class="sp"></div></div>';
@@ -2399,7 +2418,7 @@ async function loadTax(){
             <div style="background:${allDone?'#27ae60':'#1A3169'};width:${list.length?Math.round(mdone/list.length*100):0}%;height:100%;border-radius:3px"></div>
           </div>
         </div>
-        ${ROLE==='admin'&&tp!=='wht'?`<button class="btn btn-s btn-xs" onclick="event.stopPropagation();bulkAssign('${key}','${mgr}')">일괄배부</button>`:''}        ${tp!=='wht'?`<button class="btn btn-s btn-xs" style="background:#27ae60;color:#fff;border-color:#27ae60" onclick="event.stopPropagation();sendTaxPaySMS('${key}','${tp}')">📱 납부안내 발송</button>`:''}
+        ${ROLE==='admin'&&tp!=='wht'?`<button class="btn btn-s btn-xs" onclick="event.stopPropagation();bulkAssign('${key}','${mgr}')">일괄배부</button>`:''}        ${tp!=='wht'&&tp!=='biz'?`<button class="btn btn-s btn-xs" style="background:#185FA5;color:#fff;border-color:#185FA5;font-size:11px" id="pay-sms-btn-${mgr}" onclick="event.stopPropagation();sendTaxPaySMS('${key}','${tp}','${mgr}')">납부안내 발송</button>`:''}
       </div>
       <div id="${mgrId}" style="overflow:hidden;transition:max-height .25s ease">
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
@@ -2416,9 +2435,10 @@ async function loadTax(){
             <th style="padding:7px 10px;text-align:left">상호</th>
             <th style="padding:7px 10px;text-align:left">사업자번호</th>
             <th style="padding:7px 10px;text-align:center">유형</th>
-            ${tp==='wht'?'':'<th style="padding:7px 10px;text-align:center">자료수취</th>'}
+            ${(tp==='wht'||tp==='biz')?'':'(<th style="padding:7px 10px;text-align:center">자료수취</th>'}
             <th style="padding:7px 10px;text-align:center">신고완료</th>
             ${tp!=='wht'?'<th style="padding:7px 10px;text-align:right">납부금액</th>':''}
+            ${(tp!=='wht'&&tp!=='biz')?`<th style="padding:7px 10px;text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:5px">발송선택<input type="checkbox" id="pay-all-chk-${mgr}" onchange="paySelectAll(this.checked,'${mgr}')" style="width:13px;height:13px;cursor:pointer"></div></th>`:''}
             ${ROLE==='admin'&&mgr==='미배정'?'<th style="padding:7px 10px">배부담당</th>':''}
             <th style="padding:7px 10px">메모</th>
           </tr></thead>
@@ -2436,12 +2456,20 @@ async function loadTax(){
                   </select>
                 </td>`)}
                 <td class="cc" style="padding:8px 10px"><input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)"></td>
-                ${tp!=='wht'?`<td style="padding:6px 10px;text-align:right">
+                ${(tp!=='wht'&&tp!=='biz')?`
+                <td style="padding:6px 10px;text-align:right">
                   <input type="text" value="${chk[c.id]?.payAmt?Number(chk[c.id].payAmt).toLocaleString():''}" 
                     placeholder="납부금액" 
-                    style="border:1px solid #dde;border-radius:5px;padding:3px 8px;font-size:12px;width:100px;text-align:right"
+                    style="border:0.5px solid #dde;border-radius:6px;padding:4px 8px;font-size:12px;width:90px;text-align:right"
                     onblur="saveTaxPayAmt('${key}','${c.id}',this.value)"
-                    oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    oninput="this.value=this.value.replace(/[^0-9]/g,'');activatePayChk('${c.id}',this.value)">
+                </td>
+                <td style="padding:6px 14px;text-align:center">
+                  <input type="checkbox" class="pay-sms-chk" data-cid="${c.id}" data-mgr="${mgr}"
+                    ${chk[c.id]?.payAmt?'':'disabled'}
+                    
+                    onchange="updateSmsCount()"
+                    style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">
                 </td>`:''}
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
                   <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
@@ -5802,6 +5830,37 @@ async function sendTaxPaySMS(key, tp){
 
   showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
   // TODO: SENS API 연동
+}
+
+
+function updateSmsCount(){
+  var chks=document.querySelectorAll('.pay-sms-chk:checked');
+  var btn=document.getElementById('tax-sms-btn');
+  var btn2=document.getElementById('tx-sms-btn'); if(btn2) btn2.textContent='📱 납부마감 문자 발송 ('+chks.length+'개)';
+}
+
+function paySelectAll(checked, mgr){
+  document.querySelectorAll('.pay-sms-chk[data-mgr="'+mgr+'"]:not(:disabled)').forEach(function(el){
+    el.checked=checked;
+    var label=el.closest('label');
+    if(label){
+      label.style.background=checked?'#EAF3DE':'#f5f6fa';
+      label.style.border='1px solid '+(checked?'#C0DD97':'#e0e2e8');
+    }
+  });
+  updateSmsCount();
+}
+
+
+function activatePayChk(cid, val){
+  var amt = parseInt(val)||0;
+  var chkEl = document.querySelector('.pay-sms-chk[data-cid="'+cid+'"]');
+  if(chkEl){
+    chkEl.disabled = !amt;
+    if(amt) chkEl.checked = true;
+    else chkEl.checked = false;
+  }
+  updateSmsCount();
 }
 
 </script>
