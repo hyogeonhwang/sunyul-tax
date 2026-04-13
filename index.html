@@ -642,7 +642,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div class="card-hdr">
           <div class="card-ttl">📋 지급명세서 체크</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select class="sel" id="pyYear" onchange="renderPayroll()">
+            <select class="sel" id="pyYear" onchange="SALARY_CACHE={};renderPayroll()">
               <option value="2026">2026년</option>
               <option value="2025">2025년</option>
             </select>
@@ -2039,11 +2039,13 @@ function renderClients(){
   const list=ALL.filter(c=>{
     if(cType==='비활성'){
       if(!['폐업','이관','기장중지'].includes(c.status)) return false;
+      if(mgr&&c.manager!==mgr) return false;
     } else {
       // 전체/유형탭: 활성 업체만
       if(c.status!=='활성') return false;
       if(cType!=='전체'&&c.type!==cType) return false;
       if(st&&c.status!==st) return false;
+      if(mgr&&c.manager!==mgr) return false;
     }
     if(q&&!`${c.name||''}${c.bizNo||''}${c.rep||''}${c.manager||''}`.toLowerCase().includes(q)) return false;
     return true;
@@ -2438,8 +2440,14 @@ async function loadTax(){
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
   if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
   if(tp==='wht'){
-    clients=clients.filter(c=>c.manager&&c.manager!=='미배정');
+    // map 먼저 → _whtMgr 계산
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
+    clients=clients.filter(c=>{
+      if(c.whtYn!=='Y') return false;
+      if(!c._whtMgr||c._whtMgr==='미배정') return false;
+      if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
+      return true;
+    });
   }
   // tp==='all' 이면 필터 없이 전체
   // 직원도 전체 조회 가능 (삭제·설정·배부만 대표 전용)
@@ -2612,8 +2620,8 @@ async function saveTax(key,cid,field,val){
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
   if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
   if(tp==='wht'){
-    clients=clients.filter(c=>c.manager&&c.manager!=='미배정');
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
+    clients=clients.filter(c=>c.whtYn==='Y'&&c._whtMgr&&c._whtMgr!=='미배정');
   }
   const done=clients.filter(c=>chk[c.id]?.done).length;
   const pct=Math.round(done/clients.length*100);
@@ -2684,6 +2692,26 @@ function updatePyPeriod(){
   }
 }
 
+// =================== 급여 캐시 (지급명세서 필터용) ===================
+var SALARY_CACHE = {};
+
+async function ensureSalaryCache(yr){
+  if(SALARY_CACHE[yr]) return;
+  var fetches = Array.from({length:12}, function(_, i){
+    var m = i+1;
+    return db.collection('salaryChecks').doc('salary_'+yr+'_'+m).get()
+      .then(function(doc){ return {m:m, data:doc.exists?doc.data():{}}; });
+  });
+  var results = await Promise.all(fetches);
+  SALARY_CACHE[yr] = {};
+  results.forEach(function(r){ SALARY_CACHE[yr][r.m] = r.data; });
+}
+
+function hasSalaryDone(yr, months, cid){
+  if(!SALARY_CACHE[yr]) return false;
+  return months.some(function(m){ return !!(SALARY_CACHE[yr][m] && SALARY_CACHE[yr][m][cid+'_done']); });
+}
+
 async function renderPayroll(){
   var yr=document.getElementById('pyYear')?.value||'2026';
   var tp=document.getElementById('pyType')?.value||'all';
@@ -2744,7 +2772,14 @@ async function renderPayroll(){
 
   // 매월 (일용직 or 사업소득)
   if(tp==='daily'||tp==='biz'){
-    var clients=myClientsFilter(ALL.filter(function(c){return c.status==='활성'&&c.payrollSettings&&c.payrollSettings[tp]&&(!pyQ||(c.name||'').toLowerCase().includes(pyQ));}), 'pyMgrFilter', true);
+    await ensureSalaryCache(yr);
+    var clients=myClientsFilter(ALL.filter(function(c){
+      if(c.status!=='활성') return false;
+      if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
+      if(!hasSalaryDone(yr,[parseInt(pd)],c.id)) return false;
+      if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
+      return true;
+    }), 'pyMgrFilter', true);
     if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">📋</div><div>'+lbl+' 대상 거래처가 없습니다</div></div>';return;}
     var doc=await db.collection('payrollChecks').doc(yr+'_monthly').get();
     var chk=doc.exists?doc.data():{};
@@ -2781,7 +2816,15 @@ async function renderPayroll(){
 
   // 반기 (근로소득 간이)
   } else if(tp==='labor'){
-    var clients=myClientsFilter(ALL.filter(function(c){return c.status==='활성'&&c.payrollSettings&&c.payrollSettings.labor&&(!pyQ||(c.name||'').toLowerCase().includes(pyQ));}), 'pyMgrFilter', true);
+    await ensureSalaryCache(yr);
+    var laborMonths = pd==='1'?[1,2,3,4,5,6]:[7,8,9,10,11,12];
+    var clients=myClientsFilter(ALL.filter(function(c){
+      if(c.status!=='활성') return false;
+      if(!c.payrollSettings||!c.payrollSettings.labor) return false;
+      if(!hasSalaryDone(yr, laborMonths, c.id)) return false;
+      if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
+      return true;
+    }), 'pyMgrFilter', true);
     var doc=await db.collection('payrollChecks').doc(yr+'_semi').get();
     var chk=doc.exists?doc.data():{};
     var periodLbl=pd==='1'?'상반기 (7/31 마감)':'하반기 (1/31 마감)';
@@ -2805,7 +2848,16 @@ async function renderPayroll(){
   // 연간
   } else {
     var dl=dlMap[tp]||'3/10';
-    var clients=myClientsFilter(ALL.filter(function(c){return c.status==='활성'&&c.payrollSettings&&c.payrollSettings[tp]&&(!pyQ||(c.name||'').toLowerCase().includes(pyQ));}), 'pyMgrFilter', true);
+    var prevYr=String(parseInt(yr)-1);
+    await ensureSalaryCache(prevYr);
+    var allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
+    var clients=myClientsFilter(ALL.filter(function(c){
+      if(c.status!=='활성') return false;
+      if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
+      if(!hasSalaryDone(prevYr, allMonths, c.id)) return false;
+      if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
+      return true;
+    }), 'pyMgrFilter', true);
     var doc=await db.collection('payrollChecks').doc(yr+'_annual').get();
     var chk=doc.exists?doc.data():{};
     var done=clients.filter(function(c){return chk[c.id+'_'+tp];}).length;
@@ -5286,7 +5338,7 @@ function renderSendList(){
   if(!list) return;
   list.innerHTML=clients.map(function(c){
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
-      +'<input type="checkbox" class="send-chk" data-cid="'+c.id+'" checked onchange="updateSendCount()">'
+      +'<input type="checkbox" class="send-chk" data-cid="'+c.id+'" onchange="updateSendCount()">'
       +'<span style="flex:1;font-weight:500;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'
       +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
       +'</div>';
@@ -5374,7 +5426,7 @@ function renderDeadlineClients(t){
   if(!list) return;
   list.innerHTML=clients.map(function(c){
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
-      +'<input type="checkbox" class="deadline-chk" data-cid="'+c.id+'" checked onchange="updateDeadlineCount()">'
+      +'<input type="checkbox" class="deadline-chk" data-cid="'+c.id+'" onchange="updateDeadlineCount()">'
       +'<span style="flex:1;font-weight:500;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'
       +'<span style="color:#aab;font-size:11px">'+(c.manager||'-')+'</span>'
       +'</div>';
