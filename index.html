@@ -5649,13 +5649,25 @@ function renderGoji(){
       +'<td style="padding:8px 10px;color:#A32D2D;font-size:11px">'+(d.bizNo||k)+'</td>'
       +'<td style="padding:8px 10px;text-align:right;color:#A32D2D">'+amt+'원</td>'
       +'<td style="padding:8px 10px;text-align:center">-</td>'
-      +'<td style="padding:8px 10px;text-align:center"><span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FCEBEB;color:#A32D2D">미매칭</span></td>'
+      +'<td style="padding:8px 10px;text-align:center;display:flex;align-items:center;gap:6px">'
+      +'<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FCEBEB;color:#A32D2D">미매칭</span>'
+      +'<button onclick="deleteGojiEntry(\''+k+'\')" style="padding:2px 8px;background:#e74c3c;color:#fff;border:none;border-radius:5px;font-size:11px;cursor:pointer">삭제</button>'
+      +'</td>'
       +'</tr>';
   });
 
   html += '</tbody></table>';
   el.innerHTML = html;
   updateGojiCount();
+}
+
+async function deleteGojiEntry(k){
+  if(!confirm('이 미매칭 항목을 삭제할까요?')) return;
+  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  await db.collection('gojiData').doc(key).update({[k]: firebase.firestore.FieldValue.delete()});
+  delete GOJI_DATA[k];
+  renderGoji();
+  showToast('삭제 완료');
 }
 
 async function gojiSentChange(el){
