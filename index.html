@@ -4561,7 +4561,7 @@ function initProfit(){
   var yr = document.getElementById('profit-year');
   if(yr) PROFIT_YEAR = yr.value;
   var mgrSel = document.getElementById('profit-mgr');
-  if(mgrSel) mgrSel.style.display = ROLE==='admin'?'block':'none';
+  if(mgrSel) mgrSel.style.display = 'block';
   loadProfit();
 }
 
@@ -5053,8 +5053,20 @@ async function sendGojiSMS(){
 
   // 실제 발송 (발신번호 등록 후 활성화)
   showToast('📱 문자 발송 기능은 발신번호 등록 후 활성화됩니다.','warn');
-  // TODO: SENS API 연동
-  // withPhone.forEach(async function(t){ await sendSENS(t.phone, t.msg); });
+  // TODO: SENS API 연동 후 아래 주석 해제
+  /*
+  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  for(var i=0; i<withPhone.length; i++){
+    var t = withPhone[i];
+    var ok = await sendSENS(t.phone, t.msg);
+    if(ok){
+      await db.collection('gojiData').doc(key).set({[t.cid]:{...GOJI_DATA[t.cid],sent:true}},{merge:true});
+      GOJI_DATA[t.cid] = {...(GOJI_DATA[t.cid]||{}), sent:true};
+    }
+  }
+  showToast('✅ '+withPhone.length+'개 업체 문자 발송 완료!');
+  renderGoji();
+  */
 }
 
 
@@ -5270,7 +5282,7 @@ function initGoji(){
   var tp = document.getElementById('goji-type');
   if(tp) GOJI_TYPE = tp.value;
   var mgrSel = document.getElementById('goji-mgr');
-  if(mgrSel) mgrSel.style.display = ROLE==='admin'?'block':'none';
+  if(mgrSel) mgrSel.style.display = 'block';
   if(ROLE==='admin' && mgrSel){
     mgrSel.innerHTML = '<option value="">전체 담당자</option>'
       + STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
@@ -5353,7 +5365,9 @@ function renderGoji(){
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.manager||'-')+'</td>'
       +'<td style="padding:8px 10px;color:#889;font-size:11px">'+(c.bizNo||'-')+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-weight:600;color:#185FA5">'+amt+'원</td>'
-      +'<td style="padding:8px 10px;text-align:center"><input type="checkbox" data-goji-sent="'+c.id+'" '+(d.sent?'checked':'')+' onchange="gojiSentChange(this)"></td>'
+      +'<td style="padding:8px 10px;text-align:center">'
+      +(d.sent?'<span style="font-size:10px;color:#3B6D11">✅ 완료</span>':'<span style="font-size:10px;color:#aab">-</span>')
+      +'</td>'
       +'<td style="padding:8px 10px;text-align:center">'
       +(d.sent
         ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11">발송완료</span>'
@@ -5408,16 +5422,23 @@ async function uploadGojiExcel(input){
   if(rows.length > 0){
     var keys = Object.keys(rows[0]);
     keys.forEach(function(k){
-      var kk = k.replace(/\n/g,' ');
+      var kk = k.replace(/[\n\r\s]/g,'');
       if(kk.includes('사업자') && kk.includes('번호')) colBizNo = k;
-      if(kk.includes('세액')) colAmt = k;
+      if(kk.includes('세액') && !colAmt) colAmt = k;
       if(kk.includes('대상여부')) colTarget = k;
     });
   }
+  console.log('컬럼 매핑:', {colBizNo:colBizNo, colAmt:colAmt, colTarget:colTarget});
 
   rows.forEach(function(row){
     // 대상여부 '여'인 것만
-    if(colTarget && row[colTarget] !== '여') return;
+    if(colTarget && String(row[colTarget]||'').trim() !== '여') return;
+    // 제외사유가 취소인 경우 제외
+    var colExclude = null;
+    Object.keys(row).forEach(function(k){
+      if(k.replace(/[\n\r\s]/g,'').includes('제외사유')) colExclude = k;
+    });
+    if(colExclude && String(row[colExclude]||'').includes('취소')) return;
 
     var bizNo = '', amt = 0;
 
