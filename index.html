@@ -6256,7 +6256,20 @@ function renderDashStatus(){
     if(whtDone>whtTargets.length) crossAlerts.push('⚠️ 원천세: 급여관리 대상 '+whtTargets.length+'개인데 신고완료 '+whtDone+'개 — 데이터 확인 필요');
   }
 
-  // ③ 마감 임박(7일 이내) + 완료율 50% 미만
+  // ④ 급여 있는 업체 중 원천세 담당자 미배정
+  var noWhtMgr=ALL.filter(function(c){
+    if(c.status!=='활성'||c.whtYn!=='Y') return false;
+    var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:c.manager;
+    return !effMgr||effMgr==='미배정';
+  });
+  if(noWhtMgr.length>0){
+    var names=noWhtMgr.map(function(c){return c.name;});
+    crossAlerts.push({
+      type:'wht-no-mgr',
+      msg:'⚠️ 급여 있는 업체 중 원천세 담당자 미배정 <b>'+noWhtMgr.length+'개</b> — 거래처 설정 확인 필요',
+      names:names
+    });
+  }
   taxTypes.forEach(function(t){
     var dl=t.deadline;
     if(!dl) return;
@@ -6309,8 +6322,18 @@ function renderDashStatus(){
   if(crossAlerts.length){
     crossHtml='<div style="margin-top:14px;border-top:0.5px solid #f0f2f7;padding-top:12px">'
       +'<div style="font-size:11px;font-weight:600;color:#A32D2D;margin-bottom:6px">크로스체크 알림</div>'
-      +crossAlerts.map(function(a){
-        return '<div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:5px 10px;border-radius:6px;margin-bottom:4px">'+a+'</div>';
+      +crossAlerts.map(function(a,i){
+        if(typeof a==='string'){
+          return '<div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:6px 10px;border-radius:6px;margin-bottom:4px">'+a+'</div>';
+        }
+        var uid='crd-'+i;
+        return '<div style="margin-bottom:4px">'
+          +'<div onclick="var d=document.getElementById(\''+uid+'\'),ar=document.getElementById(\'ar-'+uid+'\');if(d){var o=d.style.display===\'block\';d.style.display=o?\'none\':\'block\';ar.textContent=o?\'▼\':\'▲\';}}" '
+          +'style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#A32D2D;background:#FCEBEB;padding:6px 10px;border-radius:6px;cursor:pointer">'
+          +'<span>'+a.msg+'</span><span id="ar-'+uid+'" style="margin-left:6px;flex-shrink:0">▼</span></div>'
+          +'<div id="'+uid+'" style="display:none;background:#FCEBEB;border-radius:0 0 6px 6px;padding:4px 10px 8px;margin-top:-3px">'
+          +a.names.map(function(n){return '<div style="font-size:11px;color:#A32D2D;padding:3px 0;border-bottom:0.5px solid #F7C1C1">'+n+'</div>';}).join('')
+          +'</div></div>';
       }).join('')
       +'</div>';
   }
