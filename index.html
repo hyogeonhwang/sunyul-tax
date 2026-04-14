@@ -2493,6 +2493,8 @@ async function loadTax(){
     clients=clients.filter(c=>{
       if(c.whtYn!=='Y') return false;
       if(!c._whtMgr||c._whtMgr==='미배정') return false;
+      // 반기 업체는 6월/12월에만 표시
+      if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
       // 급여관리에서 해당 월에 일용/사업/근로/퇴직 중 하나라도 체크된 업체만
       return hasSalaryDone(whtYr, whtMonths, c.id, 'daily')
           || hasSalaryDone(whtYr, whtMonths, c.id, 'biz')
@@ -3345,7 +3347,7 @@ function renderDash(){
   const tot=ALL.filter(c=>c.status==='활성').length;
   const corp=ALL.filter(c=>c.type==='법인'&&c.status==='활성').length;
   const info=USERS[ME?.email]||{};
-  const myC=ROLE==='admin'?tot:ALL.filter(c=>c.manager===info.name&&c.status==='활성').length;
+  const myC=ALL.filter(c=>c.manager===info.name&&c.status==='활성').length;
   const td=new Date(), m=td.getMonth()+1, d=td.getDate();
   const mDL=DL.filter(e=>e.m===m);
   const upcoming=mDL.filter(e=>e.d>=d);
