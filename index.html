@@ -694,6 +694,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           style="padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px">일반 안내</div>
         <div id="send-tab-deadline" onclick="switchSendTab('deadline')"
           style="padding:9px 18px;font-size:13px;cursor:pointer;color:#889;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-0.5px">납부마감 안내</div>
+        <div id="send-tab-individual" onclick="switchSendTab('individual')"
+          style="padding:9px 18px;font-size:13px;cursor:pointer;color:#889;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-0.5px">개별 문자</div>
       </div>
 
       <!-- 일반 안내 탭 -->
@@ -801,6 +803,41 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <span style="font-size:10px">발신번호: 02-2038-6632 (세무법인 선율)</span>
             </div>
             <button class="btn btn-p btn-sm" style="background:#27ae60;border-color:#27ae60" onclick="sendDeadlineSMS()">📱 문자 일괄 발송</button>
+          </div>
+        </div>
+      </div>
+      <!-- 개별 문자 탭 -->
+      <div id="send-panel-individual" style="display:none">
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:480px">
+          <!-- 왼쪽: 업체 검색/선택 -->
+          <div style="background:#f7f8fb;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="padding:10px 12px;font-size:11px;font-weight:500;color:#889;border-bottom:0.5px solid #e8ecf4">업체 선택</div>
+            <div style="padding:8px 10px;border-bottom:0.5px solid #e8ecf4">
+              <input class="si" id="indiv-search" placeholder="🔍 업체명 검색..." oninput="renderIndivList()" style="width:100%;font-size:12px">
+            </div>
+            <div id="indiv-client-list" style="flex:1;overflow-y:auto;max-height:380px"></div>
+          </div>
+          <!-- 오른쪽: 문자 작성 -->
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">받는 업체</div>
+              <div id="indiv-selected" style="padding:8px 12px;background:#e8ecf4;border-radius:8px;font-size:12px;color:#889;min-height:36px">← 왼쪽에서 업체를 선택하세요</div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">수신 번호</div>
+              <input class="fi" id="indiv-phone" placeholder="수신 번호 자동입력 (직접 수정 가능)" style="font-size:12px;width:100%">
+            </div>
+            <div style="flex:1">
+              <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">문자 내용 <span style="font-weight:400;color:#aab">({업체명} 변수 사용 가능)</span></div>
+              <textarea id="indiv-msg" class="fi" rows="8" style="font-size:12px;line-height:1.7;resize:vertical;width:100%" placeholder="문자 내용을 입력하세요..."></textarea>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f7f8fb;border-radius:10px">
+              <div style="font-size:11px;color:#889">
+                발신번호: 02-2038-6632 (세무법인 선율)<br>
+                <span id="indiv-char-count" style="color:#1A3169;font-weight:500">0</span>자
+              </div>
+              <button class="btn btn-p btn-sm" style="background:#27ae60;border-color:#27ae60" onclick="sendIndividualSMS()">📱 개별 문자 발송</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1499,6 +1536,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
           </div>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 10px;background:#FAEEDA;border-radius:6px;border:0.5px solid #EF9F27;cursor:pointer">
+          <input type="checkbox" id="f-vat-except" style="width:15px;height:15px;accent-color:#854F0B">
+          <span style="font-size:13px;color:#854F0B;font-weight:500">예정고지 예외 — 직접 신고</span>
+          <span style="font-size:11px;color:#854F0B;margin-left:auto">환급 등 사유로 직접 신고할 때 체크</span>
+        </label>
         <div class="al al-i" style="margin-bottom:12px">💡 원천세 담당자는 기본정보 탭에서 설정합니다.</div>
         <div class="sdiv">급여 관리 설정</div>
         <div class="fr" style="margin-bottom:8px">
@@ -2115,7 +2157,8 @@ function editClient(id){
     else{sdEl.value='기타';if(sdOther){sdOther.style.display='block';sdOther.value=parseInt(sd)||'';}}
   }
   var sfEl=document.getElementById('f-salary-fixed'); if(sfEl) sfEl.checked=!!c.salaryFixed;
-  setTimeout(function(){updateVatCycle(c.vatType||'일반');if(c.vatCycle){var el=document.getElementById('f-vcycle');if(el)el.value=c.vatCycle;}},50);
+  setTimeout(function(){updateVatCycle(c.vatType||'일반');if(c.vatCycle){var el=document.getElementById('f-vcycle');if(el)el.value=c.vatCycle;}
+    var excEl=document.getElementById('f-vat-except');if(excEl)excEl.checked=!!(c.vatExcept);},50);
   setTimeout(function(){if(c.bizCode){lookupBizCode(c.bizCode);var cl=document.getElementById('f-bizcode-clr');if(cl)cl.style.display='flex';}},100);
   const whtSepEl2=document.getElementById('f-wht-sep');
   if(whtSepEl2){whtSepEl2.checked=!!c.whtSep;document.getElementById('whtSepDiv').style.display=c.whtSep?'grid':'none';}
@@ -2189,6 +2232,7 @@ async function saveClient(){
     status:v('f-stat'),addr:v('f-addr'),ntsId:v('f-nid'),ntsPw:v('f-npw'),
     posContact:v('f-pos'),bizStart:v('f-bst'),vatType:v('f-vtype'),
     vatCycle:v('f-vcycle'),
+    vatExcept:!!(document.getElementById('f-vat-except')?.checked),
     whtSep:document.getElementById('f-wht-sep')?.checked||false,
     whtManager:document.getElementById('f-wht-sep')?.checked?v('f-wm2'):'',
     whtSemi:v('f-wsemi')||'N',
@@ -2436,13 +2480,24 @@ async function loadTax(){
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
   if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
   if(tp==='wht'){
-    // map 먼저 → _whtMgr 계산
+    // 원천세: 급여관리 데이터 기반으로 필터
+    var whtMonths = [];
+    var whtYr = yr;
+    var pdNum = parseInt(pd)||1;
+    // 반기(6월=상반기1~6, 12월=하반기7~12), 매월
+    if(pd==='6') whtMonths=[1,2,3,4,5,6];
+    else if(pd==='12') whtMonths=[7,8,9,10,11,12];
+    else whtMonths=[pdNum];
+    await ensureSalaryCache(whtYr);
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>{
       if(c.whtYn!=='Y') return false;
       if(!c._whtMgr||c._whtMgr==='미배정') return false;
-      if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
-      return true;
+      // 급여관리에서 해당 월에 일용/사업/근로/퇴직 중 하나라도 체크된 업체만
+      return hasSalaryDone(whtYr, whtMonths, c.id, 'daily')
+          || hasSalaryDone(whtYr, whtMonths, c.id, 'biz')
+          || hasSalaryDone(whtYr, whtMonths, c.id, 'labor')
+          || hasSalaryDone(whtYr, whtMonths, c.id, 'retire');
     });
     // whtManager 기준으로 역할 필터 적용
     clients=myClientsFilter(clients,'txMgrFilter',true);
@@ -2553,20 +2608,28 @@ async function loadTax(){
             <th style="padding:7px 10px">메모</th>
           </tr></thead>
           <tbody>
-            ${list.map(c=>`
+            ${list.map(c=>{
+              var gojiStatus=_gojiMap[c.id]?.status;
+              var isGoji=gojiStatus==='goji';
+              var isNone=gojiStatus==='none'&&!c.vatExcept;
+              var isExcept=gojiStatus==='none'&&c.vatExcept;
+              return `
               <tr data-cid="${c.id}" style="border-top:1px solid #f0f2f7;
-                ${_gojiMap[c.id]?.status==='goji'?'background:#EAF3DE22;border-left:3px solid #27ae60;opacity:0.75':
-                  _gojiMap[c.id]?.status==='none'?'background:#f7f8fb;border-left:3px solid #e0e2e8;opacity:0.6':
+                ${isGoji?'background:#EAF3DE22;border-left:3px solid #27ae60;opacity:0.75':
+                  isNone?'background:#f7f8fb;border-left:3px solid #e0e2e8;opacity:0.6':
+                  isExcept?'background:#FAEEDA22;border-left:3px solid #EF9F27':
                   chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':
                   'border-left:3px solid transparent'};transition:background .2s">
                 <td style="padding:8px 10px" onmouseenter="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='inline-block'" onmouseleave="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='none'">
                   <strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>
                   ${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}
-                  ${_gojiMap[c.id]?.status==='goji'
+                  ${isGoji
                     ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11;margin-left:6px">예정고지</span>'
-                    : _gojiMap[c.id]?.status==='none'
-                      ? (_gojiMap[c.id]?.reason&&_gojiMap[c.id].reason!=='없음' ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#f0f2f7;color:#888;margin-left:6px">'+_gojiMap[c.id].reason+'</span>' : '')
-                      : ''
+                    : isExcept
+                      ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#854F0B;margin-left:6px">직접신고</span>'
+                      : (isNone&&_gojiMap[c.id]?.reason&&_gojiMap[c.id].reason!=='없음'
+                          ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#f0f2f7;color:#888;margin-left:6px">'+_gojiMap[c.id].reason+'</span>'
+                          : '')
                   }
                   <span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span>
                   ${ROLE==='admin'&&mgr!=='미배정'?`<span class="reassign-btn" style="display:none;margin-left:8px;">
@@ -2583,12 +2646,12 @@ async function loadTax(){
                   </select>
                 </td>`)}
                 <td class="cc" style="padding:8px 10px">
-                  ${(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none')
-                    ? '<input type="checkbox" checked disabled style="opacity:0.4" title="'+((_gojiMap[c.id]?.status==='goji')?'예정고지 납부':'신고불필요')+'">'
+                  ${(isGoji||isNone)
+                    ? '<input type="checkbox" checked disabled style="opacity:0.4" title="'+(isGoji?'예정고지 납부':'신고불필요')+'">'
                     : `<input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)">`
                   }
                 </td>
-                ${(tp!=='wht'&&tp!=='biz'&&_gojiMap[c.id]?.status!=='goji'&&_gojiMap[c.id]?.status!=='none')?`
+                ${(tp!=='wht'&&tp!=='biz'&&!isGoji&&!isNone)?`
                 <td style="padding:6px 10px;text-align:right">
                   <input type="text" value="${chk[c.id]?.payAmt?Number(chk[c.id].payAmt).toLocaleString():''}" 
                     placeholder="납부금액" 
@@ -2610,7 +2673,7 @@ async function loadTax(){
                   </select>
                 </td>`:''}
                 <td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:140px" value="${esc(chk[c.id]?.memo||'')}" placeholder="메모..." onblur="saveTax('${key}','${c.id}','memo',this.value)"></td>
-              </tr>`).join('')}
+              </tr>`;}).join('')}
           </tbody>
         </table>
       </div>
@@ -2665,6 +2728,8 @@ async function saveTax(key,cid,field,val){
   _taxChkCache[cid][field]=val;
   // 행 스타일 즉시 반영
   updateTaxRow(cid, _taxChkCache[cid]);
+  // 대시보드 처리현황 갱신
+  if(field==='done'&&curPage==='dashboard') renderDashStatus();
   // Firebase 저장 (비동기)
   await db.collection('taxChecks').doc(key).set({[cid]:{[field]:val}},{merge:true});
   if(field==='assignee'){
@@ -3360,7 +3425,12 @@ function renderDash(){
   }
 
   // ⑥ 처리현황 (캐시 사용 - 즉시 표시)
-  if(statusEl) renderDashStatus();
+  if(statusEl){
+    var now2=new Date(), yr2=now2.getFullYear().toString(), m2=now2.getMonth()+1;
+    var pyM2=m2===1?12:m2-1;
+    var pyYr2=m2===1?(parseInt(yr2)-1).toString():yr2;
+    ensureSalaryCache(pyYr2).then(function(){renderDashStatus();});
+  }
 }
 
 // =================== CALCULATOR ===================
@@ -4849,9 +4919,11 @@ async function saveSalaryInstant(docId,key,val,cbEl){
 
 async function saveSalary(docId,key,val){
   await db.collection('salaryChecks').doc(docId).set({[key]:val},{merge:true});
-  // 캐시 무효화 → 지급명세서 재조회 시 최신 데이터 반영
+  // 캐시 무효화 → 지급명세서/원천세 신고체크 재조회 시 최신 데이터 반영
   var yr=docId.split('_')[1];
   if(yr&&SALARY_CACHE[yr]) delete SALARY_CACHE[yr];
+  // 대시보드 처리현황도 갱신
+  if(curPage==='dashboard') renderDashStatus();
 }
 
 
@@ -5496,16 +5568,59 @@ var SELECTED_DEADLINE_TYPE = null;
 var DEADLINE_TMPLS = {};
 
 function switchSendTab(tab){
-  var isGeneral = tab==='general';
-  document.getElementById('send-tab-general').style.cssText = isGeneral
-    ? 'padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px'
-    : 'padding:9px 18px;font-size:13px;cursor:pointer;color:#aab;border-bottom:2px solid transparent;margin-bottom:-0.5px';
-  document.getElementById('send-tab-deadline').style.cssText = !isGeneral
-    ? 'padding:9px 18px;font-size:13px;cursor:pointer;color:#1A3169;font-weight:500;border-bottom:2px solid #1A3169;margin-bottom:-0.5px'
-    : 'padding:9px 18px;font-size:13px;cursor:pointer;color:#aab;border-bottom:2px solid transparent;margin-bottom:-0.5px';
-  document.getElementById('send-panel-general').style.display = isGeneral?'grid':'none';
-  document.getElementById('send-panel-deadline').style.display = !isGeneral?'grid':'none';
-  if(!isGeneral) renderDeadlineTypes();
+  ['general','deadline','individual'].forEach(function(t){
+    var isActive=tab===t;
+    document.getElementById('send-tab-'+t).style.cssText='padding:9px 18px;font-size:13px;cursor:pointer;font-weight:500;margin-bottom:-0.5px;border-bottom:2px solid '+(isActive?'#1A3169;color:#1A3169':'transparent;color:#aab');
+    var panel=document.getElementById('send-panel-'+t);
+    if(panel) panel.style.display=isActive?(t==='general'||t==='deadline'?'grid':'block'):'none';
+  });
+  if(tab==='deadline') renderDeadlineTypes();
+  if(tab==='individual') renderIndivList();
+}
+
+// ---- 개별 문자 ----
+var _indivCid='';
+function renderIndivList(){
+  var q=(document.getElementById('indiv-search')?.value||'').toLowerCase();
+  var el=document.getElementById('indiv-client-list'); if(!el) return;
+  var clients=ALL.filter(function(c){
+    if(c.status!=='활성') return false;
+    if(q&&!(c.name||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if(!clients.length){el.innerHTML='<div style="padding:14px;text-align:center;font-size:12px;color:#aab">검색 결과 없음</div>';return;}
+  el.innerHTML=clients.map(function(c){
+    var phone=c.mobile||c.phone||'';
+    return '<div onclick="selectIndivClient(\''+c.id+'\',\''+esc(c.name)+'\',\''+phone+'\')" style="padding:9px 12px;font-size:12px;cursor:pointer;border-bottom:0.5px solid #eef;'+(c.id===_indivCid?'background:#e8ecf4;font-weight:500;':'')+'" onmouseenter="this.style.background=\'#f0f2f7\'" onmouseleave="this.style.background=\''+(c.id===_indivCid?'#e8ecf4':'')+'\'">'+c.name+(phone?'<span style="font-size:10px;color:#aab;margin-left:6px">'+phone+'</span>':'<span style="font-size:10px;color:#e74c3c;margin-left:6px">번호없음</span>')+'</div>';
+  }).join('');
+}
+
+function selectIndivClient(cid,name,phone){
+  _indivCid=cid;
+  document.getElementById('indiv-selected').innerHTML='<span style="font-weight:500;color:#1A3169">'+name+'</span>';
+  document.getElementById('indiv-phone').value=phone;
+  renderIndivList();
+}
+
+document.addEventListener('input',function(e){
+  if(e.target.id==='indiv-msg'){
+    var cnt=document.getElementById('indiv-char-count');
+    if(cnt) cnt.textContent=e.target.value.length;
+  }
+});
+
+async function sendIndividualSMS(){
+  var phone=document.getElementById('indiv-phone')?.value?.trim();
+  var msg=document.getElementById('indiv-msg')?.value?.trim();
+  var selEl=document.getElementById('indiv-selected');
+  var name=selEl?.querySelector('span')?.textContent||'';
+  if(!_indivCid){showToast('업체를 선택하세요','warn');return;}
+  if(!phone){showToast('수신 번호가 없습니다','warn');return;}
+  if(!msg){showToast('문자 내용을 입력하세요','warn');return;}
+  var finalMsg=msg.replace(/{업체명}/g,name);
+  // TODO: SENS API 연동 시 실제 발송
+  showToast('📱 ['+name+'] '+phone+' 발송 준비 완료 (SENS 연동 후 발송)','warn');
+  console.log('개별문자 발송:', phone, finalMsg);
 }
 
 // ---- 일반 안내 ----
@@ -6009,6 +6124,18 @@ async function loadDashTaxCache(){
   var pyDoc=await db.collection('payrollChecks').doc(pyYr0+'_monthly').get();
   DASH_TAX_CACHE['payroll_monthly_'+pyYr0] = pyDoc.exists ? pyDoc.data() : {};
 
+  // 예정고지 데이터 캐시 (부가세 예정달에만)
+  var vatPdMap2={1:4,4:1,7:2,10:3};
+  if(vatPdMap2[m]){
+    var vatPd2=vatPdMap2[m];
+    var isJunggan2=(vatPd2===1||vatPd2===3);
+    if(isJunggan2){
+      var gojiKey='goji_'+yr+'_vat'+(vatPd2===1?'1':'2');
+      var gojiDoc=await db.collection('gojiData').doc(gojiKey).get();
+      DASH_TAX_CACHE[gojiKey] = gojiDoc.exists ? gojiDoc.data() : {};
+    }
+  }
+
   // 캐시 완료 후 처리현황 업데이트
   var statusEl=document.getElementById('dashStatus');
   if(statusEl) renderDashStatus();
@@ -6017,66 +6144,157 @@ async function loadDashTaxCache(){
 function renderDashStatus(){
   var statusEl=document.getElementById('dashStatus');
   if(!statusEl) return;
-  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1;
+  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1, d=now.getDate();
 
   var taxTypes=[];
 
-  // 원천세 (전월분 신고)
+  // 원천세 (전월분) - 급여관리 체크 기반
   var prevM2=m===1?12:m-1;
   var prevYr2=m===1?(parseInt(yr)-1).toString():yr;
   taxTypes.push({lbl:'원천세 신고 ('+prevM2+'월분)', docKey:'tax_'+prevYr2+'_wht_'+prevM2,
-    filter:function(c){return c.whtYn==='Y'&&c.manager&&c.manager!=='미배정';},
-    getDone:function(chk,c){var d=chk[c.id]; return d&&d.done===true;}
+    deadline:{month:m,day:10},
+    filter:function(c){
+      if(c.status!=='활성'||c.type==='신고대리'||c.whtYn!=='Y') return false;
+      var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:c.manager;
+      if(!effMgr||effMgr==='미배정') return false;
+      var salYrCache=SALARY_CACHE[prevYr2];
+      if(!salYrCache||!salYrCache[prevM2]) return false;
+      var mChk=salYrCache[prevM2];
+      return !!(mChk[c.id+'_daily_done']||mChk[c.id+'_biz_done']||mChk[c.id+'_labor_done']||mChk[c.id+'_retire_done']);
+    },
+    getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
   // 부가세
-  var vatPdMap={1:4, 4:1, 7:2, 10:3};
-  if(vatPdMap[m]) taxTypes.push({lbl:'부가세 신고', docKey:'tax_'+yr+'_vat_'+vatPdMap[m],
-    filter:function(c){return (c.vatType==='일반'||c.type==='법인')&&c.status==='활성';},
-    getDone:function(chk,c){var d=chk[c.id]; return d&&d.done===true;}
-  });
+  var vatPdMap={1:4,4:1,7:2,10:3};
+  var vatDlMap={1:{month:1,day:25},2:{month:7,day:25},3:{month:10,day:25},4:{month:4,day:25}};
+  if(vatPdMap[m]){
+    var vatPd=vatPdMap[m];
+    var isJunggan=(vatPd===1||vatPd===3);
+    taxTypes.push({lbl:'부가세'+(isJunggan?' (예정)':' (확정)'), docKey:'tax_'+yr+'_vat_'+vatPd,
+      deadline:vatDlMap[vatPd]||{month:m,day:25},
+      filter:function(c){
+        if(c.status!=='활성'||c.type==='신고대리') return false;
+        if(isJunggan){
+          if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
+          // 예정고지 대상 제외 (직접신고 예외 포함)
+          var gojiData=DASH_TAX_CACHE['goji_'+yr+'_vat'+(vatPd===1?'1':'2')]||{};
+          if(gojiData[c.id]?.status==='goji') return false;
+          if(gojiData[c.id]?.status==='none'&&!c.vatExcept) return false;
+          return true;
+        }
+        return c.type==='법인'||c.vatType==='일반';
+      },
+      getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
+    });
+  }
 
   // 법인세
-  if(m===3) taxTypes.push({lbl:'법인세 신고', docKey:'tax_'+yr+'_corp_1',
-    filter:function(c){return c.type==='법인';},
-    getDone:function(chk,c){var d=chk[c.id]; return d&&d.done===true;}
+  if(m===3) taxTypes.push({lbl:'법인세', docKey:'tax_'+yr+'_corp_1',
+    deadline:{month:3,day:31},
+    filter:function(c){return c.status==='활성'&&c.type==='법인';},
+    getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
   // 종합소득세
   if(m===5) taxTypes.push({lbl:'종합소득세', docKey:'tax_'+yr+'_income_1',
-    filter:function(c){return c.type!=='법인';},
-    getDone:function(chk,c){var d=chk[c.id]; return d&&d.done===true;}
+    deadline:{month:5,day:31},
+    filter:function(c){return c.status==='활성'&&c.type!=='법인';},
+    getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
-  // 지급명세서 (전월분)
+  // 지급명세서 (전월분) - 일용직+사업소득 건수 합산 (탭별 카운트와 일치)
   var pyM=m===1?12:m-1;
   var pyYr=m===1?(parseInt(yr)-1).toString():yr;
-  taxTypes.push({lbl:'지급명세서 ('+pyM+'월분)', docKey:'payroll_monthly_'+pyYr,
-    filter:function(c){
-      var ps=c.payrollSettings||{};
-      return c.whtYn==='Y'&&(ps.daily||ps.biz);
-    },
-    getDone:function(chk,c){
-      var ps=c.payrollSettings||{};
-      var dayOk=!ps.daily||chk[c.id+'_일용직_'+pyM];
-      var bizOk=!ps.biz||chk[c.id+'_사업소득_'+pyM];
-      return dayOk&&bizOk;
+  var salCacheForPy=SALARY_CACHE[pyYr]||{};
+  var mChkForPy=salCacheForPy[pyM]||{};
+  var pyChkForDash=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
+  var pyTotalCalc=0, pyDoneCalc=0;
+  ALL.filter(function(c){return c.status==='활성'&&c.type!=='신고대리';}).forEach(function(c){
+    if(mChkForPy[c.id+'_daily_done']){pyTotalCalc++; if(pyChkForDash[c.id+'_일용직_'+pyM]) pyDoneCalc++;}
+    if(mChkForPy[c.id+'_biz_done']){pyTotalCalc++; if(pyChkForDash[c.id+'_사업소득_'+pyM]) pyDoneCalc++;}
+  });
+  if(pyTotalCalc>0){
+    taxTypes.push({lbl:'지급명세서 ('+pyM+'월분)', docKey:'payroll_monthly_'+pyYr,
+      deadline:{month:m,day:new Date(now.getFullYear(),m,0).getDate()},
+      _fixedTotal:pyTotalCalc, _fixedDone:pyDoneCalc,
+      filter:function(c){return false;}, // _fixedTotal/Done 사용
+      getDone:function(chk,c){return false;}
+    });
+  }
+
+  // === 크로스체크: 화면 표시 수 vs 신고완료 수 비교 ===
+  var crossAlerts=[];
+  var salM=pyM, salYr=pyYr;
+  var salCache=SALARY_CACHE[salYr];
+
+  // ① 지급명세서: 화면 표시 수(급여관리 체크 기반) vs 신고완료 수
+  if(salCache&&salCache[salM]){
+    var mChk=salCache[salM];
+    var pyChk=DASH_TAX_CACHE['payroll_monthly_'+salYr]||{};
+    var displayDaily=0, displayBiz=0, doneDaily=0, doneBiz=0;
+    ALL.filter(function(c){return c.status==='활성'&&c.type!=='신고대리';}).forEach(function(c){
+      if(mChk[c.id+'_daily_done']){ displayDaily++; if(pyChk[c.id+'_일용직_'+salM]) doneDaily++; }
+      if(mChk[c.id+'_biz_done']){ displayBiz++; if(pyChk[c.id+'_사업소득_'+salM]) doneBiz++; }
+    });
+    // 신고완료가 화면표시보다 많으면 → 예전 데이터 오류
+    if(doneDaily>displayDaily) crossAlerts.push('⚠️ 일용직 지급명세서: 화면 표시 '+displayDaily+'개인데 완료 체크 '+doneDaily+'개 — 예전 데이터 확인 필요');
+    if(doneBiz>displayBiz) crossAlerts.push('⚠️ 사업소득 지급명세서: 화면 표시 '+displayBiz+'개인데 완료 체크 '+doneBiz+'개 — 예전 데이터 확인 필요');
+  }
+
+  // ② 원천세: 급여관리 대상 수 vs 원천세 신고완료 수
+  if(salCache&&salCache[prevM2]){
+    var whtChk=DASH_TAX_CACHE['tax_'+prevYr2+'_wht_'+prevM2]||{};
+    var whtTargets=ALL.filter(function(c){
+      if(c.status!=='활성'||c.type==='신고대리'||c.whtYn!=='Y') return false;
+      var mData=salCache[prevM2];
+      return !!(mData&&(mData[c.id+'_daily_done']||mData[c.id+'_biz_done']||mData[c.id+'_labor_done']||mData[c.id+'_retire_done']));
+    });
+    var whtDone=whtTargets.filter(function(c){return whtChk[c.id]&&whtChk[c.id].done;}).length;
+    if(whtDone>whtTargets.length) crossAlerts.push('⚠️ 원천세: 급여관리 대상 '+whtTargets.length+'개인데 신고완료 '+whtDone+'개 — 데이터 확인 필요');
+  }
+
+  // ③ 마감 임박(7일 이내) + 완료율 50% 미만
+  taxTypes.forEach(function(t){
+    var dl=t.deadline;
+    if(!dl) return;
+    var dlDate=new Date(now.getFullYear(),dl.month-1,dl.day);
+    var daysLeft=Math.ceil((dlDate-now)/(1000*60*60*24));
+    if(daysLeft>=0&&daysLeft<=7){
+      var chk=DASH_TAX_CACHE[t.docKey]||{};
+      var targets=t._fixedTotal!==undefined?null:ALL.filter(function(c){return c.status==='활성'&&t.filter(c);});
+      var total=t._fixedTotal!==undefined?t._fixedTotal:(targets?targets.length:0);
+      if(!total) return;
+      var done=t._fixedDone!==undefined?t._fixedDone:(targets?targets.filter(function(c){return t.getDone(chk,c);}).length:0);
+      var pct=Math.round(done/total*100);
+      if(pct<50) crossAlerts.push('⚠️ '+t.lbl+': 마감 '+daysLeft+'일 전인데 완료율 '+pct+'% ('+done+'/'+total+'개)');
     }
   });
 
   var rows=taxTypes.map(function(t){
     var chk=DASH_TAX_CACHE[t.docKey]||{};
-    var targets=ALL.filter(function(c){
-      return c.status==='활성'&&t.filter(c);
-    });
-    var total=targets.length;
-    if(!total) return '';
-    var done=targets.filter(function(c){return t.getDone(chk,c);}).length;
+    var total, done;
+    if(t._fixedTotal!==undefined){
+      total=t._fixedTotal; done=t._fixedDone;
+    } else {
+      var targets=ALL.filter(function(c){return c.status==='활성'&&t.filter(c);});
+      total=targets.length;
+      if(!total) return '';
+      done=targets.filter(function(c){return t.getDone(chk,c);}).length;
+    }
     var pct=Math.round(done/total*100);
     var color=pct===100?'#27ae60':pct>=50?'#1A3169':'#e74c3c';
+    // 마감일까지 남은 일수
+    var dlBadge='';
+    if(t.deadline){
+      var dlDate=new Date(now.getFullYear(),t.deadline.month-1,t.deadline.day);
+      var daysLeft=Math.ceil((dlDate-now)/(1000*60*60*24));
+      if(daysLeft>=0&&daysLeft<=7&&pct<100)
+        dlBadge='<span style="margin-left:6px;background:#FAEEDA;color:#854F0B;font-size:10px;padding:1px 6px;border-radius:10px">D-'+daysLeft+'</span>';
+    }
     return '<div style="margin-bottom:12px">'
-      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">'
-      +'<span style="color:#445;font-weight:500">'+t.lbl+'</span>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">'
+      +'<span style="color:#445;font-weight:500">'+t.lbl+dlBadge+'</span>'
       +'<span style="font-weight:600;color:'+color+'">'+done+' / '+total+'개 ('+pct+'%)</span>'
       +'</div>'
       +'<div style="background:#e8ecf4;border-radius:4px;height:7px">'
@@ -6084,10 +6302,19 @@ function renderDashStatus(){
       +'</div></div>';
   }).join('');
 
-  statusEl.innerHTML=rows||'<div style="text-align:center;padding:22px;color:#aab;font-size:13px">이번달 신고 항목 없음</div>';
+  // 크로스체크 경고 표시
+  var crossHtml='';
+  if(crossAlerts.length){
+    crossHtml='<div style="margin-top:14px;border-top:0.5px solid #f0f2f7;padding-top:12px">'
+      +'<div style="font-size:11px;font-weight:600;color:#A32D2D;margin-bottom:6px">크로스체크 알림</div>'
+      +crossAlerts.map(function(a){
+        return '<div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:5px 10px;border-radius:6px;margin-bottom:4px">'+a+'</div>';
+      }).join('')
+      +'</div>';
+  }
+
+  statusEl.innerHTML=(rows||'<div style="text-align:center;padding:22px;color:#aab;font-size:13px">이번달 신고 항목 없음</div>')+crossHtml;
 }
-
-
 
 function showToast(msg, type){
   var wrap = document.getElementById('toast-wrap');
