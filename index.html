@@ -2684,11 +2684,14 @@ async function loadTax(){
                     oninput="this.value=this.value.replace(/[^0-9]/g,'');activatePayChk('${c.id}',this.value)">
                 </td>
                 <td style="padding:6px 14px;text-align:center">
-                  <input type="checkbox" class="pay-sms-chk" data-cid="${c.id}" data-mgr="${mgr}"
+                  ${chk[c.id]?.smsSent
+                    ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11">발송완료</span>
+                       <button onclick="resetSmsSent('${key}','${c.id}')" style="margin-left:4px;font-size:10px;padding:1px 6px;background:#f0f2f7;border:0.5px solid #dde;border-radius:4px;cursor:pointer;color:#889">재발송</button>`
+                    : `<input type="checkbox" class="pay-sms-chk" data-cid="${c.id}" data-mgr="${mgr}"
                     ${chk[c.id]?.payAmt?'':'disabled'}
-                    
                     onchange="updateSmsCount()"
-                    style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">
+                    style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">`
+                  }
                 </td>`:(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none'?'<td></td><td></td>':'')}
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
                   <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
@@ -2748,11 +2751,21 @@ async function saveTxSmsTmpl(){
   showToast('✅ 문자 문구 저장 완료');
 }
 
+var TX_SMS_TMPL_DEFAULT='[세무법인 선율] 안녕하세요 {업체명} 대표님\n{신고유형} 납부 금액은 {금액}원입니다.\n납부기한까지 납부 부탁드립니다 :)\n문의: 02-2038-6632';
+
 async function loadTxSmsTmpl(){
   var doc=await db.collection('sendCenter').doc('txSmsTmpl').get();
+  var el=document.getElementById('tx-sms-tmpl');
+  if(!el) return;
   if(doc.exists&&doc.data().tmpl){
-    var el=document.getElementById('tx-sms-tmpl');
-    if(el) el.value=doc.data().tmpl;
+    var saved=doc.data().tmpl;
+    // 잘못된 문구(원입? 등) 감지 시 기본값으로 복구
+    if(saved.includes('원입?')||saved.includes('원?')){
+      el.value=TX_SMS_TMPL_DEFAULT;
+      await db.collection('sendCenter').doc('txSmsTmpl').set({tmpl:TX_SMS_TMPL_DEFAULT});
+    } else {
+      el.value=saved;
+    }
   }
 }
 
@@ -6607,6 +6620,9 @@ async function sendTaxPaySMS(key, tp, mgr){
     var sent=await sendSENS(t.phone, t.msg);
     if(sent){
       ok++;
+      // Firebase에 발송완료 저장
+      await db.collection('taxChecks').doc(key).set({[t.cid]:{smsSent:true}},{merge:true});
+      if(_taxChkCache[t.cid]) _taxChkCache[t.cid].smsSent=true;
       // 발송완료 뱃지 표시 + 체크박스 비활성화
       var chkEl=document.querySelector('.pay-sms-chk[data-cid="'+t.cid+'"]');
       if(chkEl){
@@ -6623,6 +6639,12 @@ async function sendTaxPaySMS(key, tp, mgr){
   showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
 }
 
+
+async function resetSmsSent(key, cid){
+  await db.collection('taxChecks').doc(key).set({[cid]:{smsSent:false}},{merge:true});
+  if(_taxChkCache[cid]) _taxChkCache[cid].smsSent=false;
+  loadTax();
+}
 
 function updateSmsCount(){
   var chks=document.querySelectorAll('.pay-sms-chk:checked');
