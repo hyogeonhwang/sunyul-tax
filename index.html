@@ -2459,7 +2459,7 @@ async function loadTax(){
   }
 
   let clients=ALL.filter(c=>c.status==='활성');
-  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter');
+  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter',false,chk);
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
@@ -2754,7 +2754,7 @@ async function saveTax(key,cid,field,val){
   const tp=document.getElementById('txType')?.value;
   const pd=document.getElementById('txPeriod')?.value||'1';
   let clients=ALL.filter(c=>c.status==='활성');
-  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter');
+  if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter',false,chk);
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
     const isJunggan=pdNum===1||pdNum===3;
@@ -4940,15 +4940,20 @@ function toggleSalaryDayOther(val){
 
 // 직원이면 본인 담당 업체만 필터링, 관리자면 필터 드롭다운 적용
 // useWht=true이면 원천세 담당자(whtManager) 기준으로 필터
-function myClientsFilter(clients, filterSelId, useWht){
+function myClientsFilter(clients, filterSelId, useWht, assigneeChk){
   var mgrF=filterSelId?document.getElementById(filterSelId)?.value||'':'';
   function effMgr(c){ return useWht&&c.whtSep&&c.whtManager ? c.whtManager : c.manager; }
   if(ROLE==='admin'){
-    if(mgrF) return clients.filter(function(c){return effMgr(c)===mgrF;});
+    if(mgrF) return clients.filter(function(c){
+      return effMgr(c)===mgrF || (assigneeChk&&assigneeChk[c.id]?.assignee===mgrF);
+    });
     return clients;
   }
   var myName=USERS[ME?.email]?.name||'';
-  return clients.filter(function(c){return effMgr(c)===myName;});
+  return clients.filter(function(c){
+    // 기본 담당자이거나, 배부담당으로 배정된 업체 포함
+    return effMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
+  });
 }
 
 
