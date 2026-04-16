@@ -5545,7 +5545,19 @@ async function sendGojiSMS(){
 
   // 실제 발송 (발신번호 등록 후 활성화)
   showToast('📱 문자 발송 기능은 발신번호 등록 후 활성화됩니다.','warn');
-  // TODO: SENS API 연동 후 아래 주석 해제
+  var ok=0, fail=0;
+  for(var gi=0;gi<chks.length;gi++){
+    var c=ALL.find(function(x){return x.id===chks[gi];});
+    if(!c) continue;
+    var phone=c.mobile||c.phone||'';
+    if(!phone){fail++;continue;}
+    var tmpl=document.getElementById('msgPre')?.textContent||'';
+    var msg=tmpl.replace(/{업체명}/g,c.name);
+    var sent=await sendSENS(phone,msg);
+    if(sent) ok++; else fail++;
+  }
+  showToast('발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
+  return;
   /*
   var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
   for(var i=0; i<withPhone.length; i++){
@@ -5628,9 +5640,9 @@ async function sendIndividualSMS(){
   if(!phone){showToast('수신 번호가 없습니다','warn');return;}
   if(!msg){showToast('문자 내용을 입력하세요','warn');return;}
   var finalMsg=msg.replace(/{업체명}/g,name);
-  // TODO: SENS API 연동 시 실제 발송
-  showToast('📱 ['+name+'] '+phone+' 발송 준비 완료 (SENS 연동 후 발송)','warn');
-  console.log('개별문자 발송:', phone, finalMsg);
+  var ok = await sendSENS(phone, finalMsg);
+  if(ok) showToast('📱 ['+name+'] 문자 발송 완료');
+  else showToast('발송 실패 — 번호·내용 확인','err');
 }
 
 // ---- 일반 안내 ----
@@ -5676,6 +5688,25 @@ function updateSendCount(){
   if(el) el.textContent=cnt;
 }
 
+
+var SENS_FUNCTION_URL = 'https://asia-northeast3-sunyul-tax.cloudfunctions.net/sendSMS';
+
+async function sendSENS(to, content){
+  try {
+    var res = await fetch(SENS_FUNCTION_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({to: to, content: content})
+    });
+    var data = await res.json();
+    if(res.ok && data.statusCode && data.statusCode.startsWith('2')) return true;
+    console.error('SENS 발송 실패:', data);
+    return false;
+  } catch(e) {
+    console.error('SENS 오류:', e);
+    return false;
+  }
+}
 async function sendGeneralSMS(){
   var chks=document.querySelectorAll('.send-chk:checked');
   if(!chks.length){showToast('발송할 업체를 선택하세요.','warn');return;}
@@ -5683,7 +5714,17 @@ async function sendGeneralSMS(){
   if(!msg||msg.includes('템플릿을 선택')){showToast('템플릿을 먼저 선택하세요.','warn');return;}
   if(!confirm(chks.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
   showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
-  // TODO: SENS API 연동
+  var ok=0, fail=0;
+  for(var di=0;di<chks.length;di++){
+    var c=ALL.find(function(x){return x.id===chks[di];});
+    if(!c) continue;
+    var phone=c.mobile||c.phone||'';
+    if(!phone){fail++;continue;}
+    var sent=await sendSENS(phone,chks[di]._msg||'');
+    if(sent) ok++; else fail++;
+  }
+  showToast('발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
+  return;
 }
 
 // ---- 납부마감 안내 ----
@@ -6400,7 +6441,7 @@ async function sendTaxSMS(){
 
   if(!confirm(withPhone.length+'개 업체에 납부마감 문자를 발송합니다.\n발신번호: 02-2038-6632'+(noPhone.length?'\n\n⚠️ 연락처 없는 업체 '+noPhone.length+'개 제외':''))){return;}
 
-  // TODO: SENS API 연동 후 실제 발송
+  // SENS 발송
   showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
 
   // 발송 완료 후 자동 체크 (실제 발송 성공 시)
