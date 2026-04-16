@@ -793,9 +793,15 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div>
             <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
               <span>발송 대상 업체 <span style="color:#1A3169">(납부 있는 업체 선택)</span></span>
-              <label style="font-size:11px;color:#889;cursor:pointer;display:flex;align-items:center;gap:4px">
-                <input type="checkbox" id="deadline-select-all" onchange="deadlineSelectAll(this.checked)"> 전체선택
-              </label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <div style="position:relative">
+                  <input class="si" id="deadline-search" placeholder="🔍 업체명 검색..." oninput="renderDeadlineClients(_curDeadlineType)" style="font-size:11px;padding-right:20px;width:120px;height:26px">
+                  <span onclick="document.getElementById('deadline-search').value='';renderDeadlineClients(_curDeadlineType)" style="position:absolute;right:5px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:12px">✕</span>
+                </div>
+                <label style="font-size:11px;color:#889;cursor:pointer;display:flex;align-items:center;gap:4px">
+                  <input type="checkbox" id="deadline-select-all" onchange="deadlineSelectAll(this.checked)"> 전체선택
+                </label>
+              </div>
             </div>
             <div id="deadline-client-list" style="border:0.5px solid #e8ecf4;border-radius:8px;max-height:200px;overflow-y:auto">
               <div style="text-align:center;padding:20px;color:#aab;font-size:12px">← 왼쪽에서 신고 유형을 선택하세요</div>
@@ -820,7 +826,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div style="background:#f7f8fb;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
             <div style="padding:10px 12px;font-size:11px;font-weight:500;color:#889;border-bottom:0.5px solid #e8ecf4">업체 선택</div>
             <div style="padding:8px 10px;border-bottom:0.5px solid #e8ecf4">
-              <input class="si" id="indiv-search" placeholder="🔍 업체명 검색..." oninput="renderIndivList()" style="width:100%;font-size:12px">
+              <div style="position:relative">
+                <input class="si" id="indiv-search" placeholder="🔍 업체명 검색..." oninput="renderIndivList()" style="width:100%;font-size:12px;padding-right:24px">
+                <span onclick="document.getElementById('indiv-search').value='';renderIndivList()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:13px">✕</span>
+              </div>
             </div>
             <div id="indiv-client-list" style="flex:1;overflow-y:auto;max-height:380px"></div>
           </div>
@@ -5803,14 +5812,20 @@ function selectDeadlineType(key){
   if(txt) txt.value=tmpl;
 
   // 업체 목록
+  _curDeadlineType=t;
   renderDeadlineClients(t);
 }
 
+var _curDeadlineType=null;
+
 function renderDeadlineClients(t){
+  if(!t) return;
   var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var dQ=(document.getElementById('deadline-search')?.value||'').toLowerCase();
   var clients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(myName&&c.manager!==myName) return false;
+    if(dQ&&!(c.name||'').toLowerCase().includes(dQ)) return false;
     if(t.filter==='wht') return c.whtYn==='Y';
     if(t.filter==='vat') return c.vatType==='일반'||c.type==='법인';
     if(t.filter==='corp') return c.type==='법인';
@@ -5866,9 +5881,43 @@ async function sendDeadlineSMS(){
   var chks=document.querySelectorAll('.deadline-chk:checked');
   if(!chks.length){showToast('발송할 업체를 선택하세요.','warn');return;}
   if(!SELECTED_DEADLINE_TYPE){showToast('신고 유형을 선택하세요.','warn');return;}
-  if(!confirm(chks.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
-  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
-  // TODO: SENS API 연동
+
+  var tmpl=document.getElementById('deadline-tmpl-txt')?.value||'';
+  var t=SELECTED_DEADLINE_TYPE;
+
+  var withPhone=[], noPhone=[];
+  chks.forEach(function(el){
+    var cid=el.getAttribute('data-cid');
+    var c=ALL.find(function(x){return x.id===cid;});
+    if(!c) return;
+    var phone=c.mobile||c.phone||'';
+    var msg=tmpl.replace(/{업체명}/g,c.name).replace(/{신고유형}/g,t.lbl||'').replace(/{납부기한}/g,t.deadline||'');
+    if(phone) withPhone.push({cid,name:c.name,phone,msg,el});
+    else noPhone.push(c.name);
+  });
+
+  if(!withPhone.length){showToast('선택된 업체 중 연락처가 없습니다.','warn');return;}
+  if(!confirm(withPhone.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632'+(noPhone.length?'\n\n⚠️ 연락처 없어 제외: '+noPhone.join(', '):''))) return;
+
+  var ok=0, fail=0;
+  for(var i=0;i<withPhone.length;i++){
+    var item=withPhone[i];
+    var sent=await sendSENS(item.phone, item.msg);
+    if(sent){
+      ok++;
+      // 발송완료 뱃지 표시
+      var row=item.el.closest('div');
+      if(row){
+        item.el.disabled=true;
+        item.el.checked=false;
+        var badge=document.createElement('span');
+        badge.style.cssText='font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11;margin-left:6px';
+        badge.textContent='발송완료';
+        row.appendChild(badge);
+      }
+    } else fail++;
+  }
+  showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
 }
 
 // 발송센터 초기화 시 담당자 필터 동적 로드
@@ -6508,32 +6557,70 @@ async function saveTaxPayAmt(key, cid, val){
   if(_taxChkCache) _taxChkCache[cid] = Object.assign({},_taxChkCache[cid]||{},{payAmt:amt});
 }
 
-async function sendTaxPaySMS(key, tp){
-  var chk = _taxChkCache||{};
+async function sendTaxPaySMS(key, tp, mgr){
   var typeNames = {vat:'부가세', corp:'법인세', income:'종합소득세'};
   var typeName = typeNames[tp]||tp;
 
-  // 납부금액 있는 업체만 필터
-  var targets = ALL.filter(function(c){
-    return chk[c.id] && chk[c.id].done && chk[c.id].payAmt > 0;
+  // 발송선택 체크박스 기준으로 대상 업체 선정 (mgr 필터 강화)
+  var chkEls = Array.from(document.querySelectorAll('.pay-sms-chk:checked')).filter(function(el){
+    if(!mgr) return true;
+    return el.getAttribute('data-mgr')===mgr;
   });
-
-  if(!targets.length){
-    showToast('납부금액이 입력된 신고완료 업체가 없습니다.','warn');
+  if(!chkEls.length){
+    showToast('발송할 업체를 선택해주세요 (납부금액 입력 후 체크박스 활성화)','warn');
     return;
   }
 
+  var tmpl = document.getElementById('tx-sms-tmpl')?.value||'';
   var deadlineMap = {
     vat1:'4월 25일', vat2:'7월 25일', vat3:'10월 25일', vat4:'1월 25일',
     corp:'3월 31일', income:'5월 31일'
   };
   var pd = document.getElementById('txPeriod')?.value||'1';
   var deadline = deadlineMap[tp+pd] || deadlineMap[tp] || '';
+  var chk = _taxChkCache||{};
 
-  if(!confirm(targets.length+'개 업체에 '+typeName+' 납부안내 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
+  // 연락처 있는/없는 업체 분류
+  var withPhone=[], noPhone=[];
+  chkEls.forEach(function(el){
+    var cid=el.getAttribute('data-cid');
+    var c=ALL.find(function(x){return x.id===cid;});
+    if(!c) return;
+    var phone=c.mobile||c.phone||'';
+    var amt=chk[cid]?.payAmt?Number(chk[cid].payAmt).toLocaleString():'';
+    var msg=tmpl.replace(/{업체명}/g,c.name).replace(/{신고유형}/g,typeName).replace(/{금액}/g,amt).replace(/{납부기한}/g,deadline);
+    if(phone) withPhone.push({cid,name:c.name,phone,msg});
+    else noPhone.push(c.name);
+  });
 
-  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
-  // TODO: SENS API 연동
+  if(!withPhone.length){
+    showToast('선택된 업체 중 연락처가 없습니다.','warn');
+    return;
+  }
+
+  var confirmMsg=withPhone.length+'개 업체에 '+typeName+' 납부안내 문자를 발송합니다.\n발신번호: 02-2038-6632'+(noPhone.length?'\n\n⚠️ 연락처 없어 제외: '+noPhone.join(', '):'');
+  if(!confirm(confirmMsg)) return;
+
+  var ok=0, fail=0;
+  for(var i=0;i<withPhone.length;i++){
+    var t=withPhone[i];
+    var sent=await sendSENS(t.phone, t.msg);
+    if(sent){
+      ok++;
+      // 발송완료 뱃지 표시 + 체크박스 비활성화
+      var chkEl=document.querySelector('.pay-sms-chk[data-cid="'+t.cid+'"]');
+      if(chkEl){
+        chkEl.disabled=true;
+        chkEl.checked=false;
+        var row=chkEl.closest('tr');
+        if(row){
+          var td=chkEl.closest('td');
+          if(td) td.innerHTML='<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11">발송완료</span>';
+        }
+      }
+    } else fail++;
+  }
+  showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
 }
 
 
