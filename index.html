@@ -593,7 +593,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         </div>
         <!-- 납부마감 문자 발송 설정 -->
         <div id="tx-sms-wrap" style="display:none;margin-bottom:12px;padding:10px 14px;background:#f7f8fb;border-radius:8px">
-          <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">📱 납부마감 문자 설정 <span style="font-weight:400;color:#aab">(납부금액 입력 후 선택 발송)</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-size:11px;font-weight:500;color:#889">📱 납부마감 문자 설정 <span style="font-weight:400;color:#aab">(납부금액 입력 후 선택 발송)</span></div>
+            <button onclick="saveTxSmsTmpl()" class="btn btn-sm" style="font-size:11px;padding:2px 10px">💾 저장</button>
+          </div>
           <textarea id="tx-sms-tmpl" class="fi" rows="3" style="font-size:12px;line-height:1.7;resize:vertical;margin-bottom:6px">[세무법인 선율] 안녕하세요 {업체명} 대표님^^
 
 {신고유형} 납부 금액은 {금액}원입니다.
@@ -734,6 +737,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
                 <option value="vat">부가세 업체</option>
                 <option value="wht">원천세 업체</option>
               </select>
+              <div style="position:relative">
+                <input class="si" id="send-search" placeholder="🔍 업체명 검색..." oninput="renderSendList()" style="font-size:12px;padding-right:24px;width:150px">
+                <span onclick="document.getElementById('send-search').value='';renderSendList()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:13px">✕</span>
+              </div>
               <span style="font-size:11px;color:#889">→ 총 <b id="send-count" style="color:#1A3169">0</b>개 업체</span>
               <label style="font-size:11px;color:#889;margin-left:auto;cursor:pointer;display:flex;align-items:center;gap:4px">
                 <input type="checkbox" id="send-select-all" onchange="sendSelectAll(this.checked)"> 전체선택
@@ -821,7 +828,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">받는 업체</div>
-              <div id="indiv-selected" style="padding:8px 12px;background:#e8ecf4;border-radius:8px;font-size:12px;color:#889;min-height:36px">← 왼쪽에서 업체를 선택하세요</div>
+              <div id="indiv-selected" style="padding:8px 12px;background:#e8ecf4;border-radius:8px;font-size:12px;color:#889;min-height:36px;display:flex;align-items:center;justify-content:space-between">
+                <span id="indiv-selected-name">← 왼쪽에서 업체를 선택하세요</span>
+                <button id="indiv-clear-btn" onclick="clearIndivClient()" style="display:none;padding:1px 7px;font-size:11px;background:#f0f2f7;border:0.5px solid #dde;border-radius:4px;cursor:pointer;color:#889">✕ 초기화</button>
+              </div>
             </div>
             <div>
               <div style="font-size:11px;font-weight:500;color:#889;margin-bottom:6px">수신 번호</div>
@@ -1960,6 +1970,7 @@ function go(page){
     if(txTypeEl&&!txTypeEl.value){txTypeEl.value='';updateTxPeriod();}
     else loadTax();
     updateCrossWarnIcons();
+    loadTxSmsTmpl();
   }
   if(page==='clients'){
     cType='전체';
@@ -2721,6 +2732,20 @@ document.addEventListener('click',function(e){
   var menu=document.getElementById('reassign-menu');
   if(menu&&!menu.contains(e.target)) menu.style.display='none';
 });
+
+async function saveTxSmsTmpl(){
+  var txt=document.getElementById('tx-sms-tmpl')?.value||'';
+  await db.collection('sendCenter').doc('txSmsTmpl').set({tmpl:txt});
+  showToast('✅ 문자 문구 저장 완료');
+}
+
+async function loadTxSmsTmpl(){
+  var doc=await db.collection('sendCenter').doc('txSmsTmpl').get();
+  if(doc.exists&&doc.data().tmpl){
+    var el=document.getElementById('tx-sms-tmpl');
+    if(el) el.value=doc.data().tmpl;
+  }
+}
 
 // 현재 로드된 신고체크 데이터 캐시
 var _taxChkCache={};
@@ -5619,8 +5644,18 @@ function renderIndivList(){
 
 function selectIndivClient(cid,name,phone){
   _indivCid=cid;
-  document.getElementById('indiv-selected').innerHTML='<span style="font-weight:500;color:#1A3169">'+name+'</span>';
+  document.getElementById('indiv-selected-name').innerHTML='<span style="font-weight:500;color:#1A3169">'+name+'</span>';
+  document.getElementById('indiv-clear-btn').style.display='inline-block';
   document.getElementById('indiv-phone').value=phone;
+  renderIndivList();
+}
+
+function clearIndivClient(){
+  _indivCid='';
+  document.getElementById('indiv-selected-name').textContent='← 왼쪽에서 업체를 선택하세요';
+  document.getElementById('indiv-selected-name').style.color='#889';
+  document.getElementById('indiv-clear-btn').style.display='none';
+  document.getElementById('indiv-phone').value='';
   renderIndivList();
 }
 
@@ -5636,12 +5671,11 @@ async function sendIndividualSMS(){
   var msg=document.getElementById('indiv-msg')?.value?.trim();
   var selEl=document.getElementById('indiv-selected');
   var name=selEl?.querySelector('span')?.textContent||'';
-  if(!_indivCid){showToast('업체를 선택하세요','warn');return;}
-  if(!phone){showToast('수신 번호가 없습니다','warn');return;}
+  if(!phone){showToast('수신 번호를 입력하세요','warn');return;}
   if(!msg){showToast('문자 내용을 입력하세요','warn');return;}
-  var finalMsg=msg.replace(/{업체명}/g,name);
+  var finalMsg=msg.replace(/{업체명}/g,name||'고객');
   var ok = await sendSENS(phone, finalMsg);
-  if(ok) showToast('📱 ['+name+'] 문자 발송 완료');
+  if(ok) showToast('📱 '+(name||phone)+' 문자 발송 완료');
   else showToast('발송 실패 — 번호·내용 확인','err');
 }
 
@@ -5649,12 +5683,14 @@ async function sendIndividualSMS(){
 function renderSendList(){
   var mgrF = document.getElementById('send-mgr-filter')?.value||'';
   var typeF = document.getElementById('send-type-filter')?.value||'';
+  var sendQ = (document.getElementById('send-search')?.value||'').toLowerCase();
   var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
 
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(myName&&c.manager!==myName) return false;
     if(mgrF&&c.manager!==mgrF) return false;
+    if(sendQ&&!(c.name||'').toLowerCase().includes(sendQ)) return false;
     if(typeF==='법인') return c.type==='법인';
     if(typeF==='개인') return c.type!=='법인';
     if(typeF==='vat') return c.vatType==='일반'||c.type==='법인';
