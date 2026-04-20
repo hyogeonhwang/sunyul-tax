@@ -1993,7 +1993,7 @@ function go(page){
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
   if(page==='calendar') renderCal();
-  if(page==='dashboard'){if(ALL.length){renderDash();runCrossCheck();checkSalaryAlerts();}}
+  if(page==='dashboard'){if(ALL.length){renderDash();loadDashTaxCache().then(function(){runCrossCheck();});checkSalaryAlerts();}}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='staff'){loadStaffPage();}
@@ -2779,8 +2779,19 @@ async function saveTax(key,cid,field,val){
   _taxChkCache[cid][field]=val;
   // 행 스타일 즉시 반영
   updateTaxRow(cid, _taxChkCache[cid]);
-  // 대시보드 처리현황 갱신
-  if(field==='done'&&curPage==='dashboard') renderDashStatus();
+  // 대시보드 처리현황 갱신 (현재 페이지 무관하게 캐시 업데이트)
+  if(field==='done'){
+    // DASH_TAX_CACHE 즉시 업데이트
+    var dkParts=key.split('_'); // tax_yr_tp_pd
+    if(dkParts.length>=4){
+      var dk=key.replace('tax_','tax_');
+      if(!DASH_TAX_CACHE[dk]) DASH_TAX_CACHE[dk]={};
+      if(!DASH_TAX_CACHE[dk][cid]) DASH_TAX_CACHE[dk][cid]={};
+      DASH_TAX_CACHE[dk][cid].done=val;
+    }
+    if(curPage==='dashboard') renderDashStatus();
+    else if(openTabs.includes('dashboard')) renderDashStatus();
+  }
   // Firebase 저장 (비동기)
   await db.collection('taxChecks').doc(key).set({[cid]:{[field]:val}},{merge:true});
   if(field==='assignee'){
@@ -3112,6 +3123,12 @@ async function savePyInstant(docId,key,val,cbEl){
 
 async function savePy(docId,key,val){
   await db.collection('payrollChecks').doc(docId).set({[key]:val},{merge:true});
+  // DASH_TAX_CACHE 즉시 업데이트
+  var cacheKey='payroll_'+docId; // payroll_yr_monthly 등
+  if(!DASH_TAX_CACHE[cacheKey]) DASH_TAX_CACHE[cacheKey]={};
+  DASH_TAX_CACHE[cacheKey][key]=val;
+  // 대시보드 열려있으면 즉시 갱신
+  if(openTabs.includes('dashboard')) renderDashStatus();
 }
 
 // =================== KAKAO ===================
@@ -4964,7 +4981,7 @@ async function saveSalaryInstant(docId,key,val,cbEl){
       var allDone=row?Array.from(row.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])')).some(function(el){return el===cbEl?val:el.checked;}):val;
       await db.collection('taxChecks').doc(whtKey).set({[cid]:{done:allDone}},{merge:true});
       if(DASH_TAX_CACHE[whtKey]) DASH_TAX_CACHE[whtKey][cid]={done:allDone};
-      if(curPage==='dashboard') renderDashStatus();
+      if(openTabs.includes('dashboard')) renderDashStatus();
     }
   }
 }
@@ -4973,9 +4990,16 @@ async function saveSalary(docId,key,val){
   await db.collection('salaryChecks').doc(docId).set({[key]:val},{merge:true});
   // 캐시 무효화 → 지급명세서/원천세 신고체크 재조회 시 최신 데이터 반영
   var yr=docId.split('_')[1];
-  if(yr&&SALARY_CACHE[yr]) delete SALARY_CACHE[yr];
-  // 대시보드 처리현황도 갱신
-  if(curPage==='dashboard') renderDashStatus();
+  var m=parseInt(docId.split('_')[2]);
+  if(yr&&SALARY_CACHE[yr]){
+    // 캐시 즉시 업데이트 (삭제 대신)
+    if(!SALARY_CACHE[yr][m]) SALARY_CACHE[yr][m]={};
+    SALARY_CACHE[yr][m][key]=val;
+    // 대시보드 처리현황도 즉시 갱신
+    DASH_TAX_CACHE['payroll_monthly_'+yr] = DASH_TAX_CACHE['payroll_monthly_'+yr]||{};
+  }
+  // 대시보드 열려있으면 즉시 갱신
+  if(openTabs.includes('dashboard')) renderDashStatus();
 }
 
 
