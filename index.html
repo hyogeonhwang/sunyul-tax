@@ -2055,6 +2055,8 @@ function loadClients(){
     renderClients();
     fillKkSelect();
     renderDash();
+    renderUrgentSection();
+    loadDashTaxCache().then(function(){renderUrgentSection();runCrossCheck();}).catch(function(){renderUrgentSection();});
     document.getElementById('cLd').style.display='none';
   }, err=>{
     clearTimeout(timeout);
