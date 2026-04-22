@@ -1993,7 +1993,7 @@ function go(page){
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
   if(page==='calendar') renderCal();
-  if(page==='dashboard'){if(ALL.length){renderDash();loadDashTaxCache().then(function(){runCrossCheck();});checkSalaryAlerts();}}
+  if(page==='dashboard'){if(ALL.length){renderDash();renderUrgentSection();loadDashTaxCache().then(function(){renderUrgentSection();runCrossCheck();}).catch(function(err){console.error('loadDashTaxCache error:',err);renderUrgentSection();});checkSalaryAlerts();}}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='staff'){loadStaffPage();}
@@ -3427,21 +3427,7 @@ function renderDash(){
     <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${info.name||''} 담당</div></div>
     <div class="stat"><div class="stat-lbl">이번달 마감</div><div class="stat-val">${upcoming.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
 
-  // ② 긴급처리 (D-7 이내)
-  const urgentEl=document.getElementById('dashUrgent');
-  if(urgentEl){
-    const urgent=upcoming.filter(e=>e.d-d<=3);
-    urgentEl.innerHTML=urgent.length
-      ?urgent.map(e=>{
-          const dl=e.d-d;
-          const cl=dl<=3?'color:#e74c3c;':'color:#e67e22;';
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f6fa">
-            <span style="font-size:13px;font-weight:500">🔴 ${e.lbl}</span>
-            <span style="${cl}font-size:12px;font-weight:700">${m}/${e.d} (D-${dl})</span>
-          </div>`;
-        }).join('')
-      :'<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
-  }
+  // ② 긴급처리는 loadDashTaxCache 완료 후 renderUrgentSection()에서 처리
 
   // ③ 이번달 마감 일정
   const de=document.getElementById('dashDL');
@@ -4603,6 +4589,119 @@ async function saveTaxRecv(key, cid, val){
 var _crossAlerts=[];
 var DASH_TAX_CACHE={};  // 대시보드용 신고체크 캐시
 
+function toggleUrgentDetail(uid){
+  var d=document.getElementById(uid);
+  var a=document.getElementById('arr-'+uid);
+  if(d){var o=d.style.display==='block';d.style.display=o?'none':'block';if(a)a.textContent=o?'▼':'▲';}
+}
+
+function renderUrgentSection(){
+  var urgentEl=document.getElementById('dashUrgent');
+  if(!urgentEl) return;
+  try{
+  var now=new Date(), m=now.getMonth()+1, d=now.getDate();
+  var mDL=DL.filter(function(e){return e.m===m;});
+  var urgent=mDL.filter(function(e){return e.d>=d&&e.d-d<=3;});
+
+  if(!urgent.length){
+    urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
+    return;
+  }
+
+  var html=urgent.map(function(e){
+    var dl=e.d-d;
+    // 이 마감에 해당하는 미완료 업체 찾기
+    var incompleteClients=getIncompleteClientsForDeadline(e);
+    var uid='urgent-'+e.lbl.replace(/\s/g,'_');
+    var hasList=incompleteClients.length>0;
+    return '<div style="margin-bottom:8px;border:0.5px solid #fcc;border-radius:8px;overflow:hidden">'
+      +'<div onclick="toggleUrgentDetail(\''+uid+'\')" '
+      +'style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fff5f5;'+(hasList?'cursor:pointer':'')+'">'
+      +'<span style="font-size:13px;font-weight:600;color:#c0392b">🔴 '+e.lbl+'</span>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +(hasList?'<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>':'<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>')
+      +'<span style="color:#e74c3c;font-size:12px;font-weight:700">'+m+'/'+e.d+' (D-'+dl+')</span>'
+      +(hasList?'<span id="arr-'+uid+'" style="color:#aab;font-size:11px">▼</span>':'')
+      +'</div></div>'
+      +(hasList?'<div id="'+uid+'" style="display:none;background:#fff;border-top:0.5px solid #fcc;padding:4px 12px 8px">'
+        +incompleteClients.map(function(c){return '<div style="font-size:11px;color:#c0392b;padding:3px 0;border-bottom:0.5px solid #fee9e9">'+c.name+'<span style="color:#aab;margin-left:6px">'+c.manager+'</span></div>';}).join('')
+        +'</div>':'')
+      +'</div>';
+  }).join('');
+
+  urgentEl.innerHTML=html;
+  }catch(err){
+    urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
+    console.error('renderUrgentSection error:', err);
+  }
+}
+
+function getIncompleteClientsForDeadline(e){
+  var now=new Date();
+  var yr=now.getFullYear().toString();
+  var m=now.getMonth()+1;
+
+  if(e.t==='vat'){
+    var vatPdMap={1:4,4:1,7:2,10:3,12:4};
+    var vatPd=vatPdMap[m]||1;
+    var isJunggan=(vatPd===1||vatPd===3);
+    var cacheKey='tax_'+yr+'_vat_'+vatPd;
+    var chk=DASH_TAX_CACHE[cacheKey]||{};
+    var gojiData=DASH_TAX_CACHE['goji_'+yr+'_vat'+(vatPd===1?'1':'2')]||{};
+    return ALL.filter(function(c){
+      if(c.status!=='활성'||c.type==='신고대리') return false;
+      if(isJunggan){
+        if(c.vatType==='면세') return false;
+        if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
+        if(gojiData[c.id]&&gojiData[c.id].status==='goji') return false;
+        if(gojiData[c.id]&&gojiData[c.id].status==='none'&&!c.vatExcept) return false;
+      } else {
+        if(c.vatType==='면세') return false;
+        if(c.type!=='법인'&&c.vatType!=='일반') return false;
+      }
+      return !chk[c.id]||!chk[c.id].done;
+    }).map(function(c){return {name:c.name,manager:c.manager||'미배정'};});
+  }
+
+  if(e.t==='wht'){
+    var whtKey='tax_'+yr+'_wht_'+m;
+    var whtChk=DASH_TAX_CACHE[whtKey]||{};
+    var prevM2=m===1?12:m-1;
+    var prevYr2=m===1?(parseInt(yr)-1).toString():yr;
+    var salData=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2]||{};
+    return ALL.filter(function(c){
+      if(c.status!=='활성'||c.whtYn!=='Y') return false;
+      if(c.whtSemi==='Y') return false;
+      var hasSal=salData[c.id+'_daily_done']||salData[c.id+'_biz_done']||salData[c.id+'_labor_done']||salData[c.id+'_retire_done'];
+      if(!hasSal) return false;
+      return !whtChk[c.id]||!whtChk[c.id].done;
+    }).map(function(c){return {name:c.name,manager:c.manager||'미배정'};});
+  }
+
+  if(e.t==='pay'){
+    var pyM=m===1?12:m-1;
+    var pyYr=m===1?(parseInt(yr)-1).toString():yr;
+    var pyChk=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
+    var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
+    return ALL.filter(function(c){
+      if(c.status!=='활성'||c.type==='신고대리') return false;
+      var hasBiz=salCache[c.id+'_biz_done'];
+      var hasDaily=salCache[c.id+'_daily_done'];
+      if(!hasBiz&&!hasDaily) return false;
+      var bizDone=!hasBiz||pyChk[c.id+'_사업소득_'+pyM];
+      var dailyDone=!hasDaily||pyChk[c.id+'_일용직_'+pyM];
+      return !bizDone||!dailyDone;
+    }).map(function(c){return {name:c.name,manager:c.manager||'미배정'};});
+  }
+
+  return [];
+}
+
+function renderCrossAlerts(){
+  // 크로스체크 알림은 신고체크 탭 아이콘에만 표시 (dashUrgent 건드리지 않음)
+  updateCrossWarnIcons();
+}
+
 async function runCrossCheck(){
   var now=new Date();
   var yr=now.getFullYear().toString();
@@ -4668,7 +4767,7 @@ async function runCrossCheck(){
       _crossAlerts.push({id:c.id,name:c.name,manager:c.manager||'미배정',alerts:alerts});
   });
   renderCrossAlerts();
-  updateCrossWarnIcons();
+  renderUrgentSection();
 }
 function renderCrossAlerts(){
   var urgentEl=document.getElementById('dashUrgent');
