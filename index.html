@@ -1077,6 +1077,13 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           </div>
         </div>
         <div id="goji-tmpl-wrap" style="display:none;padding:12px 14px;background:#fff">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:500;color:#445;white-space:nowrap">납부기한</span>
+            <input id="goji-deadline" class="fi" style="font-size:12px;width:130px" placeholder="날짜를 선택하세요" readonly>
+            <input type="date" id="goji-deadline-picker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="applyGojiDeadline(this.value)">
+            <button class="btn btn-s btn-sm" onclick="document.getElementById('goji-deadline-picker').showPicker()">📅 날짜 선택</button>
+            <span style="font-size:11px;color:#aab">← {납부기한} 변수에 들어갑니다</span>
+          </div>
           <textarea id="goji-tmpl" class="fi" rows="5" style="font-size:12px;line-height:1.7;resize:vertical;margin-bottom:8px"
             placeholder="문자 템플릿을 입력하세요...">[세무법인 선율] 안녕하세요 {업체명} 대표님^^
 
@@ -5647,6 +5654,18 @@ function toggleProfitLeft(){
 }
 
 
+function applyGojiDeadline(val){
+  if(!val) return;
+  var d=new Date(val);
+  var days=['일','월','화','수','목','금','토'];
+  var month=d.getMonth()+1;
+  var day=d.getDate();
+  var dow=days[d.getDay()];
+  var formatted=month+'월 '+day+'일('+dow+')';
+  var el=document.getElementById('goji-deadline');
+  if(el) el.value=formatted;
+}
+
 function toggleGojiTmpl(){
   var wrap=document.getElementById('goji-tmpl-wrap');
   var arrow=document.getElementById('goji-tmpl-arrow');
@@ -5711,38 +5730,42 @@ async function sendGojiSMS(){
   var noPhone=targets.filter(function(t){return !t.phone;});
   var withPhone=targets.filter(function(t){return t.phone;});
 
-  var confirmMsg='총 '+withPhone.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632 (세무법인 선율)';
-  if(noPhone.length) confirmMsg+='\n\n⚠️ 연락처 없는 업체 '+noPhone.length+'개는 제외됩니다:\n'+noPhone.map(function(t){return '· '+t.name;}).join('\n');
+  // 납부기한 직접 입력값 사용
+  var deadlineInput=document.getElementById('goji-deadline')?.value?.trim()||deadline;
+
+  // 발송 목록 구성 (deadlineInput 반영)
+  var targets2=[];
+  chks.forEach(function(chk){
+    var cid=chk.dataset.cid;
+    var c=ALL.find(function(x){return x.id===cid;});
+    var d=GOJI_DATA[cid]||{};
+    if(c&&d.amt){
+      var amt=Number(d.amt).toLocaleString();
+      var msg2=tmpl.replace(/{업체명}/g,c.name||'').replace(/{금액}/g,amt).replace(/{납부기한}/g,deadlineInput);
+      var phone2=(c.mobile||c.phone||'').replace(/[^0-9]/g,'');
+      targets2.push({name:c.name,phone:phone2,msg:msg2,cid:cid});
+    }
+  });
+  var noPhone2=targets2.filter(function(t){return !t.phone;});
+  var withPhone2=targets2.filter(function(t){return t.phone;});
+
+  var confirmMsg='총 '+withPhone2.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632 (세무법인 선율)';
+  if(noPhone2.length) confirmMsg+='\n\n⚠️ 연락처 없는 업체 '+noPhone2.length+'개는 제외됩니다:\n'+noPhone2.map(function(t){return '· '+t.name;}).join('\n');
   if(!confirm(confirmMsg)) return;
 
-  // 실제 발송 (발신번호 등록 후 활성화)
-  showToast('📱 문자 발송 기능은 발신번호 등록 후 활성화됩니다.','warn');
   var ok=0, fail=0;
-  for(var gi=0;gi<chks.length;gi++){
-    var c=ALL.find(function(x){return x.id===chks[gi];});
-    if(!c) continue;
-    var phone=c.mobile||c.phone||'';
-    if(!phone){fail++;continue;}
-    var tmpl=document.getElementById('msgPre')?.textContent||'';
-    var msg=tmpl.replace(/{업체명}/g,c.name);
-    var sent=await sendSENS(phone,msg);
-    if(sent) ok++; else fail++;
-  }
-  showToast('발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
-  return;
-  /*
-  var key = 'goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
-  for(var i=0; i<withPhone.length; i++){
-    var t = withPhone[i];
-    var ok = await sendSENS(t.phone, t.msg);
-    if(ok){
+  var key='goji_'+GOJI_YEAR+'_'+GOJI_TYPE;
+  for(var gi=0;gi<withPhone2.length;gi++){
+    var t=withPhone2[gi];
+    var sent=await sendSENS(t.phone, t.msg);
+    if(sent){
+      ok++;
       await db.collection('gojiData').doc(key).set({[t.cid]:{...GOJI_DATA[t.cid],sent:true}},{merge:true});
-      GOJI_DATA[t.cid] = {...(GOJI_DATA[t.cid]||{}), sent:true};
-    }
+      GOJI_DATA[t.cid]={...(GOJI_DATA[t.cid]||{}),sent:true};
+    } else fail++;
   }
-  showToast('✅ '+withPhone.length+'개 업체 문자 발송 완료!');
+  showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
   renderGoji();
-  */
 }
 
 
