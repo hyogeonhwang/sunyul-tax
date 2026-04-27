@@ -5919,18 +5919,18 @@ async function sendGeneralSMS(){
   var msg=document.getElementById('msgPre')?.textContent||'';
   if(!msg||msg.includes('템플릿을 선택')){showToast('템플릿을 먼저 선택하세요.','warn');return;}
   if(!confirm(chks.length+'개 업체에 문자를 발송합니다.\n발신번호: 02-2038-6632')) return;
-  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
   var ok=0, fail=0;
   for(var di=0;di<chks.length;di++){
-    var c=ALL.find(function(x){return x.id===chks[di];});
+    var cid=chks[di].getAttribute('data-cid')||chks[di].value||'';
+    var c=ALL.find(function(x){return x.id===cid;});
     if(!c) continue;
-    var phone=c.mobile||c.phone||'';
+    var phone=(c.mobile||c.phone||'').replace(/[^0-9]/g,'');
     if(!phone){fail++;continue;}
-    var sent=await sendSENS(phone,chks[di]._msg||'');
+    var finalMsg=msg.replace(/{업체명}/g,c.name||'');
+    var sent=await sendSENS(phone,finalMsg);
     if(sent) ok++; else fail++;
   }
-  showToast('발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
-  return;
+  showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
 }
 
 // ---- 납부마감 안내 ----
@@ -6044,7 +6044,7 @@ async function sendDeadlineSMS(){
   if(!SELECTED_DEADLINE_TYPE){showToast('신고 유형을 선택하세요.','warn');return;}
 
   var tmpl=document.getElementById('deadline-tmpl-txt')?.value||'';
-  var t=SELECTED_DEADLINE_TYPE;
+  var t=DEADLINE_TYPES.find(function(x){return x.key===SELECTED_DEADLINE_TYPE;})||{};
 
   var withPhone=[], noPhone=[];
   chks.forEach(function(el){
@@ -6687,28 +6687,27 @@ async function sendTaxSMS(){
 
   if(!confirm(withPhone.length+'개 업체에 납부마감 문자를 발송합니다.\n발신번호: 02-2038-6632'+(noPhone.length?'\n\n⚠️ 연락처 없는 업체 '+noPhone.length+'개 제외':''))){return;}
 
-  // SENS 발송
-  showToast('📱 발신번호 등록 후 발송 가능합니다.','warn');
-
-  // 발송 완료 후 자동 체크 (실제 발송 성공 시)
-  /*
+  // SENS 실제 발송
+  var ok=0, fail=0;
   for(var i=0;i<withPhone.length;i++){
-    var c = withPhone[i];
-    var amt = parseInt(chk[c.id].payAmt).toLocaleString();
-    var msg = tmpl
+    var c=withPhone[i];
+    var amt=parseInt(chk[c.id]?.payAmt||0).toLocaleString();
+    var msg=tmpl
       .replace(/{업체명}/g, c.name)
       .replace(/{신고유형}/g, typeLbl)
       .replace(/{금액}/g, amt)
-      .replace(/{납부기한}/g, '');
-    var phone = (c.mobile||c.phone).replace(/[^0-9]/g,'');
-    var ok = await sendSENS(phone, msg);
-    if(ok){
+      .replace(/{납부기한}/g, deadline);
+    var phone=(c.mobile||c.phone||'').replace(/[^0-9]/g,'');
+    if(!phone){fail++;continue;}
+    var sent=await sendSENS(phone, msg);
+    if(sent){
+      ok++;
       await db.collection('taxChecks').doc(key).set({[c.id]:{smsSent:true}},{merge:true});
-    }
+      if(_taxChkCache[c.id]) _taxChkCache[c.id].smsSent=true;
+    } else fail++;
   }
-  showToast('✅ '+withPhone.length+'개 업체 문자 발송 완료!');
+  showToast('📱 발송완료 '+ok+'개'+(fail?', 실패 '+fail+'개':''));
   loadTax();
-  */
 }
 
 
