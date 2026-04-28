@@ -2072,14 +2072,14 @@ function loadClients(){
 }
 
 function updateCounts(){
-  // 네비 배지: 활성 업체만 카운트
-  document.getElementById('nc-clients').textContent=ALL.filter(c=>c.status==='활성').length;
+  // 네비 배지: 활성 업체만 카운트 (신고대리 제외)
+  document.getElementById('nc-clients').textContent=ALL.filter(c=>c.status==='활성'&&c.type!=='신고대리').length;
 }
 
 function updateTabCounts(filtered){
   ['전체','법인','일반','면세','신고대리'].forEach(t=>{
     const el=document.getElementById('cnt-'+t);
-    if(el) el.textContent= t==='전체'?filtered.length:filtered.filter(c=>c.type===t).length;
+    if(el) el.textContent= t==='전체'?filtered.filter(c=>c.type!=='신고대리').length:filtered.filter(c=>c.type===t).length;
   });
   // 비활성 탭: 폐업+이관+기장중지
   const biEl=document.getElementById('cnt-비활성');
@@ -2115,9 +2115,11 @@ function renderClients(){
   if(!tb) return;
   updateTabCounts(list);
   document.getElementById('cEmpty').style.display=list.length?'none':'block';
-  tb.innerHTML=list.map(c=>`
-    <tr style="cursor:pointer" onclick="editClient('${c.id}')" onmouseover="this.style.background='#f7f9ff'" onmouseout="this.style.background=''">
-      <td class="muted">${c.no||'-'}</td>
+
+  // 거래처 행 렌더링 (number 인자로 표시 번호 받음)
+  function rowHtml(c, num){
+    return `<tr style="cursor:pointer" onclick="editClient('${c.id}')" onmouseover="this.style.background='#f7f9ff'" onmouseout="this.style.background=''">
+      <td class="muted">${num}</td>
       <td><span style="color:#1A3169;font-weight:700;text-decoration:underline;text-underline-offset:2px;text-decoration-color:#c8d8f0">${c.name||'-'}</span>${c.memo?'<span title="'+esc(c.memo)+'" style="color:#C9A84C;margin-left:4px">★</span>':''}</td>
       <td>${c.rep||'-'}</td>
       <td style="font-family:monospace;font-size:11.5px">${c.bizNo||'-'}</td>
@@ -2126,7 +2128,42 @@ function renderClients(){
       <td>${c.fee?Number(c.fee).toLocaleString()+'원':'-'}</td>
       <td>${c.mobile||c.phone||'-'}</td>
       <td>${statusBdg(c.status)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }
+
+  // 비활성 탭은 기존대로 (그룹핑 없음, c.no 그대로)
+  if(cType==='비활성'){
+    tb.innerHTML=list.map(c=>rowHtml(c, c.no||'-')).join('');
+    return;
+  }
+
+  // 그룹별 분류 + 그룹 안에서 c.no 오름차순 정렬
+  const GROUP_ORDER=['법인','일반','면세','신고대리'];
+  const groups={};
+  GROUP_ORDER.forEach(g=>groups[g]=[]);
+  list.forEach(c=>{
+    if(groups[c.type]) groups[c.type].push(c);
+  });
+  Object.keys(groups).forEach(g=>{
+    groups[g].sort((a,b)=>(a.no||0)-(b.no||0));
+  });
+
+  let html='';
+  if(cType==='전체'){
+    // 전체 탭: 그룹 헤더 + 그룹 안에서 1번부터
+    GROUP_ORDER.forEach(g=>{
+      const arr=groups[g];
+      if(!arr.length) return; // 빈 그룹은 자동 숨김
+      html+=`<tr style="background:#EAF0F8"><td colspan="9" style="padding:8px 14px;font-weight:700;color:#1A3169;font-size:12px;border-top:1.5px solid #c8d8f0;border-bottom:0.5px solid #c8d8f0">${g} <span style="color:#5b6b88;font-weight:500">(${arr.length}개)</span></td></tr>`;
+      arr.forEach((c,i)=>{ html+=rowHtml(c, i+1); });
+    });
+  } else {
+    // 개별 그룹 탭(법인/일반/면세/신고대리): 헤더 없이 1번부터
+    const arr=groups[cType]||[];
+    arr.forEach((c,i)=>{ html+=rowHtml(c, i+1); });
+  }
+
+  tb.innerHTML=html;
 }
 
 function tb_type(t){
@@ -3423,7 +3460,8 @@ function renderCal(){
 
 // =================== DASHBOARD ===================
 function renderDash(){
-  const tot=ALL.filter(c=>c.status==='활성').length;
+  const tot=ALL.filter(c=>c.status==='활성'&&c.type!=='신고대리').length;
+  const agency=ALL.filter(c=>c.status==='활성'&&c.type==='신고대리').length;
   const corp=ALL.filter(c=>c.type==='법인'&&c.status==='활성').length;
   const info=USERS[ME?.email]||{};
   const myC=ALL.filter(c=>c.manager===info.name&&c.status==='활성').length;
@@ -3434,7 +3472,7 @@ function renderDash(){
   // ① 상단 통계 카드
   const se=document.getElementById('dashStats');
   if(se) se.innerHTML=`
-    <div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">${tot}</div><div class="stat-sub">활성 기준</div></div>
+    <div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">${tot}</div><div class="stat-sub">활성 기준 · 신고대리 ${agency}개 별도</div></div>
     <div class="stat"><div class="stat-lbl">법인 거래처</div><div class="stat-val">${corp}</div><div class="stat-sub">대표 직접 관리</div></div>
     <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${info.name||''} 담당</div></div>
     <div class="stat"><div class="stat-lbl">이번달 마감</div><div class="stat-val">${upcoming.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
