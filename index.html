@@ -3509,7 +3509,7 @@ function renderDash(){
     if(ROLE==='admin'){
       if(mgrCard) mgrCard.style.display='block';
       const mgrs={};
-      ALL.filter(c=>c.status==='활성').forEach(c=>{
+      ALL.filter(c=>c.status==='활성'&&c.type!=='신고대리').forEach(c=>{
         const mgr=c.manager||'미배정';
         if(!mgrs[mgr]) mgrs[mgr]={total:0};
         mgrs[mgr].total++;
