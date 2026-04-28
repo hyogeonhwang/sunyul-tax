@@ -622,9 +622,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
             <select class="sel" id="sal-mgr-filter" onchange="renderSalary()" style="display:none">
               <option value="">전체 담당자</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
             </select>
             <select class="sel" id="sal-day-filter" onchange="renderSalary()">
               <option value="">전체 급여일</option>
@@ -671,9 +668,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </select>
             <select class="sel" id="pyMgrFilter" onchange="renderPayroll()" style="display:none">
               <option value="">전체 담당자</option>
-              <option value="김서지">김서지</option>
-              <option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="renderPayroll()">조회</button>
           </div>
@@ -2893,6 +2887,15 @@ function bulkAssign(key,mgr){
 
 // =================== PAYROLL ===================
 async function loadPayroll(){
+  // 담당자 필터 동적 생성 (admin만, USERS 객체 기반 5명 전체)
+  var pyMgrSel=document.getElementById('pyMgrFilter');
+  if(pyMgrSel&&ROLE==='admin'){
+    var prevVal=pyMgrSel.value;
+    var userNames=Object.values(USERS).map(function(u){return u.name;});
+    pyMgrSel.innerHTML='<option value="">전체 담당자</option>'
+      +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+    if(prevVal) pyMgrSel.value=prevVal;
+  }
   updatePyPeriod();
   renderPayroll();
 }
@@ -4860,7 +4863,16 @@ function initSalaryMonth(){
   var mgrSel=document.getElementById('sal-mgr-filter');
   if(mgrSel){
     mgrSel.style.display=ROLE==='admin'?'block':'none';
-    if(ROLE!=='admin') mgrSel.value=''; // 직원이면 필터 초기화
+    if(ROLE==='admin'){
+      // USERS 객체 기반으로 5명 전체 동적 생성 (황효건/김서지/안지윤/유승희/김희진)
+      var prevVal=mgrSel.value;
+      var userNames=Object.values(USERS).map(function(u){return u.name;});
+      mgrSel.innerHTML='<option value="">전체 담당자</option>'
+        +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+      if(prevVal) mgrSel.value=prevVal;
+    } else {
+      mgrSel.value=''; // 직원이면 필터 초기화
+    }
   }
 }
 
@@ -5070,7 +5082,7 @@ async function saveSalaryInstant(docId,key,val,cbEl){
         var cells=tfoot.querySelectorAll('td');
         var types=[sumD,sumB,sumL,sumR];
         for(var ti=0;ti<4;ti++){
-          var cell=cells[ti+5];
+          var cell=cells[ti+2];
           if(cell){cell.textContent=types[ti]+'개';cell.style.color=types[ti]?'#3B6D11':'#aab';}
         }
       }
