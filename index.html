@@ -2550,7 +2550,7 @@ async function loadTax(){
     });
   }
   if(tp==='simp') clients=clients.filter(c=>c.vatType==='간이');
-  if(tp==='biz') clients=clients.filter(c=>c.vatType==='면세'||c.type==='면세');
+  if(tp==='biz') clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
   if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
   if(tp==='wht'){
@@ -2880,7 +2880,7 @@ async function saveTax(key,cid,field,val){
     });
   }
   if(tp==='simp') clients=clients.filter(c=>c.vatType==='간이');
-  if(tp==='biz') clients=clients.filter(c=>c.vatType==='면세'||c.type==='면세');
+  if(tp==='biz') clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
   if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
   if(tp==='wht'){
