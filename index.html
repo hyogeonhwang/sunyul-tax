@@ -3154,18 +3154,17 @@ async function renderPayroll(){
   // 연간
   } else {
     var dl=dlMap[tp]||'3/10';
-    var prevYr=String(parseInt(yr)-1);
-    await ensureSalaryCache(prevYr);
+    await ensureSalaryCache(yr);
     var allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
       if(c.type==='신고대리') return false;
-      // 사업/근로/퇴직 연간: 직전연도 급여관리 체크 기준 (대시보드와 동일)
+      // 사업/근로/퇴직 연간: 선택연도(발생연도) 급여관리 체크 기준 (매월/반기와 동일)
       //   abiz→biz, alabor→labor, retire→retire
       // 이자/배당/기타 연간: 급여관리에 항목 없음 → payrollSettings 수동설정 기준 (현행 유지)
       var salType={'abiz':'biz','alabor':'labor','retire':'retire'}[tp]||null;
       if(salType){
-        if(!hasSalaryDone(prevYr, allMonths, c.id, salType)) return false;
+        if(!hasSalaryDone(yr, allMonths, c.id, salType)) return false;
       } else {
         // int/div/other — 수동 설정된 거래처만
         if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
