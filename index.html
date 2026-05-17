@@ -249,10 +249,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
         <div class="fld"><label>직원</label>
           <select class="fi" id="lg-user">
-            <option value="황효건">황효건</option>
             <option value="김서지">김서지</option>
             <option value="안지윤">안지윤</option>
             <option value="유승희">유승희</option>
+            <option value="황효건">황효건</option>
             <option value="김희진">김희진</option>
           </select>
         </div>
@@ -281,10 +281,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
         <div class="fld" id="lu-user-row"><label>직원</label>
           <select class="fi" id="lu-user">
-            <option value="황효건">황효건</option>
             <option value="김서지">김서지</option>
             <option value="안지윤">안지윤</option>
             <option value="유승희">유승희</option>
+            <option value="황효건">황효건</option>
             <option value="김희진">김희진</option>
           </select>
         </div>
@@ -526,12 +526,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           </div>
           <select class="sel" id="cManager" onchange="renderClients()">
             <option value="">전체 담당자</option>
-            <option value="미배정">미배정</option>
-            <option value="황효건">황효건</option>
             <option value="김서지">김서지</option>
             <option value="안지윤">안지윤</option>
             <option value="유승희">유승희</option>
+            <option value="황효건">황효건</option>
             <option value="김희진">김희진</option>
+            <option value="미배정">미배정</option>
           </select>
           <select class="sel" id="cStatus" onchange="renderClients()">
             <option value="">전체 상태</option>
@@ -1461,9 +1461,9 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div class="fr">
           <div class="fld"><label>담당자</label>
             <select class="fi" id="f-mgr">
-              <option value="미배정">미배정</option><option value="황효건">황효건 (대표)</option>
               <option value="김서지">김서지</option><option value="안지윤">안지윤</option>
-              <option value="유승희">유승희</option><option value="김희진">김희진</option>
+              <option value="유승희">유승희</option><option value="황효건">황효건 (대표)</option>
+              <option value="김희진">김희진</option><option value="미배정">미배정</option>
             </select>
           </div>
           <div class="fld"><label>기장료 (원)</label><input class="fi" type="number" id="f-fee" placeholder="0" oninput="showHint(this)"><div class="num-hint" id="hint-f-fee"></div></div>
@@ -1481,10 +1481,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <label>원천세 담당자 <span style="color:#C9A84C;font-size:11px">별도 지정</span></label>
             <select class="fi" id="f-wm2">
               <option value="">선택 안함</option>
-              <option value="황효건">황효건</option>
               <option value="김서지">김서지</option>
               <option value="안지윤">안지윤</option>
               <option value="유승희">유승희</option>
+              <option value="황효건">황효건</option>
               <option value="김희진">김희진</option>
             </select>
           </div>
@@ -1774,12 +1774,22 @@ const auth = firebase.auth();
 let ME = null, ROLE = 'staff';
 const ADMIN_EMAIL = 'hg'+'@'+'sunyul.com'; // 대표 전용 — 이 이메일만 관리자 권한
 const USERS = {
-  ['hg@sunyul.com']:{name:'황효건',role:'admin',title:'대표세무사'},
   ['sj@sunyul.com']:{name:'김서지',role:'staff',title:'사원'},
   ['jy@sunyul.com']:{name:'안지윤',role:'staff',title:'사원'},
   ['sh@sunyul.com']:{name:'유승희',role:'staff',title:'사원'},
+  ['hg@sunyul.com']:{name:'황효건',role:'admin',title:'대표세무사'},
   ['hj@sunyul.com']:{name:'김희진',role:'staff',title:'세무사'},
 };
+// 담당자 표시 순서 공용 기준 (모든 드롭다운/그룹 목록이 이 순서를 따름)
+const MGR_ORDER = ['김서지','안지윤','유승희','황효건','김희진'];
+function mgrSortIndex(name){
+  if(name==='미배정') return 999; // 미배정은 항상 맨 끝
+  var i = MGR_ORDER.indexOf(name);
+  return i===-1 ? 998 : i; // 명단에 없는 이름은 미배정 바로 앞
+}
+function sortByMgrOrder(names){
+  return names.slice().sort(function(a,b){return mgrSortIndex(a)-mgrSortIndex(b);});
+}
 let ALL=[], TMPLS=[], platRows=[], editCId=null, editTId=null, selTI=-1;
 let cType='전체', pyTab='monthly';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
@@ -2653,7 +2663,7 @@ async function loadTax(){
     </div>`;
 
   const mgrKeys=Object.keys(mgrs);
-  Object.entries(mgrs).forEach(([mgr,list])=>{
+  Object.entries(mgrs).sort((a,b)=>mgrSortIndex(a[0])-mgrSortIndex(b[0])).forEach(([mgr,list])=>{
     const mdone=list.filter(c=>chk[c.id]?.done).length;
     const mgrId='mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     const allDone=mdone===list.length&&list.length>0;
@@ -2757,7 +2767,7 @@ async function loadTax(){
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
                   <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
                     <option value="">배정 안함</option>
-                    ${['황효건','김서지','안지윤','유승희','김희진'].map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
+                    ${MGR_ORDER.map(n=>`<option ${chk[c.id]?.assignee===n?'selected':''}>${n}</option>`).join('')}
                   </select>
                 </td>`:''}
                 <td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:140px" value="${esc(chk[c.id]?.memo||'')}" placeholder="메모..." onblur="saveTax('${key}','${c.id}','memo',this.value)"></td>
@@ -2780,7 +2790,7 @@ function openReassignMenu(e,key,cid,mgr){
   if(!menu) return;
   // 담당자 목록 채우기
   var list=document.getElementById('reassign-list');
-  var names=['황효건','김서지','안지윤','유승희','김희진'];
+  var names=MGR_ORDER.slice();
   list.innerHTML='<div onclick="doReassign(\'\')" style="padding:7px 16px;font-size:12px;cursor:pointer;color:#e74c3c;border-bottom:0.5px solid #f0f2f7" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">미배정으로 원복</div>'
     +names.filter(function(n){return n!==mgr;}).map(function(n){
       return '<div onclick="doReassign(\''+n+'\')" style="padding:7px 16px;font-size:12px;cursor:pointer" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">'+n+'</div>';
@@ -3033,7 +3043,7 @@ async function renderPayroll(){
     var mgrs={};
     clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
     var html='<div class="al al-i" style="margin-bottom:12px">✅ = 올해 급여관리에서 해당 유형을 한 번이라도 체크한 업체</div>';
-    Object.entries(mgrs).forEach(function([mgr,list]){
+    Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
       var mgrId='py-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
       html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
       html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7f8fb;cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
@@ -3084,7 +3094,7 @@ async function renderPayroll(){
     var mgrs={};
     clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
     var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
-    Object.entries(mgrs).forEach(function([mgr,list]){
+    Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
       var mdone=list.filter(function(c){return chk[c.id+'_'+lbl+'_'+pd];}).length;
       var mgrId='py-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
       html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
@@ -3150,9 +3160,16 @@ async function renderPayroll(){
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.status!=='활성') return false;
       if(c.type==='신고대리') return false;
-      if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
-      var salType={'abiz':'biz','alabor':'labor'}[tp]||null;
-      if(salType&&!hasSalaryDone(prevYr, allMonths, c.id, salType)) return false;
+      // 사업/근로/퇴직 연간: 직전연도 급여관리 체크 기준 (대시보드와 동일)
+      //   abiz→biz, alabor→labor, retire→retire
+      // 이자/배당/기타 연간: 급여관리에 항목 없음 → payrollSettings 수동설정 기준 (현행 유지)
+      var salType={'abiz':'biz','alabor':'labor','retire':'retire'}[tp]||null;
+      if(salType){
+        if(!hasSalaryDone(prevYr, allMonths, c.id, salType)) return false;
+      } else {
+        // int/div/other — 수동 설정된 거래처만
+        if(!c.payrollSettings||!c.payrollSettings[tp]) return false;
+      }
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
       return true;
     }), 'pyMgrFilter', true);
@@ -3201,6 +3218,13 @@ async function savePy(docId,key,val){
   var cacheKey='payroll_'+docId; // payroll_yr_monthly 등
   if(!DASH_TAX_CACHE[cacheKey]) DASH_TAX_CACHE[cacheKey]={};
   DASH_TAX_CACHE[cacheKey][key]=val;
+  // 대시보드 집계 블록이 읽는 캐시 키와 동기화 (payroll_{종류}_{yr})
+  var pp=docId.split('_'); // [yr, monthly|semi|annual]
+  if(pp.length===2){
+    var altKey='payroll_'+pp[1]+'_'+pp[0]; // payroll_semi_2026 등
+    if(!DASH_TAX_CACHE[altKey]) DASH_TAX_CACHE[altKey]={};
+    DASH_TAX_CACHE[altKey][key]=val;
+  }
   // 대시보드 열려있으면 즉시 갱신
   if(openTabs.includes('dashboard')) renderDashStatus();
 }
@@ -3551,7 +3575,7 @@ function renderDash(){
         if(!mgrs[mgr]) mgrs[mgr]={total:0};
         mgrs[mgr].total++;
       });
-      const mgrEntries=Object.entries(mgrs).sort((a,b)=>b[1].total-a[1].total);
+      const mgrEntries=Object.entries(mgrs).sort((a,b)=>mgrSortIndex(a[0])-mgrSortIndex(b[0]));
       mgrEl.innerHTML=mgrEntries.length
         ?mgrEntries.map(([name,v])=>
           `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid #f5f6fa">
@@ -5025,7 +5049,7 @@ async function renderSalary(){
     +'<span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span>'
     +'</div>';
 
-  Object.entries(mgrs).forEach(function([mgr,list]){
+  Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
     var mdone=list.filter(function(c){return isSalDone(chk,c.id);}).length;
     var mgrId='sal-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     var allDone=mdone===list.length&&list.length>0;
@@ -6523,6 +6547,16 @@ async function loadDashTaxCache(){
   var pyYr0=m===1?(parseInt(yr)-1).toString():yr;
   var pyDoc=await db.collection('payrollChecks').doc(pyYr0+'_monthly').get();
   DASH_TAX_CACHE['payroll_monthly_'+pyYr0] = pyDoc.exists ? pyDoc.data() : {};
+  // 반기(근로간이) 캐시 — 1월/7월 마감
+  if(m===1||m===7){
+    var pySemiDoc=await db.collection('payrollChecks').doc(yr+'_semi').get();
+    DASH_TAX_CACHE['payroll_semi_'+yr] = pySemiDoc.exists ? pySemiDoc.data() : {};
+  }
+  // 연간(사업/근로/퇴직) 캐시 — 3월 마감
+  if(m===3){
+    var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
+    DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
+  }
 
   // 예정고지 데이터 캐시 (부가세 예정달에만)
   var vatPdMap2={1:4,4:1,7:2,10:3};
@@ -6612,30 +6646,78 @@ function renderDashStatus(){
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
-  // 지급명세서 (전월분) - 일용직+사업소득 건수 합산 (탭별 카운트와 일치)
+  // 지급명세서 - 매월(일용/사업) + 반기(근로간이) + 연간(사업/근로/퇴직), 각 마감 달에만 집계
   var pyM=m===1?12:m-1;
   var pyYr=m===1?(parseInt(yr)-1).toString():yr;
   var salCacheForPy=SALARY_CACHE[pyYr]||{};
   var mChkForPy=salCacheForPy[pyM]||{};
-  var pyChkForDash=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
+  var pyMonChk=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
+  var pySemiChk=DASH_TAX_CACHE['payroll_semi_'+yr]||{};
+  var pyAnnChk=DASH_TAX_CACHE['payroll_annual_'+yr]||{};
   var pyTotalCalc=0, pyDoneCalc=0, pyDetailRows=[];
-  ALL.filter(function(c){return c.status==='활성'&&c.type!=='신고대리';}).forEach(function(c){
+  var actClients=ALL.filter(function(c){return c.status==='활성'&&c.type!=='신고대리';});
+
+  // ① 매월: 일용직 / 사업소득 (전월분) — 급여관리 daily/biz 체크 기준
+  actClients.forEach(function(c){
     var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
     if(mChkForPy[c.id+'_daily_done']){
       pyTotalCalc++;
-      var dOk=!!pyChkForDash[c.id+'_일용직_'+pyM];
+      var dOk=!!pyMonChk[c.id+'_일용직_'+pyM];
       if(dOk) pyDoneCalc++;
-      pyDetailRows.push({id:c.id,name:c.name+' (일용직)',mgr:effMgr,done:dOk});
+      pyDetailRows.push({id:c.id,name:c.name,grp:'일용직 ('+pyM+'월분)',mgr:effMgr,done:dOk});
     }
     if(mChkForPy[c.id+'_biz_done']){
       pyTotalCalc++;
-      var bOk=!!pyChkForDash[c.id+'_사업소득_'+pyM];
+      var bOk=!!pyMonChk[c.id+'_사업소득_'+pyM];
       if(bOk) pyDoneCalc++;
-      pyDetailRows.push({id:c.id,name:c.name+' (사업소득)',mgr:effMgr,done:bOk});
+      pyDetailRows.push({id:c.id,name:c.name,grp:'사업소득 ('+pyM+'월분)',mgr:effMgr,done:bOk});
     }
   });
+
+  // ② 반기: 근로소득 간이 — 1월=하반기(전년 7~12), 7월=상반기(올해 1~6) 마감
+  // payrollChecks/{yr}_semi 의 키: {cid}_{반기}  (반기: '1'=상반기, '2'=하반기)
+  if(m===1||m===7){
+    var semiHalf, semiMonths, semiYr;
+    if(m===7){ semiHalf='1'; semiMonths=[1,2,3,4,5,6]; semiYr=yr; }       // 상반기(올해 1~6), 7/31 마감
+    else     { semiHalf='2'; semiMonths=[7,8,9,10,11,12]; semiYr=String(parseInt(yr)-1); } // 하반기(전년 7~12), 1/31 마감
+    var sCache=SALARY_CACHE[semiYr]||{};
+    actClients.forEach(function(c){
+      var hasLabor=semiMonths.some(function(mm){return sCache[mm]&&sCache[mm][c.id+'_labor_done'];});
+      if(!hasLabor) return;
+      var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+      pyTotalCalc++;
+      var ok=!!pySemiChk[c.id+'_'+semiHalf];
+      if(ok) pyDoneCalc++;
+      pyDetailRows.push({id:c.id,name:c.name,grp:'근로소득 간이 ('+(semiHalf==='1'?'상반기':'하반기')+')',mgr:effMgr,done:ok});
+    });
+  }
+
+  // ③ 연간: 사업소득연간/근로소득연간/퇴직소득연간 — 3월 마감(직전연도 귀속분)
+  // payrollChecks/{yr}_annual 의 키: {cid}_{tp}  (tp: abiz/alabor/retire)
+  if(m===3){
+    var annYr=String(parseInt(yr)-1); // 직전연도 급여관리 기준
+    var aCache=SALARY_CACHE[annYr]||{};
+    var annAll=[1,2,3,4,5,6,7,8,9,10,11,12];
+    var annDefs=[
+      {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
+      {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
+      {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'}
+    ];
+    annDefs.forEach(function(ad){
+      actClients.forEach(function(c){
+        var hasSal=annAll.some(function(mm){return aCache[mm]&&aCache[mm][c.id+'_'+ad.sal+'_done'];});
+        if(!hasSal) return;
+        var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+        pyTotalCalc++;
+        var ok=!!pyAnnChk[c.id+'_'+ad.tp];
+        if(ok) pyDoneCalc++;
+        pyDetailRows.push({id:c.id,name:c.name,grp:ad.lbl,mgr:effMgr,done:ok});
+      });
+    });
+  }
+
   if(pyTotalCalc>0){
-    taxTypes.push({lbl:'지급명세서 ('+pyM+'월분)', docKey:'payroll_monthly_'+pyYr,
+    taxTypes.push({lbl:'지급명세서', docKey:'payroll_monthly_'+pyYr,
       deadline:{month:m,day:new Date(now.getFullYear(),m,0).getDate()},
       _fixedTotal:pyTotalCalc, _fixedDone:pyDoneCalc, _detailRows:pyDetailRows,
       filter:function(c){return false;}, // _fixedTotal/Done 사용
@@ -6730,26 +6812,38 @@ function renderDashStatus(){
     var did='dst-'+ti;
     var detailHtml='';
     var canExpand=targetList.length>0;
-    // 지급명세서: _detailRows(건별) 기반 펼치기
+    // 지급명세서: _detailRows(건별) 기반 펼치기 — 종류(grp)별로 구분
     if(!canExpand && t._detailRows && t._detailRows.length){
       canExpand=true;
-      var pdNot=t._detailRows.filter(function(r){return !r.done;});
-      var pdDone=t._detailRows.filter(function(r){return r.done;});
       var pdRow=function(r){
         return '<div onclick="event.stopPropagation();editClient(\''+r.id+'\')" '
           +'style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid #eef1f6;cursor:pointer">'
           +'<span style="color:#1A3169;text-decoration:underline;text-underline-offset:2px">'+r.name+'</span>'
           +'<span style="color:#888">'+r.mgr+' · '+(r.done?'<b style=\"color:#27ae60\">완료</b>':'<b style=\"color:#e74c3c\">미완료</b>')+'</span></div>';
       };
-      detailHtml='<div id="'+did+'" style="display:none;background:#f8fafc;border:0.5px solid #e8ecf4;border-radius:6px;padding:8px 12px;margin-top:6px;max-height:300px;overflow-y:auto">';
-      if(pdNot.length){
-        detailHtml+='<div style="font-size:11px;font-weight:700;color:#e74c3c;margin:2px 0 4px">미완료 '+pdNot.length+'건</div>'
-          +pdNot.map(pdRow).join('');
-      }
-      if(pdDone.length){
-        detailHtml+='<div style="font-size:11px;font-weight:700;color:#27ae60;margin:8px 0 4px">완료 '+pdDone.length+'건</div>'
-          +pdDone.map(pdRow).join('');
-      }
+      // grp(종류)별로 묶기 — 등장 순서 유지
+      var grpOrder=[], grpMap={};
+      t._detailRows.forEach(function(r){
+        var g=r.grp||'기타';
+        if(!grpMap[g]){ grpMap[g]=[]; grpOrder.push(g); }
+        grpMap[g].push(r);
+      });
+      detailHtml='<div id="'+did+'" style="display:none;background:#f8fafc;border:0.5px solid #e8ecf4;border-radius:6px;padding:8px 12px;margin-top:6px;max-height:340px;overflow-y:auto">';
+      grpOrder.forEach(function(g){
+        var rows=grpMap[g];
+        var gNot=rows.filter(function(r){return !r.done;});
+        var gDone=rows.filter(function(r){return r.done;});
+        detailHtml+='<div style="font-size:12px;font-weight:800;color:#1A3169;background:#eef2f9;border-radius:5px;padding:5px 8px;margin:8px 0 6px">'
+          +'━ '+g+' <span style="font-weight:600;color:#5b6b88">('+gDone.length+'/'+rows.length+')</span></div>';
+        if(gNot.length){
+          detailHtml+='<div style="font-size:11px;font-weight:700;color:#e74c3c;margin:2px 0 3px">미완료 '+gNot.length+'건</div>'
+            +gNot.map(pdRow).join('');
+        }
+        if(gDone.length){
+          detailHtml+='<div style="font-size:11px;font-weight:700;color:#27ae60;margin:6px 0 3px">완료 '+gDone.length+'건</div>'
+            +gDone.map(pdRow).join('');
+        }
+      });
       detailHtml+='</div>';
     }
     if(canExpand && targetList.length>0){
