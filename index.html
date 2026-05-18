@@ -6515,12 +6515,63 @@ async function loadDashStatus(yr, m, statusEl){
 }
 
 
+// 원천세 월마감 플래그 (Firebase: taxChecks/wht_closed, 키 {yr}_{m})
+var WHT_CLOSED = {};
+// 원천세 대시보드 기준월 계산 (방식 2: 마감버튼 + 다음다음달 안전장치)
+// 반환: {y, m, prevClosed, prevY, prevM, warnUnclosed}
+//  - prevClosed: 직전월이 마감되었는지
+//  - warnUnclosed: 직전월 미마감인데 다음다음달이 되어 자동전환된 경우 true (경고용)
+function getWhtBase(){
+  var now=new Date();
+  var cy=now.getFullYear(), cm=now.getMonth()+1;
+  // 직전월
+  var pm = cm===1?12:cm-1;
+  var py = cm===1?cy-1:cy;
+  var prevKey = py+'_'+pm;
+  var prevClosed = !!WHT_CLOSED[prevKey];
+  if(prevClosed){
+    // 직전월 마감됨 → 당월분 표시
+    return {y:cy, m:cm, prevClosed:true, prevY:py, prevM:pm, warnUnclosed:false};
+  }
+  // 직전월 미마감 — 안전장치: 직전월의 "다음다음 달"이 지났으면 자동 당월 전환 + 경고
+  // 직전월(py-pm) 기준 다음다음 달 = pm+2
+  var limM = pm+2, limY = py;
+  while(limM>12){ limM-=12; limY++; }
+  // 현재가 limY-limM 이상이면 자동 전환
+  var curIdx = cy*12+cm, limIdx = limY*12+limM;
+  if(curIdx>=limIdx){
+    return {y:cy, m:cm, prevClosed:false, prevY:py, prevM:pm, warnUnclosed:true};
+  }
+  // 정상: 직전월분 표시 (마감 버튼 노출)
+  return {y:py, m:pm, prevClosed:false, prevY:py, prevM:pm, warnUnclosed:false};
+}
+
+// 원천세 월마감 토글 (close=true 마감, false 해제)
+async function toggleWhtClose(y, mm, close){
+  var key=y+'_'+mm;
+  try{
+    if(close){
+      await db.collection('taxChecks').doc('wht_closed').set({[key]:true},{merge:true});
+      WHT_CLOSED[key]=true;
+    } else {
+      await db.collection('taxChecks').doc('wht_closed').set({[key]:firebase.firestore.FieldValue.delete()},{merge:true});
+      delete WHT_CLOSED[key];
+    }
+    // 대상월이 바뀌므로 캐시 다시 로드 후 대시보드 갱신
+    await loadDashTaxCache();
+    renderDashStatus();
+    if(typeof renderUrgentSection==='function') renderUrgentSection();
+  }catch(e){
+    alert('원천세 마감 처리 중 오류: '+(e&&e.message?e.message:e));
+  }
+}
+
 async function loadDashTaxCache(){
-  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1;
+  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1, d=now.getDate();
   var keys=[];
-  // 원천세 (전월분 - 이번달에 신고하는 건 전월분)
-  var prevM = m===1?12:m-1;
-  var prevYr = m===1?(parseInt(yr)-1).toString():yr;
+  // 원천세 - 마감버튼 기준 (getWhtBase: 방식2)
+  var wb=getWhtBase();
+  var prevM=wb.m, prevYr=String(wb.y);
   keys.push('tax_'+prevYr+'_wht_'+prevM);
   // 부가세 (예정/확정 - pd는 1~4)
   var vatPdMap={1:4, 4:1, 7:2, 10:3};
@@ -6540,6 +6591,12 @@ async function loadDashTaxCache(){
   docs.forEach(function(doc,i){
     DASH_TAX_CACHE[keys[i]] = doc.exists ? doc.data() : {};
   });
+
+  // 원천세 월마감 플래그 로드
+  try {
+    var wcDoc=await db.collection('taxChecks').doc('wht_closed').get();
+    WHT_CLOSED = wcDoc.exists ? (wcDoc.data()||{}) : {};
+  } catch(e){ WHT_CLOSED = WHT_CLOSED||{}; }
 
   // 지급명세서 캐시 (전월분)
   var pyM0=m===1?12:m-1;
@@ -6581,9 +6638,12 @@ function renderDashStatus(){
 
   var taxTypes=[];
 
-  // 원천세 (전월분) - 급여관리 체크 기반
-  var prevM2=m===1?12:m-1;
-  var prevYr2=m===1?(parseInt(yr)-1).toString():yr;
+  // 원천세 - 급여관리 체크 기반 (대상월: 마감버튼 기준 getWhtBase 방식2)
+  var _wb=getWhtBase();
+  var prevM2=_wb.m;
+  var prevYr2=String(_wb.y);
+  var _whtWarnUnclosed=_wb.warnUnclosed;   // 직전월 미마감 자동전환 경고
+  var _whtPrevY=_wb.prevY, _whtPrevM=_wb.prevM, _whtPrevClosed=_wb.prevClosed;
   taxTypes.push({lbl:'원천세 신고 ('+prevM2+'월분)', docKey:'tax_'+prevYr2+'_wht_'+prevM2,
     deadline:{month:m,day:10},
     filter:function(c){
@@ -6924,11 +6984,35 @@ function renderDashStatus(){
       detailHtml+='</div>';
     }
 
+    // 원천세 줄: 마감 버튼 + 미마감 경고
+    var whtBtnHtml='', whtWarnHtml='';
+    if(t.docKey.indexOf('_wht_')>-1){
+      var ck=_whtPrevY+'_'+_whtPrevM;
+      if(_whtPrevClosed){
+        // 직전월 마감됨 → 현재 당월분 보는 중. 마감취소 버튼
+        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+_whtPrevY+','+_whtPrevM+',false)" '
+          +'style="margin-left:8px;font-size:10px;padding:2px 8px;background:#eef2f9;border:0.5px solid #c9d4e8;border-radius:10px;cursor:pointer;color:#5b6b88">'
+          +_whtPrevM+'월분 마감취소</button>';
+      } else if(_whtWarnUnclosed){
+        // 직전월 미마감인데 자동전환됨 → 경고 + 지금이라도 마감
+        whtWarnHtml='<div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:6px 10px;border-radius:6px;margin:4px 0 6px">'
+          +'⚠️ '+_whtPrevM+'월분 원천세가 마감되지 않았습니다 '
+          +'<button onclick="event.stopPropagation();toggleWhtClose('+_whtPrevY+','+_whtPrevM+',true)" '
+          +'style="margin-left:6px;font-size:10px;padding:2px 8px;background:#fff;border:0.5px solid #e0b0b0;border-radius:10px;cursor:pointer;color:#A32D2D">지금 '+_whtPrevM+'월분 마감</button></div>';
+      } else {
+        // 직전월분 보는 중 (마감 전) → 마감 버튼
+        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+prevYr2+','+prevM2+',true)" '
+          +'style="margin-left:8px;font-size:10px;padding:2px 8px;background:#1A3169;border:none;border-radius:10px;cursor:pointer;color:#fff;font-weight:600">'
+          +prevM2+'월분 마감</button>';
+      }
+    }
+
     return '<div style="margin-bottom:12px">'
+      +(whtWarnHtml||'')
       +'<div '+(canExpand?'onclick="var dd=document.getElementById(\''+did+'\'),aa=document.getElementById(\'ar-'+did+'\');if(dd){var op=dd.style.display===\'block\';dd.style.display=op?\'none\':\'block\';if(aa)aa.textContent=op?\'▼\':\'▲\';}" style="cursor:pointer;"':'')
       +' >'
       +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">'
-      +'<span style="color:#445;font-weight:500">'+t.lbl+dlBadge+(canExpand?' <span id="ar-'+did+'" style="color:#aab;font-size:10px">▼</span>':'')+'</span>'
+      +'<span style="color:#445;font-weight:500">'+t.lbl+dlBadge+(canExpand?' <span id="ar-'+did+'" style="color:#aab;font-size:10px">▼</span>':'')+whtBtnHtml+'</span>'
       +'<span style="font-weight:600;color:'+color+'">'+done+' / '+total+'개 ('+pct+'%)</span>'
       +'</div>'
       +'<div style="background:#e8ecf4;border-radius:4px;height:7px">'
