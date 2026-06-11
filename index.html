@@ -1884,7 +1884,7 @@ function logout(){
   // 상태 완전 초기화 후 로그아웃
   resetAllState();
   // 저장된 탭 상태 제거 (다른 사용자 로그인 대비)
-  try{ localStorage.removeItem('sn_curPage'); localStorage.removeItem('sn_openTabs'); }catch(e){}
+  try{ sessionStorage.removeItem('sn_curPage'); sessionStorage.removeItem('sn_openTabs'); }catch(e){}
   window._snTabsRestored=false;
   // 모든 메뉴 숨기기
   ['nav-settings','nav-staff','nav-leave'].forEach(function(id){
@@ -1919,7 +1919,7 @@ function resetAllState(){
   // localStorage에 저장된 페이지가 있으면 대시보드 대신 그 페이지를 미리 표시 (깜빡임 방지)
   var _restorePage=null;
   try{
-    var sp=localStorage.getItem('sn_curPage');
+    var sp=sessionStorage.getItem('sn_curPage');
     if(sp&&sp!=='dashboard'&&document.getElementById('pg-'+sp)) _restorePage=sp;
   }catch(e){}
   var _initial=_restorePage||'dashboard';
@@ -1930,7 +1930,7 @@ function resetAllState(){
 
   // ② 탭 초기화 (저장된 탭 목록이 있으면 그것으로, 없으면 대시보드만)
   try{
-    var st=localStorage.getItem('sn_openTabs');
+    var st=sessionStorage.getItem('sn_openTabs');
     if(st){
       var parsed=JSON.parse(st);
       if(Array.isArray(parsed)&&parsed.length) openTabs=parsed;
@@ -2008,7 +2008,7 @@ function go(page){
   if(!openTabs.includes(page)) openTabs.push(page);
   curPage=page;
   // 새로고침 후 복원용 — 현재 탭/페이지 상태 저장
-  try{ localStorage.setItem('sn_curPage', page); localStorage.setItem('sn_openTabs', JSON.stringify(openTabs)); }catch(e){}
+  try{ sessionStorage.setItem('sn_curPage', page); sessionStorage.setItem('sn_openTabs', JSON.stringify(openTabs)); }catch(e){}
   document.querySelectorAll('.pg').forEach(p=>p.style.display='none');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('pg-'+page);
@@ -2073,7 +2073,7 @@ function closeTab(page){
   const idx=openTabs.indexOf(page); if(idx<0) return;
   openTabs.splice(idx,1);
   if(!openTabs.length) openTabs=['dashboard'];
-  try{ localStorage.setItem('sn_openTabs', JSON.stringify(openTabs)); }catch(e){}
+  try{ sessionStorage.setItem('sn_openTabs', JSON.stringify(openTabs)); }catch(e){}
   if(curPage===page) go(openTabs[Math.max(0,idx-1)]);
   else renderTabs();
 }
@@ -2108,8 +2108,8 @@ function loadClients(){
     if(!window._snTabsRestored){
       window._snTabsRestored=true;
       try{
-        var savedTabs=localStorage.getItem('sn_openTabs');
-        var savedPage=localStorage.getItem('sn_curPage');
+        var savedTabs=sessionStorage.getItem('sn_openTabs');
+        var savedPage=sessionStorage.getItem('sn_curPage');
         if(savedTabs){
           var parsed=JSON.parse(savedTabs);
           if(Array.isArray(parsed)&&parsed.length){ openTabs=parsed; renderTabs(); }
