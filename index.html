@@ -3654,10 +3654,30 @@ function retAutoYr(){
   var od=new Date(o.slice(0,4)+'-'+o.slice(4,6)+'-'+o.slice(6,8));
   if(isNaN(id)||isNaN(od)||od<=id) return;
   var days=(od-id)/(1000*60*60*24)+1;
+  // 효건님 기준 근속연수 절상:
+  //  - 입사~퇴사가 정확히 만 N년(예: 2025-08-01 ~ 2026-07-31, 만 12개월)이면 → N년
+  //  - 1일이라도 넘으면(예: 2025-08-01 ~ 2026-08-01) → N+1년
+  //  - 1년 1개월, 0년 11개월 등 단수가 있으면 무조건 절상
+  // 표준 한국 근속연수: 퇴사일이 "입사일의 (y년+1) 같은 월·일의 전날"이면 정확히 y년
+  //   예: 입사 2025-08-01 → "1년 후 같은 월·일" = 2026-08-01 → "그 전날" = 2026-07-31
+  //       퇴사가 2026-07-31이면 정확히 1년, 2026-08-01이면 1년+1일 → 2년 절상
   var y=od.getFullYear()-id.getFullYear(), m=od.getMonth()-id.getMonth();
   if(od.getDate()<id.getDate()) m--;
   if(m<0){y--;m+=12;}
-  var yrCeil=Math.ceil(days/365);
+  // 단수(잔여 일·월) 판정:
+  //   입사 2025-08-01, y=1 → 정확히 1년이려면 퇴사일 = 2026-07-31
+  //   "입사일에 y년 더한 날짜의 전날" 과 퇴사일이 같으면 정확히 y년
+  var exactEnd=new Date(id.getFullYear()+y, id.getMonth(), id.getDate()-1);
+  var yrCeil;
+  if(od.getTime()===exactEnd.getTime()){
+    // 정확히 y년 (단수 없음)
+    yrCeil=y;
+  } else {
+    // 1일이라도 넘거나 단수(개월) 있음 → y+1년
+    yrCeil=y+1;
+  }
+  // 안전장치: 0년 이하 방지 (입사=퇴사 같은 날인 경우 1년)
+  if(yrCeil<1) yrCeil=1;
   var disp=document.getElementById('ret-yr-display');
   if(disp) disp.innerHTML='<strong style="color:#1A3169">근속연수: '+y+'년 '+m+'개월</strong> <span style="color:#aab">(세법 올림: '+yrCeil+'년)</span>';
   return {y:y,m:m,yrCeil:yrCeil,days:days};
@@ -3716,7 +3736,15 @@ function calcRetire(){
     if(disp){var m2=disp.textContent.match(/(\d+)년/); if(m2) yrCeil=parseInt(m2[1]);}
   }
   if(!yrCeil){el.innerHTML='<div style="color:#e74c3c;font-size:12px;margin-top:8px">입사일/퇴사일을 입력하거나 근속연수를 확인하세요.</div>';return;}
-  var d1=yrCeil<=5?yrCeil*300000:yrCeil<=10?1500000+(yrCeil-5)*500000:yrCeil<=20?4000000+(yrCeil-10)*800000:12000000+(yrCeil-20)*1200000;
+  // 근속연수공제 (소득세법 시행령 §105 별표6 - 위하고 PDF 기준)
+  //  - 5년 이하:   100만 × 근속연수
+  //  - 10년 이하:  500만 + 200만 × (근속연수 - 5)
+  //  - 20년 이하:  1,500만 + 250만 × (근속연수 - 10)
+  //  - 20년 초과:  4,000만 + 300만 × (근속연수 - 20)
+  var d1=yrCeil<=5?yrCeil*1000000
+       :yrCeil<=10?5000000+(yrCeil-5)*2000000
+       :yrCeil<=20?15000000+(yrCeil-10)*2500000
+       :40000000+(yrCeil-20)*3000000;
   var inc=pay-d1;
   if(inc<=0){el.innerHTML=_box([_row('퇴직금',_won(pay)),_row('근속연수공제','-'+_won(d1)),_row('과세표준','0원 (세금없음)',true),_row('실수령액',_won(pay),true)]);return;}
   var ann=inc/yrCeil*12;
