@@ -3683,6 +3683,23 @@ function retAutoYr(){
   return {y:y,m:m,yrCeil:yrCeil,days:days};
 }
 
+// 퇴직금 자동계산 공용 함수
+// 평균임금 = 3개월 총급여 ÷ 퇴사일 직전 3개월의 실제 달력일수 (근로기준법 §2 시행령)
+// 퇴직금 = 평균임금 × 30일 × (재직일수 / 365)
+function _calcRetirePay(sal3, od, retireDays){
+  // od: 퇴사일 Date 객체, retireDays: 재직일수
+  // 근로기준법 시행령 §2: 평균임금 = 산정사유발생일(=퇴사일) 이전 3개월 임금 ÷ 그 기간 일수
+  //   "퇴사일 이전 3개월" = 퇴사일 다음날에서 3개월 전 ~ 퇴사일
+  //   예: 퇴사 2026-07-31 → 다음날 8/1 기준 3개월 전 = 5/1 → 5/1 ~ 7/31 = 92일
+  //   예: 퇴사 2026-07-15 → 다음날 7/16 기준 3개월 전 = 4/16 → 4/16 ~ 7/15 = 91일
+  var nextDay=new Date(od.getFullYear(), od.getMonth(), od.getDate()+1);
+  var start3=new Date(nextDay.getFullYear(), nextDay.getMonth()-3, nextDay.getDate());
+  var days3=Math.round((od-start3)/(1000*60*60*24))+1;
+  if(days3<=0) days3=92; // 안전장치
+  var avgWage=Math.floor(sal3/days3);  // 평균임금 원단위 절사 (위하고 방식)
+  return Math.round(avgWage*30*retireDays/365);
+}
+
 function retAuto3m(){
   var i=document.getElementById('ret-in').value;
   var o=document.getElementById('ret-out').value;
@@ -3691,7 +3708,8 @@ function retAuto3m(){
   if(i.length===8&&o.length===8){
     var r=retAutoYr();
     if(r){
-      var calculated=Math.round(sal3/90*30*r.days/365);
+      var od=new Date(o.slice(0,4)+'-'+o.slice(4,6)+'-'+o.slice(6,8));
+      var calculated=_calcRetirePay(sal3, od, r.days);
       document.getElementById('ret-pay').value=calculated;
       return true;
     }
@@ -3706,7 +3724,9 @@ function retCalcBtn(){
   var el=document.getElementById('ret-result');
   // 3개월 총급여 입력됐으면 퇴직금 자동계산
   if(sal3 && r){
-    var calculated=Math.round(sal3/90*30*r.days/365);
+    var o2=document.getElementById('ret-out').value;
+    var od2=new Date(o2.slice(0,4)+'-'+o2.slice(4,6)+'-'+o2.slice(6,8));
+    var calculated=_calcRetirePay(sal3, od2, r.days);
     document.getElementById('ret-pay').value=calculated;
   }
   // 날짜 없이 퇴직금만 입력된 경우
@@ -3748,7 +3768,17 @@ function calcRetire(){
   var inc=pay-d1;
   if(inc<=0){el.innerHTML=_box([_row('퇴직금',_won(pay)),_row('근속연수공제','-'+_won(d1)),_row('과세표준','0원 (세금없음)',true),_row('실수령액',_won(pay),true)]);return;}
   var ann=inc/yrCeil*12;
-  var d2=ann<=8000000?ann*0.5:ann<=10000000?4000000+(ann-8000000)*0.4:ann<=30000000?4800000+(ann-10000000)*0.2:ann<=100000000?8800000+(ann-30000000)*0.1:15800000+(ann-100000000)*0.05;
+  // 환산급여공제 (소득세법 시행령 §105 별표6의2 - 위하고 PDF 기준)
+  //  - 800만 이하:    환산급여 × 100%
+  //  - 7,000만 이하:  800만 + (환산급여 - 800만) × 60%
+  //  - 1억 이하:      4,520만 + (환산급여 - 7,000만) × 55%
+  //  - 3억 이하:      6,170만 + (환산급여 - 1억) × 45%
+  //  - 3억 초과:      1억5,170만 + (환산급여 - 3억) × 35%
+  var d2=ann<=8000000?ann
+       :ann<=70000000?8000000+(ann-8000000)*0.60
+       :ann<=100000000?45200000+(ann-70000000)*0.55
+       :ann<=300000000?61700000+(ann-100000000)*0.45
+       :151700000+(ann-300000000)*0.35;
   var tb=ann-d2, tx=0;
   if(tb<=14000000) tx=tb*0.06;
   else if(tb<=50000000) tx=840000+(tb-14000000)*0.15;
@@ -3756,7 +3786,8 @@ function calcRetire(){
   else if(tb<=150000000) tx=15360000+(tb-88000000)*0.35;
   else if(tb<=300000000) tx=37060000+(tb-150000000)*0.38;
   else tx=94060000+(tb-300000000)*0.40;
-  var sodk=Math.round(tx/12*yrCeil), local=Math.round(sodk*0.1), tot=sodk+local;
+  // 소득세: 원단위 절사 / 지방소득세: 10원단위 절사 (위하고/세무 표준)
+  var sodk=Math.floor(tx/12*yrCeil), local=Math.floor(sodk*0.1/10)*10, tot=sodk+local;
   el.innerHTML=_box([
     _row('퇴직금',_won(pay)),_row('근속연수',(r?r.y+'년 '+r.m+'개월':yrCeil+'년')+' (세법 '+yrCeil+'년)'),
     _row('근속연수공제','-'+_won(d1)),_row('퇴직소득금액',_won(inc)),
