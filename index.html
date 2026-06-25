@@ -4739,7 +4739,16 @@ function ctRegister(){
 async function ctSaveHist(){
   var d=ctGetForm();
   if(!d.name||!d.bizNo){ alert('상호와 사업자등록번호는 필수입니다.'); return; }
-  if(!confirm('이 계약서 발급 이력을 저장하시겠습니까?')) return;
+  // 사업자번호 기준 중복 체크 (하이픈 제거 후 비교)
+  var bizDigits=(d.bizNo||'').replace(/[^0-9]/g,'');
+  var dup=CONTRACT_HIST.find(function(r){
+    return (r.bizNo||'').replace(/[^0-9]/g,'')===bizDigits;
+  });
+  if(dup){
+    if(!confirm('동일한 사업자번호("'+(dup.name||'')+'", '+(dup.date||(dup.createdAt||'').slice(0,10))+' 발급)로 이미 이력이 있습니다.\n\n기존 이력을 덮어쓰시겠습니까?\n\n[확인] 덮어쓰기  /  [취소] 저장 안 함')) return;
+  } else {
+    if(!confirm('이 계약서 발급 이력을 저장하시겠습니까?')) return;
+  }
   try{
     var rec={
       name:d.name, bizNo:d.bizNo, ceo:d.ceo, phone:d.phone, addr:d.addr,
@@ -4749,11 +4758,25 @@ async function ctSaveHist(){
       createdAt: new Date().toISOString(),
       createdBy: (ME&&ME.email)||''
     };
-    var docRef=await db.collection('contracts').add(rec);
-    rec.id=docRef.id;
-    CONTRACT_HIST.unshift(rec);
-    ctRenderHist();
-    alert('발급 이력이 저장되었습니다.');
+    if(dup){
+      // 덮어쓰기: 기존 문서 업데이트
+      rec.createdAt = dup.createdAt;  // 최초 발급일은 유지
+      rec.updatedAt = new Date().toISOString();
+      await db.collection('contracts').doc(dup.id).set(rec);
+      rec.id=dup.id;
+      // 메모리 리스트에서 기존 항목 제거 후 새로 추가
+      CONTRACT_HIST=CONTRACT_HIST.filter(function(r){return r.id!==dup.id;});
+      CONTRACT_HIST.unshift(rec);
+      ctRenderHist();
+      alert('기존 이력을 덮어썼습니다.');
+    } else {
+      // 신규 저장
+      var docRef=await db.collection('contracts').add(rec);
+      rec.id=docRef.id;
+      CONTRACT_HIST.unshift(rec);
+      ctRenderHist();
+      alert('발급 이력이 저장되었습니다.');
+    }
   }catch(e){
     alert('저장 실패: '+(e&&e.message?e.message:e));
   }
