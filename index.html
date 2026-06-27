@@ -5331,7 +5331,13 @@ function ctClear(){
 }
 
 // =================== 연차관리 ===================
-var STAFF_LIST = ['김서지','안지윤','유승희'];
+var STAFF_LIST = ['황효건','김서지','안지윤','유승희','김희진'];
+
+// 연차관리 전용: 황효건(대표)·김희진은 연차 관리 대상에서 제외
+function getLeaveStaffList(){
+  var exclude = ['황효건','김희진'];
+  return STAFF_LIST.filter(function(n){return exclude.indexOf(n) < 0;});
+}
 var LEAVE_DATA = {}; // {userId: {totalDays, entries:[{id,date,days,reason}]}}
 var curLeaveUser = null;
 
@@ -5346,7 +5352,7 @@ function initLeavePage(){
     tabWrap.style.display = 'flex';
     var btns = document.getElementById('leave-staff-tab-btns');
     btns.innerHTML = '';
-    STAFF_LIST.forEach(function(name){
+    getLeaveStaffList().forEach(function(name){
       var btn = document.createElement('button');
       btn.className = 'btn btn-s btn-sm';
       btn.id = 'leave-tab-'+name;
@@ -5382,8 +5388,8 @@ function loadLeaveData(){
   var summaryBody = document.getElementById('leave-summary-body');
   if(summaryBody) summaryBody.innerHTML = '<tr><td colspan="5" style="padding:12px;text-align:center;color:#aab">로딩 중...</td></tr>';
 
-  // 각 직원 데이터 로드
-  var promises = STAFF_LIST.map(function(name){
+  // 각 직원 데이터 로드 (황효건/김희진 제외)
+  var promises = getLeaveStaffList().map(function(name){
     return db.collection('annualLeave').doc(yr+'_'+name).get().then(function(doc){
       LEAVE_DATA[name] = doc.exists ? doc.data() : {totalDays:0, entries:[]};
     });
@@ -5391,7 +5397,7 @@ function loadLeaveData(){
 
   Promise.all(promises).then(function(){
     renderLeaveSummary();
-    var first = curLeaveUser || STAFF_LIST[0];
+    var first = curLeaveUser || getLeaveStaffList()[0];
     setLeaveUser(first);
   });
 }
@@ -5407,7 +5413,7 @@ function loadLeaveUser(name){
 function setLeaveUser(name){
   curLeaveUser = name;
   // 탭 활성화
-  STAFF_LIST.forEach(function(n){
+  getLeaveStaffList().forEach(function(n){
     var btn = document.getElementById('leave-tab-'+n);
     if(btn) btn.className = 'btn btn-sm '+(n===name?'btn-p':'btn-s');
   });
@@ -5418,7 +5424,7 @@ function setLeaveUser(name){
 function renderLeaveSummary(){
   var body = document.getElementById('leave-summary-body');
   if(!body) return;
-  body.innerHTML = STAFF_LIST.map(function(name){
+  body.innerHTML = getLeaveStaffList().map(function(name){
     var d = LEAVE_DATA[name]||{totalDays:0,entries:[]};
     var used = (d.entries||[]).reduce(function(s,e){return s+parseFloat(e.days||0);},0);
     var remain = (d.totalDays||0) - used;
@@ -5727,19 +5733,25 @@ function toggleLeaveDate(status){
 // 직원 초기 데이터 자동 등록
 async function initDefaultStaff(){
   var defaults=[
+    {name:'황효건', email:'hg@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'대표세무사', memo:''},
     {name:'김서지', email:'sj@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
     {name:'안지윤', email:'jy@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
     {name:'유승희', email:'sh@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
+    {name:'김희진', email:'hj@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
   ];
   var snap=await db.collection('staffs').get();
-  if(!snap.empty) return; // 이미 데이터 있으면 스킵
+  // 이미 등록된 직원 이름 수집
+  var existingNames = snap.docs.map(function(d){return d.data().name;});
+  // 누락된 직원만 필터링
+  var missing = defaults.filter(function(d){return existingNames.indexOf(d.name) < 0;});
+  if(missing.length === 0) return;
   var batch=db.batch();
-  defaults.forEach(function(s){
+  missing.forEach(function(s){
     var ref=db.collection('staffs').doc();
     batch.set(ref,Object.assign(s,{createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
   });
   await batch.commit();
-  console.log('직원 초기 데이터 등록 완료');
+  console.log('누락된 직원 자동 추가:', missing.map(function(m){return m.name;}).join(', '));
 }
 
 
@@ -6109,7 +6121,8 @@ function initSalaryMonth(){
       var prevVal=mgrSel.value;
       var userNames=Object.values(USERS).map(function(u){return u.name;});
       mgrSel.innerHTML='<option value="">전체 담당자</option>'
-        +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+        +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
+        +'<option value="미배정">미배정</option>';
       if(prevVal) mgrSel.value=prevVal;
     } else {
       mgrSel.value=''; // 직원이면 필터 초기화
@@ -7356,7 +7369,8 @@ function initSendCenter(){
   var mgrSel=document.getElementById('send-mgr-filter');
   if(mgrSel&&ROLE==='admin'){
     mgrSel.innerHTML='<option value="">전체 담당자</option>'
-      +STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+      +STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
+      +'<option value="미배정">미배정</option>';
   }
 }
 
@@ -7375,7 +7389,8 @@ function initGoji(){
   if(mgrSel) mgrSel.style.display = 'block';
   if(ROLE==='admin' && mgrSel){
     mgrSel.innerHTML = '<option value="">전체 담당자</option>'
-      + STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+      + STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
+      + '<option value="미배정">미배정</option>';
   }
 }
 
