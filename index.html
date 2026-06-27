@@ -7068,6 +7068,7 @@ function renderIndivList(){
   var el=document.getElementById('indiv-client-list'); if(!el) return;
   var clients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
+    if(c.type==='신고대리') return false;  // 신고대리는 문자 발송 대상 아님
     if(q&&!(c.name||'').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -7124,6 +7125,7 @@ function renderSendList(){
 
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
+    if(c.type==='신고대리') return false;  // 신고대리는 문자 발송 대상 아님
     if(myName&&c.manager!==myName) return false;
     if(mgrF&&c.manager!==mgrF) return false;
     if(sendQ&&!(c.name||'').toLowerCase().includes(sendQ)) return false;
