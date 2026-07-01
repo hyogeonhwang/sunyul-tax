@@ -474,6 +474,13 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
     <!-- ===== DASHBOARD ===== -->
     <div id="pg-dashboard" class="pg" style="display:none">
+      <!-- 조회 시점 선택 -->
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:12px">
+        <span style="font-size:12px;color:#889">조회 시점</span>
+        <select id="dashYear" onchange="onDashPeriodChange()" style="padding:5px 10px;font-size:13px;border:1px solid #dde;border-radius:6px;background:#fff"></select>
+        <select id="dashMonth" onchange="onDashPeriodChange()" style="padding:5px 10px;font-size:13px;border:1px solid #dde;border-radius:6px;background:#fff"></select>
+        <button onclick="dashResetToday()" style="padding:5px 10px;font-size:12px;background:#f0f2f7;border:1px solid #dde;border-radius:6px;cursor:pointer" title="오늘 기준으로">📅 오늘</button>
+      </div>
       <!-- 상단 요약 카드 -->
       <div class="stats-row" id="dashStats">
         <div class="stat"><div class="stat-lbl">로딩중...</div><div class="stat-val" style="color:#ddd">-</div></div>
@@ -500,7 +507,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
               <div class="card-ttl">📊 처리 현황</div>
-              <span id="dash-month-lbl" style="font-size:12px;color:#889"></span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
+                  <option value="">전체 담당자</option>
+                </select>
+                <span id="dash-month-lbl" style="font-size:12px;color:#889"></span>
+              </div>
             </div>
             <div id="dashStatus"></div>
           </div>
@@ -589,8 +601,8 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div class="card-hdr">
           <div class="card-ttl">✅ 신고 체크</div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select class="sel" id="txYear" onchange="loadTax()"><option value="2026">2026년</option><option value="2025">2025년</option></select>
-            <select class="sel" id="txType" onchange="updateTxPeriod();loadTax()">
+            <select class="sel" id="txYear" onchange="loadTax();updateBelongHint()"><option value="2026">2026년</option><option value="2025">2025년</option></select>
+            <select class="sel" id="txType" onchange="updateTxPeriod();loadTax();updateBelongHint()">
               <option value="" disabled selected>신고 유형을 선택하세요</option>
               <option value="vat">부가세 (일반과세)</option>
               <option value="simp">부가세 (간이과세)</option>
@@ -600,6 +612,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <option value="wht">원천세</option>
               <option value="close">폐업 부가세</option>
             </select>
+            <span id="txBelongHint" style="display:none;font-size:12px;color:#889;font-weight:400;white-space:nowrap"></span>
             <select class="sel" id="txPeriod" onchange="loadTax()"></select>
             <select class="sel" id="txMgrFilter" onchange="loadTax()" style="display:none">
               <option value="">전체 담당자</option>
@@ -2245,7 +2258,7 @@ function go(page){
   if(page==='payroll') loadPayroll();
   if(page==='kakao') renderKakao();
   if(page==='calendar') renderCal();
-  if(page==='dashboard'){if(ALL.length){renderDash();renderUrgentSection();loadDashTaxCache().then(function(){renderUrgentSection();runCrossCheck();}).catch(function(err){console.error('loadDashTaxCache error:',err);renderUrgentSection();});checkSalaryAlerts();}}
+  if(page==='dashboard'){if(ALL.length){initDashPeriodDropdown();renderDash();renderUrgentSection();loadDashTaxCache().then(function(){renderUrgentSection();runCrossCheck();}).catch(function(err){console.error('loadDashTaxCache error:',err);renderUrgentSection();});checkSalaryAlerts();}}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='staff'){loadStaffPage();}
@@ -2767,6 +2780,29 @@ function updateTxPeriod(){
   // 납부금액 컬럼은 loadTax에서 처리
 }
 
+// 종합소득세/법인세 화면에 "N년 귀속" 안내 표시
+// (효건님이 작업 시점과 귀속 연도가 다른 세금이므로 헷갈리지 않게 보조)
+function updateBelongHint(){
+  var yr=document.getElementById('txYear')?.value;
+  var tp=document.getElementById('txType')?.value;
+  var hint=document.getElementById('txBelongHint');
+  if(!hint) return;
+  // 종합소득세: N년 귀속 → 다음해 5월 신고
+  // 법인세: N년 사업연도 → 다음해 3월 신고 (12월 결산 기준)
+  if(tp==='income' && yr){
+    var yy=String(yr).slice(2);
+    hint.textContent='· '+yy+'년 귀속 ('+(parseInt(yr)+1)+'년 5월 신고)';
+    hint.style.display='inline';
+  } else if(tp==='corp' && yr){
+    var yy2=String(yr).slice(2);
+    hint.textContent='· '+yy2+'년 사업연도 ('+(parseInt(yr)+1)+'년 3월 신고)';
+    hint.style.display='inline';
+  } else {
+    hint.style.display='none';
+    hint.textContent='';
+  }
+}
+
 async function loadTax(){
   const yr=document.getElementById('txYear')?.value;
   const tp=document.getElementById('txType')?.value;
@@ -2915,6 +2951,7 @@ async function loadTax(){
 
   const mgrKeys=Object.keys(mgrs);
   Object.entries(mgrs).sort((a,b)=>mgrSortIndex(a[0])-mgrSortIndex(b[0])).forEach(([mgr,list])=>{
+    list=sortClientsByType(list);
     const mdone=list.filter(c=>chk[c.id]?.done).length;
     const mgrId='mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     const allDone=mdone===list.length&&list.length>0;
@@ -3246,13 +3283,42 @@ function updatePyPeriod(){
 // =================== 급여 캐시 (지급명세서 필터용) ===================
 var SALARY_CACHE = {};
 
-// 지급명세서 표시 가능 여부: 비활성 거래처(이관/기장중지/폐업)는 endDate >= 마감일이면 우리 신고 대상
+// 폐업 거래처의 실효 지급명세서 마감일 계산
+// - 매월(daily/biz), 반기(labor): 일반 마감일 그대로
+// - 연간(abiz/alabor/retire/int/div/other): 폐업일 다음다음달 말일
+function getPayrollDeadlineForClosed(client, tp, defaultDueDate){
+  if(!client.endDate) return defaultDueDate;
+  var isAnnual = ['abiz','alabor','retire','int','div','other'].indexOf(tp) >= 0;
+  if(!isAnnual) return defaultDueDate;
+  // 연간 지급명세서: 폐업 다음다음달 말일
+  var parts = client.endDate.split('-');
+  var closeYr = parseInt(parts[0]), closeMon = parseInt(parts[1]);
+  if(!closeYr||!closeMon) return defaultDueDate;
+  var dueYr = closeYr, dueMon = closeMon + 2;
+  while(dueMon > 12){ dueMon -= 12; dueYr++; }
+  var lastDay = new Date(dueYr, dueMon, 0).getDate();
+  return dueYr + '-' + String(dueMon).padStart(2,'0') + '-' + String(lastDay).padStart(2,'0');
+}
+
+// 지급명세서 표시 여부 (이관/폐업/기장중지 별도 처리)
+// - 활성: 항상 표시
+// - 이관/기장중지: endDate >= 마감일이면 표시 (그 시점 우리 담당)
+// - 폐업: 폐업일 <= 실효마감일(연간이면 폐업 다음다음달 말일)이면 표시 (우리 신고 의무)
+//        endDate 없으면 표시 유지 (효건님이 나중에 입력할 수 있게)
 // dueDate: 'YYYY-MM-DD' 형식 지급명세서 마감일
-function isPayrollVisible(c, dueDate){
+// tp: 지급명세서 유형 (daily/biz/labor/abiz/alabor/retire/int/div/other 등, 없으면 매월로 간주)
+function isPayrollVisible(c, dueDate, tp){
   if(c.status==='활성') return true;
   if(['이관','기장중지','폐업'].indexOf(c.status) < 0) return false;
+  // 폐업: endDate 없으면 표시 유지 (예: 대표자 사망 등, 정식 폐업 대기 중)
+  if(c.status==='폐업' && !c.endDate) return true;
   if(!c.endDate || !dueDate) return false;
-  // 끝일이 마감일 이상이면 우리가 마감일 시점 담당이므로 신고 책임
+  if(c.status==='폐업'){
+    // 폐업: 폐업일이 실효마감일 이내면 우리가 최종 신고 (연간은 특별 마감)
+    var effDue = getPayrollDeadlineForClosed(c, tp, dueDate);
+    return c.endDate <= effDue;
+  }
+  // 이관/기장중지: 끝일이 마감일 이상이면 그 시점엔 우리 담당
   return c.endDate >= dueDate;
 }
 
@@ -3298,12 +3364,34 @@ async function renderPayroll(){
   if(tp==='all'){
     await ensureSalaryCache(yr);
     var allMonthsAll=[1,2,3,4,5,6,7,8,9,10,11,12];
+    // 전체 탭 마감일: 그 해 연간 지급명세서 마감(다음해 3/10)을 기준으로 판정
+    // - 활성: 항상 표시
+    // - 이관/기장중지: 아직 우리가 담당하는 월 신고가 남아있으면 표시 (매월 반기 연간 중 하나)
+    // - 폐업: 폐업 후 신고 의무가 아직 남아있으면 표시
+    var yrEndDue = (parseInt(yr)+1)+'-03-10';  // 연간 마감 (가장 늦은 기본 마감)
     var clients=myClientsFilter(ALL.filter(function(c){
-      if(c.status!=='활성') return false;
       if(c.type==='신고대리') return false;
       if(pyQ && !(c.name||'').toLowerCase().includes(pyQ)) return false;
-      // 원천세 대상이거나, 해당 연도에 급여 체크 이력이 있으면 표시
-      // (작년엔 신고했지만 올해 whtYn='N'으로 바뀐 거래처도 지급명세서 대상)
+      // 이관/기장중지/폐업 판정: 하나라도 아직 우리 신고 대상이면 표시
+      if(c.status!=='활성'){
+        if(['이관','기장중지','폐업'].indexOf(c.status) < 0) return false;
+        // 폐업: endDate 없으면 표시 유지 (효건님 확인 필요 케이스)
+        if(c.status==='폐업' && !c.endDate) {
+          // 그 해 급여 이력 있으면 표시
+          var hasAnyClosed = ['daily','biz','labor','retire'].some(function(tp){
+            return hasSalaryDone(yr, allMonthsAll, c.id, tp);
+          });
+          if(!hasAnyClosed && c.whtYn!=='Y') return false;
+          return true;
+        }
+        if(!c.endDate) return false;
+        // 어느 지급명세서라도 아직 우리 대상이면 표시
+        var stillOurs = ['daily','biz','labor','abiz','alabor','retire'].some(function(tp){
+          return isPayrollVisible(c, yrEndDue, tp);
+        });
+        if(!stillOurs) return false;
+      }
+      // 여기까지 왔으면 활성 또는 아직 신고 대상 - 이제 급여 이력/whtYn 확인
       if(c.whtYn==='Y') return true;
       var hasAnyCheck = ['daily','biz','labor','retire'].some(function(tp){
         return hasSalaryDone(yr, allMonthsAll, c.id, tp);
@@ -3314,6 +3402,7 @@ async function renderPayroll(){
     clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
     var html='<div class="al al-i" style="margin-bottom:12px">✅ = 올해 급여관리에서 해당 유형을 한 번이라도 체크한 업체</div>';
     Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
+      list=sortClientsByType(list);
       var mgrId='py-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
       html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
       html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7f8fb;cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
@@ -3357,7 +3446,7 @@ async function renderPayroll(){
     var dueDateStr = dueYr+'-'+String(dueMonth).padStart(2,'0')+'-'+String(dueLastDay).padStart(2,'0');
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.type==='신고대리') return false;
-      if(!isPayrollVisible(c, dueDateStr)) return false;
+      if(!isPayrollVisible(c, dueDateStr, tp)) return false;
       // 그 달 급여기록 있으면 포함
       if(!hasSalaryDone(yr,[parseInt(pd)],c.id,tp)) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
@@ -3405,7 +3494,7 @@ async function renderPayroll(){
     var laborDueDate = pd==='1' ? yr+'-07-31' : (parseInt(yr)+1)+'-01-31';
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.type==='신고대리') return false;
-      if(!isPayrollVisible(c, laborDueDate)) return false;
+      if(!isPayrollVisible(c, laborDueDate, 'labor')) return false;
       // 그 반기 급여기록 있으면 포함
       if(!hasSalaryDone(yr, laborMonths, c.id, 'labor')) return false;
       if(pyQ&&!(c.name||'').toLowerCase().includes(pyQ)) return false;
@@ -3419,6 +3508,15 @@ async function renderPayroll(){
     var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
     html+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f7f8fb"><th style="padding:8px 10px;text-align:left">상호</th><th style="padding:8px 10px;text-align:left">담당자</th><th style="padding:8px 10px;text-align:center">'+periodLbl+'</th></tr></thead><tbody>';
     if(!clients.length) html+='<tr><td colspan="3" class="muted" style="text-align:center;padding:30px">근로소득 반기 대상 거래처 없음</td></tr>';
+    // 담당자순 → 유형순(법인/일반/면세/신고대리)으로 정렬
+    clients=clients.slice().sort(function(a,b){
+      var ma=mgrSortIndex((a.whtSep&&a.whtManager)?a.whtManager:(a.manager||'미배정'));
+      var mb=mgrSortIndex((b.whtSep&&b.whtManager)?b.whtManager:(b.manager||'미배정'));
+      if(ma!==mb) return ma-mb;
+      var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
+      if(ta!==tb) return ta-tb;
+      return (a.name||'').localeCompare(b.name||'');
+    });
     clients.forEach(function(c){
       var k=c.id+'_'+pd;
       var isDone=chk[k];
@@ -3440,7 +3538,7 @@ async function renderPayroll(){
     var annualDueDate = (parseInt(yr)+1)+'-03-10';
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.type==='신고대리') return false;
-      if(!isPayrollVisible(c, annualDueDate)) return false;
+      if(!isPayrollVisible(c, annualDueDate, tp)) return false;
       // 사업/근로/퇴직 연간: 선택연도(발생연도) 급여관리 체크 기준
       var salType={'abiz':'biz','alabor':'labor','retire':'retire'}[tp]||null;
       if(salType){
@@ -3460,6 +3558,15 @@ async function renderPayroll(){
     var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
     html+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f7f8fb"><th style="padding:8px 10px;text-align:left">상호</th><th style="padding:8px 10px;text-align:left">담당자</th><th style="padding:8px 10px;text-align:center">'+lbl+' <span style="font-size:11px;color:#C9A84C">'+dl+' 마감</span></th></tr></thead><tbody>';
     if(!clients.length) html+='<tr><td colspan="3" class="muted" style="text-align:center;padding:30px">'+lbl+' 연간 대상 거래처 없음</td></tr>';
+    // 담당자순 → 유형순(법인/일반/면세/신고대리)으로 정렬
+    clients=clients.slice().sort(function(a,b){
+      var ma=mgrSortIndex((a.whtSep&&a.whtManager)?a.whtManager:(a.manager||'미배정'));
+      var mb=mgrSortIndex((b.whtSep&&b.whtManager)?b.whtManager:(b.manager||'미배정'));
+      if(ma!==mb) return ma-mb;
+      var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
+      if(ta!==tb) return ta-tb;
+      return (a.name||'').localeCompare(b.name||'');
+    });
     clients.forEach(function(c){
       var k=c.id+'_'+tp;
       var isDone=chk[k];
@@ -3611,12 +3718,12 @@ function lastDay(y,m){return new Date(y,m,0).getDate();}
 
 const DL_BASE=[
   // 원천세 납부 (매월 10일)
-  {m:1,d:10,lbl:'원천세 납부',t:'wht'},{m:2,d:10,lbl:'원천세 납부',t:'wht'},
-  {m:3,d:10,lbl:'원천세 납부',t:'wht'},{m:4,d:10,lbl:'원천세 납부',t:'wht'},
-  {m:5,d:10,lbl:'원천세 납부',t:'wht'},{m:6,d:10,lbl:'원천세 납부',t:'wht'},
-  {m:7,d:10,lbl:'원천세 납부',t:'wht'},{m:8,d:10,lbl:'원천세 납부',t:'wht'},
-  {m:9,d:10,lbl:'원천세 납부',t:'wht'},{m:10,d:10,lbl:'원천세 납부',t:'wht'},
-  {m:11,d:10,lbl:'원천세 납부',t:'wht'},{m:12,d:10,lbl:'원천세 납부',t:'wht'},
+  {m:1,d:10,lbl:'원천세 신고',t:'wht'},{m:2,d:10,lbl:'원천세 신고',t:'wht'},
+  {m:3,d:10,lbl:'원천세 신고',t:'wht'},{m:4,d:10,lbl:'원천세 신고',t:'wht'},
+  {m:5,d:10,lbl:'원천세 신고',t:'wht'},{m:6,d:10,lbl:'원천세 신고',t:'wht'},
+  {m:7,d:10,lbl:'원천세 신고',t:'wht'},{m:8,d:10,lbl:'원천세 신고',t:'wht'},
+  {m:9,d:10,lbl:'원천세 신고',t:'wht'},{m:10,d:10,lbl:'원천세 신고',t:'wht'},
+  {m:11,d:10,lbl:'원천세 신고',t:'wht'},{m:12,d:10,lbl:'원천세 신고',t:'wht'},
   // 부가세
   {m:1,d:25,lbl:'부가세 납부',t:'vat'},
   {m:4,d:25,lbl:'부가세 1기 예정',t:'vat'},
@@ -3800,23 +3907,90 @@ function renderCal(){
 }
 
 // =================== DASHBOARD ===================
-function renderDash(){
-  const tot=ALL.filter(c=>c.status==='활성'&&c.type!=='신고대리').length;
-  const agency=ALL.filter(c=>c.status==='활성'&&c.type==='신고대리').length;
-  const corp=ALL.filter(c=>c.type==='법인'&&c.status==='활성').length;
-  const info=USERS[ME?.email]||{};
-  const myC=ALL.filter(c=>c.manager===info.name&&c.status==='활성').length;
-  const td=new Date(), m=td.getMonth()+1, d=td.getDate();
-  const mDL=DL.filter(e=>e.m===m);
-  const upcoming=mDL.filter(e=>e.d>=d);
+// ─── 대시보드 조회 시점 (연도/월) ───
+var DASH_YEAR = new Date().getFullYear();
+var DASH_MONTH = new Date().getMonth()+1;
 
-  // ① 상단 통계 카드
+// 그 월(YY.MM) 시점에 활성이었던 거래처인가?
+// 판정: 현재 활성 = 항상 표시 / 이관·기장중지·폐업 = endDate가 그 월 이후면 표시
+function isActiveInMonth(client, yr, month){
+  if(client.status === '활성') return true;
+  if(['이관','기장중지','폐업'].indexOf(client.status) < 0) return false;
+  if(!client.endDate) return false;
+  // 그 월 말일 기준 - endDate가 그 월 말일 이후(같거나)면 그 시점 우리 거래처
+  var monthEnd = yr + '-' + String(month).padStart(2,'0') + '-' +
+                 String(new Date(yr, month, 0).getDate()).padStart(2,'0');
+  return client.endDate >= monthEnd;
+}
+
+// 대시보드 드롭다운 초기화 (연도/월 옵션 채우기)
+function initDashPeriodDropdown(){
+  var yrSel=document.getElementById('dashYear');
+  var mSel=document.getElementById('dashMonth');
+  if(!yrSel||!mSel) return;
+  // 연도: 최근 3년 + 다음해 (총 5년, 원한다면 확장)
+  var curYr=new Date().getFullYear();
+  yrSel.innerHTML='';
+  for(var y=curYr-3; y<=curYr+1; y++){
+    yrSel.innerHTML+='<option value="'+y+'">'+y+'년</option>';
+  }
+  yrSel.value=DASH_YEAR;
+  // 월: 1~12월
+  mSel.innerHTML='';
+  for(var mm=1; mm<=12; mm++){
+    mSel.innerHTML+='<option value="'+mm+'">'+mm+'월</option>';
+  }
+  mSel.value=DASH_MONTH;
+}
+
+function onDashPeriodChange(){
+  DASH_YEAR=parseInt(document.getElementById('dashYear').value);
+  DASH_MONTH=parseInt(document.getElementById('dashMonth').value);
+  renderDash();
+  renderUrgentSection();
+  loadDashTaxCache().then(function(){renderUrgentSection();}).catch(function(err){console.error('loadDashTaxCache error:',err);});
+}
+
+function dashResetToday(){
+  DASH_YEAR=new Date().getFullYear();
+  DASH_MONTH=new Date().getMonth()+1;
+  document.getElementById('dashYear').value=DASH_YEAR;
+  document.getElementById('dashMonth').value=DASH_MONTH;
+  renderDash();
+  renderUrgentSection();
+  loadDashTaxCache().then(function(){renderUrgentSection();}).catch(function(err){console.error('loadDashTaxCache error:',err);});
+}
+
+function renderDash(){
+  // 드롭다운이 비어있으면 초기화 (첫 로그인 등)
+  var _yrSel=document.getElementById('dashYear');
+  if(_yrSel && !_yrSel.options.length) initDashPeriodDropdown();
+  // 대시보드 조회 시점 (연도/월)
+  const yr=DASH_YEAR, m=DASH_MONTH;
+  const isCurrentMonth=(yr===new Date().getFullYear() && m===new Date().getMonth()+1);
+  const today=new Date();
+  const d=isCurrentMonth?today.getDate():1;  // 현재월이면 오늘, 과거/미래월이면 1일 기준
+  const info=USERS[ME?.email]||{};
+  const isStaff=(ROLE!=='admin');
+  const myName=info.name||'';
+
+  // ① 상단 통계 카드 (그 월 시점 활성 거래처)
+  // 직원 로그인 시: 자기 담당 거래처만 카운트
+  const staffFilter=isStaff?function(c){return (c.manager===myName)||(c.whtSep&&c.whtManager===myName);}:function(){return true;};
+  const tot=ALL.filter(c=>c.type!=='신고대리' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
+  const agency=ALL.filter(c=>c.type==='신고대리' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
+  const corp=ALL.filter(c=>c.type==='법인' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
+  const myC=ALL.filter(c=>c.manager===info.name && isActiveInMonth(c, yr, m)).length;
+  const mDL=DL.filter(e=>e.m===m);
+  // 이번달 마감: 현재월이면 남은 마감, 그 외엔 전체 마감
+  const upcoming=isCurrentMonth?mDL.filter(e=>e.d>=d):mDL;
+
   const se=document.getElementById('dashStats');
   if(se) se.innerHTML=`
     <div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">${tot}</div><div class="stat-sub">활성 기준 · 신고대리 ${agency}개 별도</div></div>
     <div class="stat"><div class="stat-lbl">법인 거래처</div><div class="stat-val">${corp}</div><div class="stat-sub">대표 직접 관리</div></div>
     <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${info.name||''} 담당</div></div>
-    <div class="stat"><div class="stat-lbl">이번달 마감</div><div class="stat-val">${upcoming.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
+    <div class="stat"><div class="stat-lbl">${m}월 마감</div><div class="stat-val">${upcoming.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
 
   // ② 긴급처리는 loadDashTaxCache 완료 후 renderUrgentSection()에서 처리
 
@@ -3825,32 +3999,49 @@ function renderDash(){
   if(de){
     de.innerHTML=upcoming.length
       ?upcoming.slice(0,8).map(e=>{
-          const dl=e.d-d;
-          const cl=dl<=3?'td-err':dl<=7?'td-warn':'';
+          const dl=isCurrentMonth?(e.d-d):null;
+          const cl=isCurrentMonth?(dl<=3?'td-err':dl<=7?'td-warn':''):'';
+          const rightText=isCurrentMonth?(m+'/'+e.d+' (D-'+dl+')'):(m+'/'+e.d+' 마감');
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f6fa">
             <span style="font-size:13px">${e.lbl}</span>
-            <span class="${cl}" style="font-size:12px;font-weight:700">${m}/${e.d} (D-${dl})</span>
+            <span class="${cl}" style="font-size:12px;font-weight:700">${rightText}</span>
           </div>`;
         }).join('')
-      :'<div class="muted" style="text-align:center;padding:22px">이번달 남은 마감일이 없습니다</div>';
+      :'<div class="muted" style="text-align:center;padding:22px">'+m+'월 마감일이 없습니다</div>';
   }
 
-  // ④ 처리 현황 (이번달 신고체크 현황 - Firebase 연동)
+  // ④ 처리 현황 (선택 월 기준 신고체크 현황 - Firebase 연동)
   const statusEl=document.getElementById('dashStatus');
   const monthLbl=document.getElementById('dash-month-lbl');
   if(monthLbl) monthLbl.textContent=m+'월 기준';
+  // 처리현황 담당자 필터 - admin만 표시, 전체 직원 + 미배정
+  var statusMgrSel=document.getElementById('dashStatusMgrFilter');
+  if(statusMgrSel){
+    if(isStaff){
+      statusMgrSel.style.display='none';
+    } else {
+      statusMgrSel.style.display='inline-block';
+      // 기존 선택값 보존
+      var _prev=statusMgrSel.value;
+      var _opts='<option value="">전체 담당자</option>';
+      STAFF_LIST.forEach(function(nm){_opts+='<option value="'+nm+'">'+nm+'</option>';});
+      _opts+='<option value="미배정">미배정</option>';
+      statusMgrSel.innerHTML=_opts;
+      statusMgrSel.value=_prev||'';
+    }
+  }
   if(statusEl){
     statusEl.innerHTML='<div style="text-align:center;padding:16px;color:#aab;font-size:12px">로딩중...</div>';
   }
 
-  // ⑤ 담당자별 현황
+  // ⑤ 담당자별 현황 (그 월 시점 활성 거래처 기준, 담당자는 현재 기준)
   const mgrEl=document.getElementById('dashMgr');
   const mgrCard=document.getElementById('dashMgrCard');
   if(mgrEl){
     if(ROLE==='admin'){
       if(mgrCard) mgrCard.style.display='block';
       const mgrs={};
-      ALL.filter(c=>c.status==='활성'&&c.type!=='신고대리').forEach(c=>{
+      ALL.filter(c=>c.type!=='신고대리' && isActiveInMonth(c, yr, m)).forEach(c=>{
         const mgr=c.manager||'미배정';
         if(!mgrs[mgr]) mgrs[mgr]={total:0};
         mgrs[mgr].total++;
@@ -3870,11 +4061,10 @@ function renderDash(){
     }
   }
 
-  // ⑥ 처리현황 (캐시 사용 - 즉시 표시)
+  // ⑥ 처리현황 (캐시 사용 - 즉시 표시, 선택 월 기준)
   if(statusEl){
-    var now2=new Date(), yr2=now2.getFullYear().toString(), m2=now2.getMonth()+1;
-    var pyM2=m2===1?12:m2-1;
-    var pyYr2=m2===1?(parseInt(yr2)-1).toString():yr2;
+    var pyM2=m===1?12:m-1;
+    var pyYr2=m===1?(parseInt(yr)-1).toString():yr.toString();
     ensureSalaryCache(pyYr2).then(function(){renderDashStatus();});
   }
 }
@@ -5308,6 +5498,19 @@ function getLeaveStaffList(){
   var exclude = ['황효건','김희진'];
   return STAFF_LIST.filter(function(n){return exclude.indexOf(n) < 0;});
 }
+
+// 거래처 유형 정렬 순서 (거래처관리 GROUP_ORDER와 통일: 법인→일반→면세→신고대리)
+function typeSortIndex(type){
+  var order={'법인':1,'일반':2,'면세':3,'신고대리':4};
+  return order[type]||99;
+}
+function sortClientsByType(list){
+  return list.slice().sort(function(a,b){
+    var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
+    if(ta!==tb) return ta-tb;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+}
 var LEAVE_DATA = {}; // {userId: {totalDays, entries:[{id,date,days,reason}]}}
 var curLeaveUser = null;
 
@@ -5840,9 +6043,13 @@ function renderUrgentSection(){
   var urgentEl=document.getElementById('dashUrgent');
   if(!urgentEl) return;
   try{
-  var now=new Date(), m=now.getMonth()+1, d=now.getDate();
+  // 대시보드 선택 월 기준
+  var m=DASH_MONTH||(new Date().getMonth()+1);
+  var isCurMonth=(DASH_YEAR===new Date().getFullYear() && m===new Date().getMonth()+1);
+  var d=isCurMonth?new Date().getDate():1;
   var mDL=DL.filter(function(e){return e.m===m;});
-  var urgent=mDL.filter(function(e){return e.d>=d&&e.d-d<=3;});
+  // 현재월: D-3 이내 임박 마감, 그 외: 그 월 전체 마감
+  var urgent=isCurMonth?mDL.filter(function(e){return e.d>=d&&e.d-d<=3;}):mDL;
 
   if(!urgent.length){
     urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
@@ -5850,7 +6057,7 @@ function renderUrgentSection(){
   }
 
   var html=urgent.map(function(e){
-    var dl=e.d-d;
+    var dl=isCurMonth?(e.d-d):null;
     // 이 마감에 해당하는 미완료 업체 찾기
     var incompleteClients=getIncompleteClientsForDeadline(e);
     var uid='urgent-'+e.lbl.replace(/\s/g,'_');
@@ -5861,7 +6068,7 @@ function renderUrgentSection(){
       +'<span style="font-size:13px;font-weight:600;color:#c0392b">🔴 '+e.lbl+'</span>'
       +'<div style="display:flex;align-items:center;gap:8px">'
       +(hasList?'<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>':'<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>')
-      +'<span style="color:#e74c3c;font-size:12px;font-weight:700">'+m+'/'+e.d+' (D-'+dl+')</span>'
+      +'<span style="color:#e74c3c;font-size:12px;font-weight:700">'+m+'/'+e.d+(isCurMonth?' (D-'+dl+')':' 마감')+'</span>'
       +(hasList?'<span id="arr-'+uid+'" style="color:#aab;font-size:11px">▼</span>':'')
       +'</div></div>'
       +(hasList?'<div id="'+uid+'" style="display:none;background:#fff;border-top:0.5px solid #fcc;padding:4px 12px 8px">'
@@ -5878,9 +6085,9 @@ function renderUrgentSection(){
 }
 
 function getIncompleteClientsForDeadline(e){
-  var now=new Date();
-  var yr=now.getFullYear().toString();
-  var m=now.getMonth()+1;
+  // 대시보드 선택 시점 기반
+  var yr=String(DASH_YEAR||new Date().getFullYear());
+  var m=DASH_MONTH||(new Date().getMonth()+1);
 
   if(e.t==='vat'){
     // 폐업부가세: 폐업일 다음달이 이번 달인 폐업 거래처 중 미신고
@@ -5903,7 +6110,8 @@ function getIncompleteClientsForDeadline(e){
     var chk=DASH_TAX_CACHE[cacheKey]||{};
     var gojiData=DASH_TAX_CACHE['goji_'+yr+'_vat'+(vatPd===1?'1':'2')]||{};
     return ALL.filter(function(c){
-      if(c.status!=='활성'||c.type==='신고대리') return false;
+      if(c.type==='신고대리') return false;
+      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
       if(isJunggan){
         if(c.vatType==='면세') return false;
         if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
@@ -5918,9 +6126,10 @@ function getIncompleteClientsForDeadline(e){
   }
 
   if(e.t==='wht'){
-    // 처리현황 원천세와 완전히 동일 기준 (getWhtBase 방식2 + 폐업이어도 그 달 급여기록 있으면 포함)
-    var _wb=(typeof getWhtBase==='function')?getWhtBase():{y:m===1?parseInt(yr)-1:parseInt(yr), m:m===1?12:m-1};
-    var whtBaseM=_wb.m, whtBaseY=String(_wb.y);
+    // 처리현황 원천세와 동일 기준: 대시보드 선택 월(m)의 직전월이 원천세 대상월
+    // 예: 대시보드 6월 → 5월분 원천세 (6/10 신고 마감)
+    var whtBaseM=m===1?12:m-1;
+    var whtBaseY=m===1?String(parseInt(yr)-1):yr;
     var whtKey='tax_'+whtBaseY+'_wht_'+whtBaseM;
     var whtChk=DASH_TAX_CACHE[whtKey]||{};
     var salData=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][whtBaseM]||{};
@@ -5948,7 +6157,8 @@ function getIncompleteClientsForDeadline(e){
     var pyChk=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
     var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
     return ALL.filter(function(c){
-      if(c.status!=='활성'||c.type==='신고대리') return false;
+      if(c.type==='신고대리') return false;
+      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
       var hasBiz=salCache[c.id+'_biz_done'];
       var hasDaily=salCache[c.id+'_daily_done'];
       if(!hasBiz&&!hasDaily) return false;
@@ -6203,6 +6413,7 @@ async function renderSalary(){
     +'</div>';
 
   Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
+    list=sortClientsByType(list);
     var mdone=list.filter(function(c){return isSalDone(chk,c.id);}).length;
     var mgrId='sal-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     var allDone=mdone===list.length&&list.length>0;
@@ -6527,6 +6738,7 @@ function renderProfit(){
   var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
+    if(c.type==='신고대리') return false;  // 중간손익은 신고대리 제외
     if(myName&&c.manager!==myName) return false;
     if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
     if(q&&!(c.name||'').toLowerCase().includes(q)) return false;
@@ -7085,6 +7297,14 @@ function renderIndivList(){
     return true;
   });
   if(!clients.length){el.innerHTML='<div style="padding:14px;text-align:center;font-size:12px;color:#aab">검색 결과 없음</div>';return;}
+  // 담당자순 → 유형순 정렬
+  clients=clients.slice().sort(function(a,b){
+    var ma=mgrSortIndex(a.manager||'미배정'), mb=mgrSortIndex(b.manager||'미배정');
+    if(ma!==mb) return ma-mb;
+    var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
+    if(ta!==tb) return ta-tb;
+    return (a.name||'').localeCompare(b.name||'');
+  });
   el.innerHTML=clients.map(function(c){
     var phone=c.mobile||c.phone||'';
     return '<div onclick="selectIndivClient(\''+c.id+'\',\''+esc(c.name)+'\',\''+phone+'\')" style="padding:9px 12px;font-size:12px;cursor:pointer;border-bottom:0.5px solid #eef;'+(c.id===_indivCid?'background:#e8ecf4;font-weight:500;':'')+'" onmouseenter="this.style.background=\'#f0f2f7\'" onmouseleave="this.style.background=\''+(c.id===_indivCid?'#e8ecf4':'')+'\'">'+c.name+(phone?'<span style="font-size:10px;color:#aab;margin-left:6px">'+phone+'</span>':'<span style="font-size:10px;color:#e74c3c;margin-left:6px">번호없음</span>')+'</div>';
@@ -7153,6 +7373,14 @@ function renderSendList(){
 
   var list=document.getElementById('send-client-list');
   if(!list) return;
+  // 담당자순 → 유형순 정렬
+  clients=clients.slice().sort(function(a,b){
+    var ma=mgrSortIndex(a.manager||'미배정'), mb=mgrSortIndex(b.manager||'미배정');
+    if(ma!==mb) return ma-mb;
+    var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
+    if(ta!==tb) return ta-tb;
+    return (a.name||'').localeCompare(b.name||'');
+  });
   list.innerHTML=clients.map(function(c){
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:0.5px solid #f5f6fa;font-size:12px">'
       +'<input type="checkbox" class="send-chk" data-cid="'+c.id+'" onchange="updateSendCount()">'
@@ -7725,11 +7953,13 @@ async function toggleWhtClose(y, mm, close){
 }
 
 async function loadDashTaxCache(){
-  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1, d=now.getDate();
+  // 대시보드 선택 시점 기반
+  var yr=String(DASH_YEAR||new Date().getFullYear());
+  var m=DASH_MONTH||(new Date().getMonth()+1);
   var keys=[];
-  // 원천세 - 마감버튼 기준 (getWhtBase: 방식2)
-  var wb=getWhtBase();
-  var prevM=wb.m, prevYr=String(wb.y);
+  // 원천세 - 대시보드 선택 월의 직전월이 대상월 (renderDashStatus와 동일 로직)
+  var prevM=m===1?12:m-1;
+  var prevYr=m===1?String(parseInt(yr)-1):yr;
   keys.push('tax_'+prevYr+'_wht_'+prevM);
   // 부가세 (예정/확정 - pd는 1~4)
   var vatPdMap={1:4, 4:1, 7:2, 10:3};
@@ -7792,21 +8022,44 @@ async function loadDashTaxCache(){
 function renderDashStatus(){
   var statusEl=document.getElementById('dashStatus');
   if(!statusEl) return;
-  var now=new Date(), yr=now.getFullYear().toString(), m=now.getMonth()+1, d=now.getDate();
+  try{
+  // 대시보드 선택 월 기준 (오늘이 아님)
+  var yr=String(DASH_YEAR||new Date().getFullYear());
+  var m=DASH_MONTH||(new Date().getMonth()+1);
+  var isCurMonth=(parseInt(yr)===new Date().getFullYear() && m===new Date().getMonth()+1);
+  var d=isCurMonth?new Date().getDate():1;
+  var now=new Date();  // D-일 계산은 실제 오늘 기준
+  // 직원 로그인 시: 자기 담당만 필터 (선택 담당자로 추후 세분화)
+  var _info=USERS[ME?.email]||{};
+  var isStaff=(ROLE!=='admin');
+  var myName=_info.name||'';
+  // 처리현황 담당자 필터 (전체=빈 문자열, 특정 담당자 이름 또는 '미배정')
+  var mgrFilter=document.getElementById('dashStatusMgrFilter')?document.getElementById('dashStatusMgrFilter').value:'';
+  var effectiveMgr=isStaff?myName:mgrFilter;  // 직원은 자기 이름 강제, admin은 필터값
+  function isMyClient(c, useWht){
+    if(!effectiveMgr) return true;
+    if(useWht){
+      // 원천세: whtSep이면 whtManager, 아니면 manager
+      var wm=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+      return wm===effectiveMgr;
+    }
+    // 그 외: manager만
+    var mg=c.manager||'미배정';
+    return mg===effectiveMgr;
+  }
 
   var taxTypes=[];
 
-  // 원천세 - 급여관리 체크 기반 (대상월: 마감버튼 기준 getWhtBase 방식2)
-  var _wb=getWhtBase();
-  var prevM2=_wb.m;
-  var prevYr2=String(_wb.y);
-  var _whtWarnUnclosed=_wb.warnUnclosed;   // 직전월 미마감 자동전환 경고
-  var _whtPrevY=_wb.prevY, _whtPrevM=_wb.prevM, _whtPrevClosed=_wb.prevClosed;
+  // 원천세 - 대시보드 선택 월(m)의 직전월이 원천세 대상월 (신고 마감: 선택 월 10일)
+  // 예: 대시보드 7월 선택 → 6월분 원천세, 5월 선택 → 4월분
+  var prevM2 = m===1?12:m-1;
+  var prevYr2 = m===1?String(parseInt(yr)-1):yr;
   taxTypes.push({lbl:'원천세 신고 ('+prevM2+'월분)', docKey:'tax_'+prevYr2+'_wht_'+prevM2,
     deadline:{month:m,day:10},
     filter:function(c){
       // 신고대리 제외 + 급여있음 필수
       if(c.type==='신고대리'||c.whtYn!=='Y') return false;
+      if(!isMyClient(c, true)) return false;
       // 활성이면 포함 (반기/매월 무관, 담당자 무관, 체크 무관 → 급여관리 갯수와 일치)
       if(c.status==='활성') return true;
       // 폐업/이관 등 비활성이어도 그 월에 급여 처리 기록이 있으면 포함
@@ -7833,7 +8086,9 @@ function renderDashStatus(){
     taxTypes.push({lbl:'부가세'+(isJunggan?' (예정)':' (확정)'), docKey:'tax_'+yr+'_vat_'+vatPd,
       deadline:vatDlMap[vatPd]||{month:m,day:25},
       filter:function(c){
-        if(c.status!=='활성'||c.type==='신고대리') return false;
+        if(c.type==='신고대리') return false;
+        if(!isActiveInMonth(c, parseInt(yr), m)) return false;
+        if(!isMyClient(c, false)) return false;
         if(isJunggan){
           if(c.vatType==='면세') return false;
           if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
@@ -7843,6 +8098,8 @@ function renderDashStatus(){
           if(gojiData[c.id]?.status==='none'&&!c.vatExcept) return false;
           return true;
         }
+        // 확정 신고: 면세 제외, 법인(일반/간이) + 일반과세 개인
+        if(c.vatType==='면세') return false;
         return c.type==='법인'||c.vatType==='일반';
       },
       getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
@@ -7852,14 +8109,14 @@ function renderDashStatus(){
   // 법인세
   if(m===3) taxTypes.push({lbl:'법인세', docKey:'tax_'+yr+'_corp_1',
     deadline:{month:3,day:31},
-    filter:function(c){return c.status==='활성'&&c.type==='법인';},
+    filter:function(c){return c.type==='법인' && isActiveInMonth(c, parseInt(yr), m) && isMyClient(c, false);},
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
   // 종합소득세
   if(m===5) taxTypes.push({lbl:'종합소득세', docKey:'tax_'+yr+'_income_1',
     deadline:{month:5,day:31},
-    filter:function(c){return c.status==='활성'&&c.type!=='법인';},
+    filter:function(c){return c.type!=='법인' && isActiveInMonth(c, parseInt(yr), m) && isMyClient(c, false);},
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
@@ -7873,7 +8130,11 @@ function renderDashStatus(){
   var pyAnnChk=DASH_TAX_CACHE['payroll_annual_'+yr]||{};
   var pyTotalCalc=0, pyDoneCalc=0, pyDetailRows=[];
   // 신고대리만 제외 — 폐업/이관 등도 그 시점 급여기록 있으면 포함 (각 ①②③ 안에서 hasSalaryDone으로 자동 필터)
-  var actClients=ALL.filter(function(c){return c.type!=='신고대리';});
+  var actClients=ALL.filter(function(c){
+    if(c.type==='신고대리') return false;
+    if(!isMyClient(c, true)) return false;  // 지급명세서는 원천세 담당(whtSep) 기준
+    return true;
+  });
 
   // ① 매월: 일용직 / 사업소득 (전월분) — 급여관리 daily/biz 체크 기준
   actClients.forEach(function(c){
@@ -8094,8 +8355,10 @@ function renderDashStatus(){
     if(canExpand && targetList.length>0){
       var doneList=targetList.filter(function(c){return t.getDone(chk,c);});
       var notList=targetList.filter(function(c){return !t.getDone(chk,c);});
+      var isWht=(t.docKey.indexOf('_wht_')>-1);
       var cliRow=function(c,ok){
-        var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+        // 원천세는 원천세 담당(whtSep), 그 외 세금(부가세/법인세/종소세)은 기장 담당(manager)만
+        var effMgr=isWht?((c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정')):(c.manager||'미배정');
         return '<div onclick="event.stopPropagation();editClient(\''+c.id+'\')" '
           +'style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid #eef1f6;cursor:pointer">'
           +'<span style="color:#1A3169;text-decoration:underline;text-underline-offset:2px">'+c.name+'</span>'
@@ -8143,26 +8406,21 @@ function renderDashStatus(){
       detailHtml+='</div>';
     }
 
-    // 원천세 줄: 마감 버튼 + 미마감 경고
+    // 원천세 줄: 마감 버튼 + 미마감 경고 (대시보드 선택 월 기반)
     var whtBtnHtml='', whtWarnHtml='';
     if(t.docKey.indexOf('_wht_')>-1){
-      var ck=_whtPrevY+'_'+_whtPrevM;
-      if(_whtPrevClosed){
-        // 직전월 마감됨 → 현재 당월분 보는 중. 마감취소 버튼
-        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+_whtPrevY+','+_whtPrevM+',false)" '
+      var _whtY=prevYr2, _whtM=prevM2;  // 원천세 대상월 (대시보드 선택 월의 직전월)
+      var _whtClosed=!!WHT_CLOSED[_whtY+'_'+_whtM];
+      if(_whtClosed){
+        // 마감됨 → 마감취소 버튼
+        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+_whtY+','+_whtM+',false)" '
           +'style="margin-left:8px;font-size:10px;padding:2px 8px;background:#eef2f9;border:0.5px solid #c9d4e8;border-radius:10px;cursor:pointer;color:#5b6b88">'
-          +_whtPrevM+'월분 마감취소</button>';
-      } else if(_whtWarnUnclosed){
-        // 직전월 미마감인데 자동전환됨 → 경고 + 지금이라도 마감
-        whtWarnHtml='<div style="font-size:11px;color:#A32D2D;background:#FCEBEB;padding:6px 10px;border-radius:6px;margin:4px 0 6px">'
-          +'⚠️ '+_whtPrevM+'월분 원천세가 마감되지 않았습니다 '
-          +'<button onclick="event.stopPropagation();toggleWhtClose('+_whtPrevY+','+_whtPrevM+',true)" '
-          +'style="margin-left:6px;font-size:10px;padding:2px 8px;background:#fff;border:0.5px solid #e0b0b0;border-radius:10px;cursor:pointer;color:#A32D2D">지금 '+_whtPrevM+'월분 마감</button></div>';
+          +_whtM+'월분 마감취소</button>';
       } else {
-        // 직전월분 보는 중 (마감 전) → 마감 버튼
-        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+prevYr2+','+prevM2+',true)" '
+        // 미마감 → 마감 버튼
+        whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+_whtY+','+_whtM+',true)" '
           +'style="margin-left:8px;font-size:10px;padding:2px 8px;background:#1A3169;border:none;border-radius:10px;cursor:pointer;color:#fff;font-weight:600">'
-          +prevM2+'월분 마감</button>';
+          +_whtM+'월분 마감</button>';
       }
     }
 
@@ -8203,6 +8461,10 @@ function renderDashStatus(){
   }
 
   statusEl.innerHTML=(rows||'<div style="text-align:center;padding:22px;color:#aab;font-size:13px">이번달 신고 항목 없음</div>')+crossHtml;
+  }catch(e){
+    console.error('renderDashStatus 오류:', e, e.stack);
+    statusEl.innerHTML='<div style="padding:16px;color:#e74c3c;font-size:12px">처리현황 렌더 오류: '+(e&&e.message?e.message:e)+'<br><small style="color:#aab">브라우저 콘솔(F12)에서 상세 확인</small></div>';
+  }
 }
 
 function showToast(msg, type){
