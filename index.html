@@ -8209,6 +8209,7 @@ function renderDashStatus(){
   var closeTargets=ALL.filter(function(c){
     if(c.status!=='폐업'||!c.endDate) return false;
     if(c.type==='신고대리') return false;
+    if(!isMyClient(c, false)) return false;
     var ep=String(c.endDate).split('-');
     var ey=parseInt(ep[0]), em=parseInt(ep[1]);
     if(!ey||!em) return false;
@@ -8221,6 +8222,7 @@ function renderDashStatus(){
       _closeTargets:closeTargets,
       filter:function(c){
         if(c.status!=='폐업'||!c.endDate||c.type==='신고대리') return false;
+        if(!isMyClient(c, false)) return false;
         var ep=String(c.endDate).split('-');
         var ey=parseInt(ep[0]), em=parseInt(ep[1]);
         if(!ey||!em) return false;
