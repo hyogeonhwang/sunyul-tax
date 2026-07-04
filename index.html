@@ -3716,6 +3716,16 @@ async function saveTmpl(){
 // 매월 말일 계산 함수
 function lastDay(y,m){return new Date(y,m,0).getDate();}
 
+// 세법상 마감일 조정: 토·일이면 다음 평일(월)로
+// 공휴일은 마감캘린더에서 수동 조정 (효건님이 임시공휴일 등 대응)
+function adjustDeadline(y, m, d){
+  var date = new Date(y, m-1, d);
+  var day = date.getDay();
+  if(day===6) date.setDate(date.getDate()+2);      // 토요일 → 월요일
+  else if(day===0) date.setDate(date.getDate()+1); // 일요일 → 월요일
+  return {y: date.getFullYear(), m: date.getMonth()+1, d: date.getDate()};
+}
+
 const DL_BASE=[
   // 원천세 납부 (매월 10일)
   {m:1,d:10,lbl:'원천세 신고',t:'wht'},{m:2,d:10,lbl:'원천세 신고',t:'wht'},
@@ -3742,10 +3752,15 @@ const DL_BASE=[
 
 // 매월 말일 지급명세서 마감 추가 (동적)
 function buildDL(y){
-  var dl=DL_BASE.slice();
+  // DL_BASE 각 항목의 마감일을 주말·공휴일 감안해 조정
+  var dl=DL_BASE.slice().map(function(ev){
+    var adj = adjustDeadline(y, ev.m, ev.d);
+    return Object.assign({}, ev, {m: adj.m, d: adj.d});
+  });
   for(var mo=1;mo<=12;mo++){
     var ld=lastDay(y,mo);
-    dl.push({m:mo,d:ld,lbl:'지급명세서 마감',t:'pay'});
+    var adjPay = adjustDeadline(y, mo, ld);
+    dl.push({m:adjPay.m,d:adjPay.d,lbl:'지급명세서 마감',t:'pay'});
   }
   // 폐업부가세: 폐업일 다음달 25일 (같은 달은 1줄로 합침)
   var closeMonths={};
@@ -3757,7 +3772,8 @@ function buildDL(y){
     if(dy===y) closeMonths[dm]=true;
   });
   Object.keys(closeMonths).forEach(function(mo){
-    dl.push({m:parseInt(mo),d:25,lbl:'폐업부가세 신고',t:'vat'});
+    var adjClose = adjustDeadline(y, parseInt(mo), 25);
+    dl.push({m:adjClose.m,d:adjClose.d,lbl:'폐업부가세 신고',t:'vat'});
   });
   return dl;
 }
@@ -3788,24 +3804,58 @@ function chMonth(d){calM+=d;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--
 let customEvents=[];
 var calSeeded={};
 
+// customEvents(마감캘린더) → DL 재구성
+// 효건님이 마감캘린더에서 수정하면 즉시 DL에 반영, 대시보드 자동 갱신
+function refreshDLFromCal(){
+  if(!Array.isArray(customEvents)) return;
+  DL = customEvents
+    .filter(function(e){return e.isDL && e.date && e.date.startsWith(calY+'');})
+    .map(function(e){
+      var parts = e.date.split('-');
+      return {m: parseInt(parts[1]), d: parseInt(parts[2]), lbl: e.lbl, t: e.type};
+    });
+}
+
 function loadCalEvents(){
-  db.collection('calEvents').onSnapshot(snap=>{
-    customEvents=snap.docs.map(d=>({id:d.id,...d.data()}));
+  db.collection('calEvents').onSnapshot(function(snap){
+    customEvents=snap.docs.map(function(d){return Object.assign({id:d.id}, d.data());});
     renderCal();
-    // 현재 연도 DL 시딩 (최초 1회)
-    seedDLForYear(calY);
+    // 현재 연도 DL 시딩 (최초 1회 or 자동 계산 결과 다를 때만)
+    seedDLForYear(calY).then(function(){
+      // 시딩 완료 후 최신 customEvents로 DL 재구성
+      refreshDLFromCal();
+      // 대시보드 열려있으면 즉시 재렌더링
+      var dashPg=document.getElementById('pg-dashboard');
+      if(dashPg && dashPg.style.display!=='none' && typeof renderDash==='function'){
+        try{
+          renderDash();
+          if(typeof renderUrgentSection==='function') renderUrgentSection();
+        }catch(e){console.error('대시보드 재렌더 오류:', e);}
+      }
+    });
   });
 }
 
 async function seedDLForYear(y){
   if(calSeeded[y]) return;
   calSeeded[y]=true;
-  // 이미 이 연도 DL이 있으면 스킵
-  var existing=customEvents.filter(function(e){return e.isDL&&e.date&&e.date.startsWith(y+'');});
-  if(existing.length>0) return;
-  // Firebase에 DL 일괄 저장
+  // 자동 계산 결과 (주말·공휴일 감안된 최신 마감일)
   var dl=buildDL(y);
+  var newKeys=new Set(dl.map(function(ev){
+    return y+'-'+String(ev.m).padStart(2,'0')+'-'+String(ev.d).padStart(2,'0')+'|'+ev.lbl;
+  }));
+  // 기존 자동 시딩 데이터 (isDL:true)
+  var existing=customEvents.filter(function(e){return e.isDL&&e.date&&e.date.startsWith(y+'');});
+  var oldKeys=new Set(existing.map(function(e){return e.date+'|'+e.lbl;}));
+  // 정확히 일치하면 재시딩 불필요
+  var isSame=newKeys.size===oldKeys.size && Array.from(newKeys).every(function(k){return oldKeys.has(k);});
+  if(isSame) return;
+  // 기존 자동 시딩 데이터 삭제 후 최신 자동 계산 결과로 재시딩
+  // (효건님이 수동으로 만든 커스텀 이벤트는 isDL 없어서 보존됨)
   var batch=db.batch();
+  existing.forEach(function(e){
+    if(e.id) batch.delete(db.collection('calEvents').doc(e.id));
+  });
   dl.forEach(function(ev){
     var mo=String(ev.m).padStart(2,'0');
     var dd=String(ev.d).padStart(2,'0');
@@ -3814,7 +3864,7 @@ async function seedDLForYear(y){
     batch.set(ref,{date:date,lbl:ev.lbl,type:ev.t,isDL:true,year:y});
   });
   await batch.commit();
-  console.log(y+'년 기본 마감일정 저장 완료');
+  console.log(y+'년 마감일정 자동 갱신 (기존 '+existing.length+'개 → 새 '+dl.length+'개, 공휴일 감안)');
 }
 
 let editCalId=null;
@@ -8381,6 +8431,7 @@ function renderDashStatus(){
         var sCache=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
         var salMgrAll=ALL.filter(function(c){
           if(c.status!=='활성'||c.type==='신고대리'||c.whtYn!=='Y') return false;
+          if(!isMyClient(c, true)) return false;  // 담당자 필터 반영 (원천세는 whtSep 기준)
           return true;
         });
         var tIds={}; targetList.forEach(function(c){tIds[c.id]=1;});
