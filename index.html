@@ -634,6 +634,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 문의: 02-2038-6632</textarea>
           <div style="font-size:10px;color:#aab">변수: {업체명} {신고유형} {금액} {납부기한}</div>
         </div>
+        <div style="margin-bottom:10px;position:relative">
+          <input class="si" id="tx-search" placeholder="🔍 업체명 검색..." oninput="onTxSearchInput()" style="width:100%;padding-right:32px">
+          <span id="tx-search-clr" onclick="document.getElementById('tx-search').value='';onTxSearchInput();this.style.display='none'"
+            style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
+        </div>
         <div id="txContent"></div>
       </div>
     </div>
@@ -2803,6 +2808,13 @@ function updateBelongHint(){
   }
 }
 
+// 검색 입력 디바운스 (타이핑 중 매번 loadTax 안 부르게)
+var _txSearchTimer=null;
+function onTxSearchInput(){
+  clearTimeout(_txSearchTimer);
+  _txSearchTimer=setTimeout(function(){loadTax();}, 250);
+}
+
 async function loadTax(){
   const yr=document.getElementById('txYear')?.value;
   const tp=document.getElementById('txType')?.value;
@@ -2837,6 +2849,11 @@ async function loadTax(){
   }
 
   let clients=ALL.filter(c=>c.status==='활성');
+  // 업체명 검색 필터
+  var txQ=(document.getElementById('tx-search')?.value||'').toLowerCase().trim();
+  var txClr=document.getElementById('tx-search-clr');
+  if(txClr) txClr.style.display=txQ?'block':'none';
+  if(txQ) clients=clients.filter(c=>(c.name||'').toLowerCase().includes(txQ));
   if(tp!=='wht') clients=myClientsFilter(clients,'txMgrFilter',false,chk);
   if(tp==='vat'){
     const pdNum=parseInt(pd)||1;
@@ -2887,6 +2904,7 @@ async function loadTax(){
   // 폐업 부가세: 폐업 업체만, 별도 렌더링
   if(tp==='close'){
     var closeClients=ALL.filter(function(c){return c.status==='폐업'&&c.endDate;});
+    if(txQ) closeClients=closeClients.filter(function(c){return (c.name||'').toLowerCase().includes(txQ);});
     closeClients=myClientsFilter(closeClients,'txMgrFilter');
     if(!closeClients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>폐업 업체가 없습니다</div></div>';return;}
     var closeHtml='<table style="width:100%;border-collapse:collapse">'
@@ -3167,8 +3185,24 @@ async function saveTax(key,cid,field,val){
       _taxChkCache[cid][field]=val;
     }
     showToast(val?'✅ 배부담당 저장 완료!':'↩️ 미배정으로 원복 완료!');
-    // 담당자 그룹이 바뀌므로 재조회
-    setTimeout(function(){loadTax();},300);
+    // 담당자 그룹이 바뀌므로 재조회 (스크롤 위치 유지)
+    // 스크롤 컨테이너는 .main 요소 (window 아님)
+    var _mainEl = document.querySelector('.main');
+    var _savedScrollY = _mainEl ? _mainEl.scrollTop : window.scrollY;
+    setTimeout(function(){
+      var p = loadTax();
+      var restore = function(){
+        requestAnimationFrame(function(){
+          if(_mainEl) _mainEl.scrollTop = _savedScrollY;
+          else window.scrollTo(0, _savedScrollY);
+        });
+      };
+      if(p && typeof p.then === 'function'){
+        p.then(restore);
+      } else {
+        setTimeout(restore, 150);
+      }
+    },300);
     return;
   }
   const chk=_taxChkCache;
