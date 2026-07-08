@@ -3540,27 +3540,38 @@ async function renderPayroll(){
     var done=clients.filter(function(c){return chk[c.id+'_'+pd];}).length;
     var pct=clients.length?Math.round(done/clients.length*100):0;
     var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
-    html+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f7f8fb"><th style="padding:8px 10px;text-align:left">상호</th><th style="padding:8px 10px;text-align:left">담당자</th><th style="padding:8px 10px;text-align:center">'+periodLbl+'</th></tr></thead><tbody>';
-    if(!clients.length) html+='<tr><td colspan="3" class="muted" style="text-align:center;padding:30px">근로소득 반기 대상 거래처 없음</td></tr>';
-    // 담당자순 → 유형순(법인/일반/면세/신고대리)으로 정렬
-    clients=clients.slice().sort(function(a,b){
-      var ma=mgrSortIndex((a.whtSep&&a.whtManager)?a.whtManager:(a.manager||'미배정'));
-      var mb=mgrSortIndex((b.whtSep&&b.whtManager)?b.whtManager:(b.manager||'미배정'));
-      if(ma!==mb) return ma-mb;
-      var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
-      if(ta!==tb) return ta-tb;
-      return (a.name||'').localeCompare(b.name||'');
+    if(!clients.length){
+      html+='<div class="es"><div class="es-ic">📋</div><div>근로소득 반기 대상 거래처 없음</div></div>';
+      el.innerHTML=html; return;
+    }
+    // 담당자별 그룹화
+    var mgrs={};
+    clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
+    Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function(entry){
+      var mgr=entry[0], list=entry[1];
+      list=sortClientsByType(list);
+      var mdone=list.filter(function(c){return chk[c.id+'_'+pd];}).length;
+      var mgrId='py-semi-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+      html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7f8fb;cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
+      html+='<span id="arr-'+mgrId+'" style="color:#889;width:16px">▼</span>';
+      html+='<span style="font-size:13px;font-weight:700;color:#1A3169;min-width:80px">담당: '+mgr+'</span>';
+      html+='<span style="font-size:12px;color:#889">('+mdone+'/'+list.length+' 완료)</span>';
+      html+='<div style="flex:1"><div style="background:#e8ecf4;border-radius:3px;height:5px"><div style="background:#1A3169;width:'+(list.length?Math.round(mdone/list.length*100):0)+'%;height:5px;border-radius:3px"></div></div></div>';
+      html+='</div><div id="'+mgrId+'">';
+      html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col><col style="width:140px"><col style="width:120px"></colgroup>';
+      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">'+periodLbl+'</th></tr></thead><tbody>';
+      list.forEach(function(c){
+        var k=c.id+'_'+pd;
+        var isDone=chk[k];
+        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
     });
-    clients.forEach(function(c){
-      var k=c.id+'_'+pd;
-      var isDone=chk[k];
-      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table>';
     el.innerHTML=html;
 
   // 연간
@@ -3590,27 +3601,38 @@ async function renderPayroll(){
     var done=clients.filter(function(c){return chk[c.id+'_'+tp];}).length;
     var pct=clients.length?Math.round(done/clients.length*100):0;
     var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
-    html+='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f7f8fb"><th style="padding:8px 10px;text-align:left">상호</th><th style="padding:8px 10px;text-align:left">담당자</th><th style="padding:8px 10px;text-align:center">'+lbl+' <span style="font-size:11px;color:#C9A84C">'+dl+' 마감</span></th></tr></thead><tbody>';
-    if(!clients.length) html+='<tr><td colspan="3" class="muted" style="text-align:center;padding:30px">'+lbl+' 연간 대상 거래처 없음</td></tr>';
-    // 담당자순 → 유형순(법인/일반/면세/신고대리)으로 정렬
-    clients=clients.slice().sort(function(a,b){
-      var ma=mgrSortIndex((a.whtSep&&a.whtManager)?a.whtManager:(a.manager||'미배정'));
-      var mb=mgrSortIndex((b.whtSep&&b.whtManager)?b.whtManager:(b.manager||'미배정'));
-      if(ma!==mb) return ma-mb;
-      var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
-      if(ta!==tb) return ta-tb;
-      return (a.name||'').localeCompare(b.name||'');
+    if(!clients.length){
+      html+='<div class="es"><div class="es-ic">📋</div><div>'+lbl+' 연간 대상 거래처 없음</div></div>';
+      el.innerHTML=html; return;
+    }
+    // 담당자별 그룹화
+    var mgrs={};
+    clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
+    Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function(entry){
+      var mgr=entry[0], list=entry[1];
+      list=sortClientsByType(list);
+      var mdone=list.filter(function(c){return chk[c.id+'_'+tp];}).length;
+      var mgrId='py-ann-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
+      html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7f8fb;cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
+      html+='<span id="arr-'+mgrId+'" style="color:#889;width:16px">▼</span>';
+      html+='<span style="font-size:13px;font-weight:700;color:#1A3169;min-width:80px">담당: '+mgr+'</span>';
+      html+='<span style="font-size:12px;color:#889">('+mdone+'/'+list.length+' 완료)</span>';
+      html+='<div style="flex:1"><div style="background:#e8ecf4;border-radius:3px;height:5px"><div style="background:#1A3169;width:'+(list.length?Math.round(mdone/list.length*100):0)+'%;height:5px;border-radius:3px"></div></div></div>';
+      html+='</div><div id="'+mgrId+'">';
+      html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col><col style="width:140px"><col style="width:140px"></colgroup>';
+      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">'+lbl+' <span style="font-size:11px;color:#C9A84C">'+dl+' 마감</span></th></tr></thead><tbody>';
+      list.forEach(function(c){
+        var k=c.id+'_'+tp;
+        var isDone=chk[k];
+        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
+        html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
     });
-    clients.forEach(function(c){
-      var k=c.id+'_'+tp;
-      var isDone=chk[k];
-      html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-      html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
-      html+='<td style="padding:8px 10px">'+(c.manager||'-')+'</td>';
-      html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table>';
     el.innerHTML=html;
   }
 }
