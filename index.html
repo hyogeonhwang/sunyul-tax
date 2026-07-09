@@ -1229,6 +1229,58 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           </div>
           <div id="ins-result"></div>
         </div>
+
+        <!-- 급여 분배 계산기 (전체 폭) -->
+        <div class="card" style="grid-column: 1 / -1">
+          <div class="card-hdr">
+            <div class="card-ttl">💼 급여 분배 계산기 <span style="font-size:11px;color:#889;font-weight:400">(연차수당·연장근로수당 사전 배분)</span></div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-p btn-sm" onclick="paySplitCalc()">🔍 계산</button>
+              <button class="btn btn-s btn-sm" onclick="paySplitReset()">초기화</button>
+              <button class="btn btn-s btn-sm" onclick="paySplitCopy()">📋 복사</button>
+            </div>
+          </div>
+          <div style="padding:6px 4px 4px;font-size:12px;color:#5b6b88;line-height:1.6">
+            근로계약서용 항목 배분. 노무사 서식과 동일 로직 (통상시급 = 월봉 ÷ (209 + 연장×1.5 + 연차))
+          </div>
+          <div class="fr">
+            <div class="fld">
+              <label>월봉 (세전) <span style="font-size:11px;color:#C9A84C">*</span></label>
+              <input class="fi" type="text" id="ps-monthly" placeholder="3,000,000"
+                oninput="var v=this.value.replace(/[^0-9]/g,'');this.value=v?parseInt(v).toLocaleString():'';paySplitCalc();">
+            </div>
+            <div class="fld">
+              <label>최저임금 (시급)</label>
+              <input class="fi" type="text" id="ps-minwage" value="10,320"
+                oninput="var v=this.value.replace(/[^0-9]/g,'');this.value=v?parseInt(v).toLocaleString():'';savePaySplitPrefs();paySplitCalc();">
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fld">
+              <label>연차 일수 <span style="font-size:11px;color:#889">근로기준법 15일</span></label>
+              <input class="fi" type="number" id="ps-annleave" value="15" min="0" max="25"
+                oninput="paySplitCalc();">
+            </div>
+            <div class="fld">
+              <label>월 고정연장근로 시간 <span style="font-size:11px;color:#889">주 12시간 이내</span></label>
+              <input class="fi" type="number" id="ps-ot" value="10" min="0" max="52"
+                oninput="paySplitCalc();">
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fld">
+              <label>식대 <span style="font-size:11px;color:#889">월 20만원 비과세</span></label>
+              <input class="fi" type="text" id="ps-meal" value="200,000"
+                oninput="var v=this.value.replace(/[^0-9]/g,'');this.value=v?parseInt(v).toLocaleString():'';paySplitCalc();">
+            </div>
+            <div class="fld">
+              <label>자가운전보조금 <span style="font-size:11px;color:#889">본인 명의 차량 월 20만원</span></label>
+              <input class="fi" type="text" id="ps-car" value="0"
+                oninput="var v=this.value.replace(/[^0-9]/g,'');this.value=v?parseInt(v).toLocaleString():'';paySplitCalc();">
+            </div>
+          </div>
+          <div id="ps-result" style="margin-top:12px"></div>
+        </div>
       </div>
     </div>
 
@@ -2266,6 +2318,7 @@ function go(page){
   if(page==='dashboard'){if(ALL.length){initDashPeriodDropdown();renderDash();renderUrgentSection();loadDashTaxCache().then(function(){renderUrgentSection();runCrossCheck();}).catch(function(err){console.error('loadDashTaxCache error:',err);renderUrgentSection();});checkSalaryAlerts();}}
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
+  if(page==='calc'){loadPaySplitPrefs();paySplitCalc();}
   if(page==='staff'){loadStaffPage();}
   if(page==='contract'){ctInitPage();}
   if(page==='yexempt'){yeInitPage();}
@@ -4280,6 +4333,127 @@ function retReset(){
   document.getElementById('ret-result').innerHTML='';
   var d=document.getElementById('ret-yr-display');
   if(d) d.innerHTML='근속연수: 입사일/퇴사일 입력 후 계산 버튼을 누르세요';
+}
+
+// ─── 급여 분배 계산기 (노무사 서식 로직) ───
+// 최저임금 값을 localStorage에 저장 (매년 효건님이 값 바꾸면 자동 유지)
+function savePaySplitPrefs(){
+  try{
+    var minwage=(document.getElementById('ps-minwage').value||'').replace(/,/g,'');
+    if(minwage) localStorage.setItem('paySplit_minwage', minwage);
+  }catch(e){}
+}
+function loadPaySplitPrefs(){
+  try{
+    var saved=localStorage.getItem('paySplit_minwage');
+    if(saved){
+      var el=document.getElementById('ps-minwage');
+      if(el) el.value=parseInt(saved).toLocaleString();
+    }
+  }catch(e){}
+}
+
+function paySplitCalc(){
+  var el=document.getElementById('ps-result');
+  if(!el) return;
+  var monthly=parseInt((document.getElementById('ps-monthly').value||'').replace(/,/g,''))||0;
+  var minWage=parseInt((document.getElementById('ps-minwage').value||'').replace(/,/g,''))||0;
+  var annLeave=parseFloat(document.getElementById('ps-annleave').value)||0;
+  var ot=parseFloat(document.getElementById('ps-ot').value)||0;
+  var meal=parseInt((document.getElementById('ps-meal').value||'').replace(/,/g,''))||0;
+  var car=parseInt((document.getElementById('ps-car').value||'').replace(/,/g,''))||0;
+
+  if(!monthly){el.innerHTML='<div class="muted" style="text-align:center;padding:20px;font-size:12px">월봉을 입력하세요</div>';return;}
+
+  // 시간 계산 (노무사 서식 Z 열 로직)
+  var otHours = ot * 1.5;  // 연장근로수당 시간 (원래 시간 × 1.5)
+  var leaveHours = annLeave * 8 / 12;  // 연차 시간 (연차일수 × 8시간 ÷ 12개월)
+  var baseTime = 209;  // 통상임금 산정 기준 (소정 + 주휴)
+  var totalTime = baseTime + otHours + leaveHours;
+  var wage = monthly / totalTime;  // 통상시급 (실수)
+  var wageRounded = Math.round(wage);  // 표시용
+
+  // 각 수당 계산 (10원 단위 올림)
+  var roundUp10 = function(v){return Math.ceil(v/10)*10;};
+  var otPay = roundUp10(wage * otHours);
+  var leavePay = roundUp10(wage * leaveHours);
+  var basePay = monthly - meal - car - otPay - leavePay;
+
+  // 검증
+  var warnings = [];
+  if(wageRounded < minWage) warnings.push('⚠️ 통상시급('+wageRounded.toLocaleString()+'원) < 최저임금('+minWage.toLocaleString()+'원)');
+  if(basePay < 0) warnings.push('⚠️ 기본급이 음수입니다. 입력값 확인 필요');
+  // 최저임금 대비 기본급 검증 (기본급 ÷ 209시간)
+  var baseWage = basePay / baseTime;
+  if(basePay > 0 && baseWage < minWage) warnings.push('⚠️ 기본급 환산 시급('+Math.round(baseWage).toLocaleString()+'원) < 최저임금');
+
+  var fmt = function(n){return n.toLocaleString()+'원';};
+  var pct = function(n){return monthly?((n/monthly*100).toFixed(1)+'%'):'0%';};
+
+  var html='';
+  if(warnings.length){
+    html+='<div style="background:#FCEBEB;border:1px solid #e0b0b0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#A32D2D;line-height:1.7">'+warnings.join('<br>')+'</div>';
+  }
+
+  html+='<div style="background:#EAF0F8;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#1A3169;line-height:1.7">'
+    +'<b>통상시급</b>: '+fmt(wageRounded)+' <span style="color:#889">(월봉 ÷ '+totalTime.toFixed(1)+'시간 = 209 + 연장'+otHours+' + 연차'+leaveHours.toFixed(2)+')</span><br>'
+    +'<b>연간</b>: '+fmt(monthly*12)+' (월봉 × 12)'
+    +'</div>';
+
+  html+='<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="background:#f7f8fb;border-bottom:1px solid #dde"><th style="padding:8px 10px;text-align:left">구분</th><th style="padding:8px 10px;text-align:right">월</th><th style="padding:8px 10px;text-align:right">연</th><th style="padding:8px 10px;text-align:right">비율</th><th style="padding:8px 10px;text-align:left;font-size:11px;color:#889">계산근거</th></tr></thead><tbody>';
+
+  html+='<tr style="border-bottom:1px solid #f0f2f7"><td style="padding:8px 10px;font-weight:600">기본급</td><td style="padding:8px 10px;text-align:right">'+fmt(basePay)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+fmt(basePay*12)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+pct(basePay)+'</td><td style="padding:8px 10px;font-size:11px;color:#889">월봉 − 나머지 항목</td></tr>';
+  html+='<tr style="border-bottom:1px solid #f0f2f7"><td style="padding:8px 10px;font-weight:600">연장근로수당</td><td style="padding:8px 10px;text-align:right">'+fmt(otPay)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+fmt(otPay*12)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+pct(otPay)+'</td><td style="padding:8px 10px;font-size:11px;color:#889">통상시급 × '+otHours+'h (월'+ot+'h × 1.5)</td></tr>';
+  html+='<tr style="border-bottom:1px solid #f0f2f7"><td style="padding:8px 10px;font-weight:600">미사용연차수당</td><td style="padding:8px 10px;text-align:right">'+fmt(leavePay)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+fmt(leavePay*12)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+pct(leavePay)+'</td><td style="padding:8px 10px;font-size:11px;color:#889">통상시급 × '+leaveHours.toFixed(2)+'h ('+annLeave+'일÷12)</td></tr>';
+  if(meal){
+    html+='<tr style="border-bottom:1px solid #f0f2f7"><td style="padding:8px 10px;font-weight:600;color:#27ae60">식대 (비과세)</td><td style="padding:8px 10px;text-align:right">'+fmt(meal)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+fmt(meal*12)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+pct(meal)+'</td><td style="padding:8px 10px;font-size:11px;color:#889">월 20만원 한도</td></tr>';
+  }
+  if(car){
+    html+='<tr style="border-bottom:1px solid #f0f2f7"><td style="padding:8px 10px;font-weight:600;color:#27ae60">자가운전보조금 (비과세)</td><td style="padding:8px 10px;text-align:right">'+fmt(car)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+fmt(car*12)+'</td><td style="padding:8px 10px;text-align:right;color:#889">'+pct(car)+'</td><td style="padding:8px 10px;font-size:11px;color:#889">본인차량+실비미지급 조건, 월 20만원 한도</td></tr>';
+  }
+
+  var totalCheck = basePay + otPay + leavePay + meal + car;
+  var taxable = basePay + otPay + leavePay;  // 과세소득
+  var nonTax = meal + car;  // 비과세소득
+
+  html+='<tr style="background:#f7f8fb;border-top:2px solid #1A3169"><td style="padding:10px;font-weight:700">합계 (월봉)</td><td style="padding:10px;text-align:right;font-weight:700">'+fmt(totalCheck)+'</td><td style="padding:10px;text-align:right;font-weight:700;color:#1A3169">'+fmt(totalCheck*12)+'</td><td style="padding:10px;text-align:right;font-weight:700">100%</td><td style="padding:10px;font-size:11px;color:#889">과세 '+fmt(taxable)+' + 비과세 '+fmt(nonTax)+'</td></tr>';
+  html+='</tbody></table>';
+
+  el.innerHTML=html;
+  // 결과 저장 (복사용)
+  window._paySplitResult = {monthly:monthly, wage:wageRounded, basePay:basePay, otPay:otPay, leavePay:leavePay, meal:meal, car:car, ot:ot, annLeave:annLeave, totalTime:totalTime, otHours:otHours, leaveHours:leaveHours};
+}
+
+function paySplitReset(){
+  document.getElementById('ps-monthly').value='';
+  // 최저임금은 저장된 값 유지 (없으면 10,320)
+  var saved='';
+  try{saved=localStorage.getItem('paySplit_minwage')||'';}catch(e){}
+  document.getElementById('ps-minwage').value=saved?parseInt(saved).toLocaleString():'10,320';
+  document.getElementById('ps-annleave').value='15';
+  document.getElementById('ps-ot').value='10';
+  document.getElementById('ps-meal').value='200,000';
+  document.getElementById('ps-car').value='0';
+  document.getElementById('ps-result').innerHTML='';
+  window._paySplitResult=null;
+}
+
+function paySplitCopy(){
+  var r=window._paySplitResult;
+  if(!r){showToast('먼저 계산을 해주세요');return;}
+  var fmt=function(n){return n.toLocaleString();};
+  var text='[근로계약서용 급여 항목]\n'
+    +'월봉 총액: '+fmt(r.monthly)+'원\n'
+    +'통상시급: '+fmt(r.wage)+'원 (월봉 ÷ '+r.totalTime.toFixed(1)+'시간)\n'
+    +'\n'
+    +'▪ 기본급(月): '+fmt(r.basePay)+'원\n'
+    +'▪ 연장근로수당(月): '+fmt(r.otPay)+'원 (월 고정연장 '+r.ot+'시간 × 통상시급 × 1.5)\n'
+    +'▪ 미사용연차수당(月): '+fmt(r.leavePay)+'원 (연 '+r.annLeave+'일분 배분)\n';
+  if(r.meal) text+='▪ 식대(月): '+fmt(r.meal)+'원 (비과세)\n';
+  if(r.car) text+='▪ 자가운전보조금(月): '+fmt(r.car)+'원 (비과세)\n';
+  text+='\n합계: '+fmt(r.basePay+r.otPay+r.leavePay+r.meal+r.car)+'원';
+  navigator.clipboard.writeText(text).then(function(){showToast('✅ 복사 완료');}).catch(function(){showToast('복사 실패');});
 }
 
 function calcRetire(){
