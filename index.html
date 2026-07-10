@@ -2939,11 +2939,31 @@ async function loadTax(){
     else if(pd==='12') whtMonths=[7,8,9,10,11,12];
     else whtMonths=[pdNum];
     await ensureSalaryCache(whtYr);
+    // 폐업자 중 폐업일 속한 달이 현재 pd(대상월)인 업체 추가
+    // 예: 4월말 폐업 → 4월분 원천세(5/10 마감) → pd=4 조회 시 표시
+    var closedInPd = ALL.filter(function(c){
+      if(c.status!=='폐업' || !c.endDate || c.type==='신고대리') return false;
+      var _cYr = parseInt(c.endDate.split('-')[0]);
+      var _cM = parseInt(c.endDate.split('-')[1]);
+      if(!_cYr||!_cM) return false;
+      // 폐업월이 대상월(pd)과 일치
+      return _cYr===parseInt(whtYr) && _cM===pdNum;
+    });
+    clients = clients.concat(closedInPd);
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>{
+      if(!c._whtMgr||c._whtMgr==='미배정') return false;
+      // 폐업자: 위에서 이미 pd 조건 걸었으니 통과 (급여 이력 있으면 표시)
+      if(c.status==='폐업'){
+        var _cM2 = parseInt(c.endDate.split('-')[1]);
+        // 폐업 그 달(귀속월) 급여 이력 있으면 표시
+        return hasSalaryDone(whtYr, [_cM2], c.id, 'daily')
+            || hasSalaryDone(whtYr, [_cM2], c.id, 'biz')
+            || hasSalaryDone(whtYr, [_cM2], c.id, 'labor')
+            || hasSalaryDone(whtYr, [_cM2], c.id, 'retire');
+      }
       // 매월 납부자는 whtYn='Y' 필수, 반기 납부자(whtSemi='Y')는 whtYn 무관
       if(c.whtSemi!=='Y' && c.whtYn!=='Y') return false;
-      if(!c._whtMgr||c._whtMgr==='미배정') return false;
       // 반기 업체는 6월/12월에만 표시
       if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
       // 급여관리에서 해당 월에 일용/사업/근로/퇴직 중 하나라도 체크된 업체만
@@ -3372,17 +3392,17 @@ function updatePyPeriod(){
 var SALARY_CACHE = {};
 
 // 폐업 거래처의 실효 지급명세서 마감일 계산
-// - 매월(daily/biz), 반기(labor): 일반 마감일 그대로
-// - 연간(abiz/alabor/retire/int/div/other): 폐업일 다음다음달 말일
+// - 매월(daily/biz), 반기(labor) = 간이지급명세서: 폐업 다음달 말일
+// - 연간(abiz/alabor/retire/int/div/other) = 지급명세서: 폐업 다음다음달 말일
 function getPayrollDeadlineForClosed(client, tp, defaultDueDate){
   if(!client.endDate) return defaultDueDate;
-  var isAnnual = ['abiz','alabor','retire','int','div','other'].indexOf(tp) >= 0;
-  if(!isAnnual) return defaultDueDate;
-  // 연간 지급명세서: 폐업 다음다음달 말일
   var parts = client.endDate.split('-');
   var closeYr = parseInt(parts[0]), closeMon = parseInt(parts[1]);
   if(!closeYr||!closeMon) return defaultDueDate;
-  var dueYr = closeYr, dueMon = closeMon + 2;
+  // 연간(지급명세서)은 다음다음달, 매월/반기(간이지급명세서)는 다음달
+  var isAnnual = ['abiz','alabor','retire','int','div','other'].indexOf(tp) >= 0;
+  var monthAdd = isAnnual ? 2 : 1;
+  var dueYr = closeYr, dueMon = closeMon + monthAdd;
   while(dueMon > 12){ dueMon -= 12; dueYr++; }
   var lastDay = new Date(dueYr, dueMon, 0).getDate();
   return dueYr + '-' + String(dueMon).padStart(2,'0') + '-' + String(lastDay).padStart(2,'0');
@@ -3436,11 +3456,23 @@ function hasSalaryInHalf(yr, halfMonths, cid){
 }
 
 // 원천세 신고 대상 판정 (공통)
+// - 폐업자: 폐업일 속한 달(귀속)이 대상월과 일치할 때만 대상 (whtSemi 무관)
+//   예: 4월말 폐업 → 4월분 원천세 (5/10 마감) → m=5일 때 신고 대상
 // - 매월납부(whtSemi≠'Y'): whtYn='Y'이면 대상
 // - 반기납부(whtSemi='Y'): 반기 마감월(7월/1월)에만 대상 + 그 반기 급여 이력 필수
-// yr: 대상월 연도, m: 대상 마감월 (예: 7월=상반기 신고, 1월=하반기 신고)
+// yr, m: 신고 마감월 (예: 5월 마감 = 4월분 원천세)
 function isWhtTargetForMonth(c, yr, m){
   if(c.type==='신고대리') return false;
+  // 폐업자: 폐업일 속한 달의 다음달이 마감월
+  if(c.status==='폐업' && c.endDate){
+    var closeYr = parseInt(c.endDate.split('-')[0]);
+    var closeMon = parseInt(c.endDate.split('-')[1]);
+    if(!closeYr||!closeMon) return false;
+    // 폐업월의 다음달이 마감월 = m
+    var dueMon = closeMon===12 ? 1 : closeMon+1;
+    var dueYr = closeMon===12 ? closeYr+1 : closeYr;
+    return dueYr===parseInt(yr) && dueMon===m;
+  }
   // 매월 납부자
   if(c.whtSemi!=='Y'){
     return c.whtYn==='Y';
@@ -6442,6 +6474,21 @@ function getIncompleteClientsForDeadline(e){
     var salData=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][whtBaseM]||{};
     return ALL.filter(function(c){
       if(c.type==='신고대리') return false;
+      // 폐업자: 폐업일 속한 달(귀속) = whtBaseM일 때 대상 (whtSemi 무관, 최우선)
+      // 예: 4월말 폐업 → 4월분 원천세 (5/10 마감) → whtBaseM=4일 때 표시
+      if(c.status==='폐업'){
+        if(!c.endDate) return false;
+        var _cY=parseInt(c.endDate.split('-')[0]);
+        var _cM=parseInt(c.endDate.split('-')[1]);
+        if(!_cY||!_cM) return false;
+        if(_cY!==parseInt(whtBaseY) || _cM!==parseInt(whtBaseM)) return false;
+        // 폐업 그 달 급여 이력 확인
+        var _cSC=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][_cM]||{};
+        var _closeHasRec=_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done'];
+        if(!_closeHasRec) return false;
+        // 폐업자: 신고체크만 완료로 인정
+        return !(whtChk[c.id]&&whtChk[c.id].done);
+      }
       // 반기납부(whtSemi='Y'): 마감월 e.m이 7월(상반기) 또는 1월(하반기)에만 대상
       if(c.whtSemi==='Y'){
         if(e.m!==7 && e.m!==1) return false;
@@ -6458,7 +6505,7 @@ function getIncompleteClientsForDeadline(e){
       if(c.status==='활성'){
         // 활성: 분모 포함
       } else {
-        // 폐업/이관 등 비활성: 그 달 급여기록 있어야 포함
+        // 이관/기장중지: 그 달 급여기록 있어야 포함
         var hasRec=salData[c.id+'_no_salary']||salData[c.id+'_daily_done']||salData[c.id+'_biz_done']||salData[c.id+'_labor_done']||salData[c.id+'_retire_done'];
         if(!hasRec) return false;
       }
@@ -8379,6 +8426,19 @@ function renderDashStatus(){
       // 신고대리 제외
       if(c.type==='신고대리') return false;
       if(!isMyClient(c, true)) return false;
+      // 폐업자: 폐업일이 속한 달(귀속월) = prevM2일 때 대상 (whtSemi 무관, 최우선 판정)
+      // 예: 4월말 폐업 → 4월분 원천세 → 대시보드 5월 조회 시(prevM2=4) 표시
+      if(c.status==='폐업'){
+        if(!c.endDate) return false;
+        var _cY=parseInt(c.endDate.split('-')[0]);
+        var _cM=parseInt(c.endDate.split('-')[1]);
+        if(!_cY||!_cM) return false;
+        // 폐업일 속한 달이 대상월과 일치해야 표시 (5/10 마감 = 4월분)
+        if(_cY!==parseInt(prevYr2) || _cM!==parseInt(prevM2)) return false;
+        // 폐업 그 달 급여 이력이 있으면 대상
+        var _closeSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
+        return !!(_closeSC&&(_closeSC[c.id+'_no_salary']||_closeSC[c.id+'_daily_done']||_closeSC[c.id+'_biz_done']||_closeSC[c.id+'_labor_done']||_closeSC[c.id+'_retire_done']));
+      }
       // 반기납부(whtSemi='Y'): 7월(상반기 마감)/1월(하반기 마감)에만 대상, whtYn 무관
       if(c.whtSemi==='Y'){
         if(m!==7 && m!==1) return false;
@@ -8392,7 +8452,7 @@ function renderDashStatus(){
       if(c.whtYn!=='Y') return false;
       // 활성이면 포함
       if(c.status==='활성') return true;
-      // 폐업/이관 등 비활성이어도 그 월에 급여 처리 기록이 있으면 포함
+      // 이관/기장중지 등: 그 월에 급여 처리 기록이 있으면 포함
       var sc=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
       if(sc&&(sc[c.id+'_no_salary']||sc[c.id+'_daily_done']||sc[c.id+'_biz_done']||sc[c.id+'_labor_done']||sc[c.id+'_retire_done'])) return true;
       return false;
@@ -8711,8 +8771,19 @@ function renderDashStatus(){
       if(t.docKey.indexOf('_wht_')>-1){
         var sCache=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
         var salMgrAll=ALL.filter(function(c){
-          if(c.status!=='활성'||c.type==='신고대리') return false;
-          if(!isMyClient(c, true)) return false;  // 담당자 필터 반영 (원천세는 whtSep 기준)
+          if(c.type==='신고대리') return false;
+          if(!isMyClient(c, true)) return false;
+          // 폐업자: 폐업일 속한 달(귀속) = prevM2일 때 원천세 대상 (whtSemi 무관)
+          if(c.status==='폐업'){
+            if(!c.endDate) return false;
+            var _cY=parseInt(c.endDate.split('-')[0]);
+            var _cM=parseInt(c.endDate.split('-')[1]);
+            if(!_cY||!_cM) return false;
+            if(_cY!==parseInt(prevYr2) || _cM!==parseInt(prevM2)) return false;
+            var _cSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
+            return !!(_cSC&&(_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done']));
+          }
+          if(c.status!=='활성') return false;
           // 매월납부는 whtYn='Y' 필수, 반기납부(whtSemi='Y')는 whtYn 무관 + 마감월(7월/1월)만
           if(c.whtSemi==='Y'){
             if(m!==7 && m!==1) return false;
