@@ -2941,7 +2941,8 @@ async function loadTax(){
     await ensureSalaryCache(whtYr);
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>{
-      if(c.whtYn!=='Y') return false;
+      // 매월 납부자는 whtYn='Y' 필수, 반기 납부자(whtSemi='Y')는 whtYn 무관
+      if(c.whtSemi!=='Y' && c.whtYn!=='Y') return false;
       if(!c._whtMgr||c._whtMgr==='미배정') return false;
       // 반기 업체는 6월/12월에만 표시
       if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
@@ -3425,6 +3426,32 @@ function hasSalaryDone(yr, months, cid, type){
   if(!SALARY_CACHE[yr]) return false;
   var key = type ? cid+'_'+type+'_done' : cid+'_done';
   return months.some(function(m){ return !!(SALARY_CACHE[yr][m] && SALARY_CACHE[yr][m][key]); });
+}
+
+// 반기 급여 이력 확인 (일용/사업/근로/퇴직 중 하나라도)
+function hasSalaryInHalf(yr, halfMonths, cid){
+  return ['daily','biz','labor','retire'].some(function(tp){
+    return hasSalaryDone(yr, halfMonths, cid, tp);
+  });
+}
+
+// 원천세 신고 대상 판정 (공통)
+// - 매월납부(whtSemi≠'Y'): whtYn='Y'이면 대상
+// - 반기납부(whtSemi='Y'): 반기 마감월(7월/1월)에만 대상 + 그 반기 급여 이력 필수
+// yr: 대상월 연도, m: 대상 마감월 (예: 7월=상반기 신고, 1월=하반기 신고)
+function isWhtTargetForMonth(c, yr, m){
+  if(c.type==='신고대리') return false;
+  // 매월 납부자
+  if(c.whtSemi!=='Y'){
+    return c.whtYn==='Y';
+  }
+  // 반기 납부자: 반기 마감월만 대상
+  var isH1 = (m===7);   // 상반기(1~6월분) → 7월 마감
+  var isH2 = (m===1);   // 하반기(7~12월분) → 1월 마감
+  if(!isH1 && !isH2) return false;
+  var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+  var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);  // 하반기는 전년도 이력
+  return hasSalaryInHalf(halfYr, halfMonths, c.id);
 }
 
 // 급여관리 업체 완료 판단: 이달없음 OR 유형 중 하나라도 체크
@@ -6414,8 +6441,20 @@ function getIncompleteClientsForDeadline(e){
     var whtChk=DASH_TAX_CACHE[whtKey]||{};
     var salData=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][whtBaseM]||{};
     return ALL.filter(function(c){
-      // 처리현황 filter와 동일
-      if(c.type==='신고대리'||c.whtYn!=='Y') return false;
+      if(c.type==='신고대리') return false;
+      // 반기납부(whtSemi='Y'): 마감월 e.m이 7월(상반기) 또는 1월(하반기)에만 대상
+      if(c.whtSemi==='Y'){
+        if(e.m!==7 && e.m!==1) return false;
+        var isH1 = (e.m===7);
+        var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+        var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);
+        // 반기 급여 이력 확인
+        if(!hasSalaryInHalf(halfYr, halfMonths, c.id)) return false;
+        // 반기납부: 신고체크만 완료로 인정 (급여 처리 완료로 자동 완료 X)
+        return !(whtChk[c.id]&&whtChk[c.id].done);
+      }
+      // 매월납부: 기존 로직
+      if(c.whtYn!=='Y') return false;
       if(c.status==='활성'){
         // 활성: 분모 포함
       } else {
@@ -8337,20 +8376,32 @@ function renderDashStatus(){
   taxTypes.push({lbl:'원천세 신고 ('+prevM2+'월분)', docKey:'tax_'+prevYr2+'_wht_'+prevM2,
     deadline:{month:m,day:10},
     filter:function(c){
-      // 신고대리 제외 + 급여있음 필수
-      if(c.type==='신고대리'||c.whtYn!=='Y') return false;
+      // 신고대리 제외
+      if(c.type==='신고대리') return false;
       if(!isMyClient(c, true)) return false;
-      // 활성이면 포함 (반기/매월 무관, 담당자 무관, 체크 무관 → 급여관리 갯수와 일치)
+      // 반기납부(whtSemi='Y'): 7월(상반기 마감)/1월(하반기 마감)에만 대상, whtYn 무관
+      if(c.whtSemi==='Y'){
+        if(m!==7 && m!==1) return false;
+        var isH1 = (m===7);
+        var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+        var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);
+        // 그 반기 급여 이력이 있으면 대상
+        return hasSalaryInHalf(halfYr, halfMonths, c.id);
+      }
+      // 매월 납부자: whtYn='Y' 필수
+      if(c.whtYn!=='Y') return false;
+      // 활성이면 포함
       if(c.status==='활성') return true;
       // 폐업/이관 등 비활성이어도 그 월에 급여 처리 기록이 있으면 포함
-      // (예: 4월 급여 있던 업체가 5월 폐업 → 4월분 원천세는 신고해야 하므로 분모에 남아야 함)
       var sc=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
       if(sc&&(sc[c.id+'_no_salary']||sc[c.id+'_daily_done']||sc[c.id+'_biz_done']||sc[c.id+'_labor_done']||sc[c.id+'_retire_done'])) return true;
       return false;
     },
     getDone:function(chk,c){
       if(chk[c.id]&&chk[c.id].done) return true;
-      // 급여관리에서 그 달 급여처리 완료(급여없음/일용/사업/근로/퇴직 중 하나) = 원천세 마감으로 간주 (기존 데이터 소급 포함)
+      // 반기납부는 신고체크만 완료로 인정 (급여 처리로 자동 완료 X)
+      if(c.whtSemi==='Y') return false;
+      // 매월납부: 급여관리에서 그 달 급여처리 완료(급여없음/일용/사업/근로/퇴직 중 하나) = 원천세 마감으로 간주
       var sc=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
       if(sc&&(sc[c.id+'_no_salary']||sc[c.id+'_daily_done']||sc[c.id+'_biz_done']||sc[c.id+'_labor_done']||sc[c.id+'_retire_done'])) return true;
       return false;
@@ -8660,9 +8711,17 @@ function renderDashStatus(){
       if(t.docKey.indexOf('_wht_')>-1){
         var sCache=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
         var salMgrAll=ALL.filter(function(c){
-          if(c.status!=='활성'||c.type==='신고대리'||c.whtYn!=='Y') return false;
+          if(c.status!=='활성'||c.type==='신고대리') return false;
           if(!isMyClient(c, true)) return false;  // 담당자 필터 반영 (원천세는 whtSep 기준)
-          return true;
+          // 매월납부는 whtYn='Y' 필수, 반기납부(whtSemi='Y')는 whtYn 무관 + 마감월(7월/1월)만
+          if(c.whtSemi==='Y'){
+            if(m!==7 && m!==1) return false;
+            var isH1 = (m===7);
+            var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+            var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);
+            return hasSalaryInHalf(halfYr, halfMonths, c.id);
+          }
+          return c.whtYn==='Y';
         });
         var tIds={}; targetList.forEach(function(c){tIds[c.id]=1;});
         var missing=salMgrAll.filter(function(c){return !tIds[c.id];}).map(function(c){
