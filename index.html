@@ -6565,20 +6565,26 @@ function getIncompleteClientsForDeadline(e){
   // 폐업 지급명세서: 이벤트에 clients 목록이 이미 있으므로 미완료만 필터
   if(e.t==='closedSemi' || e.t==='closedAnnual'){
     if(!e.clients) return [];
-    var docId = e.t==='closedSemi' ? (yr+'_semi') : (yr+'_annual');
     var chk = DASH_TAX_CACHE['payroll_'+ (e.t==='closedSemi'?'semi':'annual') +'_'+yr] || {};
+    var salCacheY = SALARY_CACHE[yr] || {};
+    var allMons = [1,2,3,4,5,6,7,8,9,10,11,12];
     return e.clients.filter(function(c){
-      // 매월/반기(semi)는 pd별 체크, 연간은 tp별 체크
-      // 간이(closedSemi): 어느 하나라도 미완료면 표시
       if(e.t==='closedSemi'){
-        var pdList = m<=6?['1']:['2']; // 반기(labor) 완료 여부
-        return !chk[c.id+'_'+pdList[0]];
+        // 폐업월 속한 반기 기준
+        var _cM = parseInt((c.endDate||'').split('-')[1])||0;
+        var half = _cM<=6 ? '1' : '2';
+        return !chk[c.id+'_'+half];
       } else {
-        // 연간: 근로/사업/퇴직 중 하나라도 미완료
-        return !chk[c.id+'_alabor'] || !chk[c.id+'_abiz'] || !chk[c.id+'_retire'];
+        // 연간: 그 해 이력이 있는 유형만 완료 여부 판정
+        var defs=[{tp:'abiz',sal:'biz'},{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'}];
+        var pending=false;
+        defs.forEach(function(d){
+          var hasSal = allMons.some(function(mm){return salCacheY[mm]&&salCacheY[mm][c.id+'_'+d.sal+'_done'];});
+          if(hasSal && !chk[c.id+'_'+d.tp]) pending=true;
+        });
+        return pending;
       }
     }).map(function(c){
-      // 담당자 표시 (원천세 담당 우선)
       var mgr = (c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
       return {name:c.name, manager:mgr};
     });
@@ -8522,16 +8528,12 @@ async function loadDashTaxCache(){
   var pyYr0=m===1?(parseInt(yr)-1).toString():yr;
   var pyDoc=await db.collection('payrollChecks').doc(pyYr0+'_monthly').get();
   DASH_TAX_CACHE['payroll_monthly_'+pyYr0] = pyDoc.exists ? pyDoc.data() : {};
-  // 반기(근로간이) 캐시 — 1월/7월 마감
-  if(m===1||m===7){
-    var pySemiDoc=await db.collection('payrollChecks').doc(yr+'_semi').get();
-    DASH_TAX_CACHE['payroll_semi_'+yr] = pySemiDoc.exists ? pySemiDoc.data() : {};
-  }
-  // 연간(사업/근로/퇴직) 캐시 — 3월 마감
-  if(m===3){
-    var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
-    DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
-  }
+  // 반기(근로간이) 캐시 — 정기 1월/7월 + 폐업자 마감월(어느 달이든 가능)이므로 항상 로드
+  var pySemiDoc=await db.collection('payrollChecks').doc(yr+'_semi').get();
+  DASH_TAX_CACHE['payroll_semi_'+yr] = pySemiDoc.exists ? pySemiDoc.data() : {};
+  // 연간(사업/근로/퇴직) 캐시 — 정기 3월 + 폐업자 마감월이므로 항상 로드
+  var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
+  DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
 
   // 예정고지 데이터 캐시 (부가세 예정달에만)
   var vatPdMap2={1:4,4:1,7:2,10:3};
@@ -8726,6 +8728,15 @@ function renderDashStatus(){
     var sCache=SALARY_CACHE[semiYr]||{};
     actClients.forEach(function(c){
       if(!isPayrollVisible(c, semiDueDate, 'labor')) return;
+      // 폐업자: 실효 마감(폐업 다음달 말일)이 이 조회월(1월/7월)과 일치할 때만 여기서 처리
+      // (조기 마감 폐업자는 ⑤에서 마감월에 이미 처리됨 — 중복 방지)
+      if(c.status==='폐업' && c.endDate){
+        var _cM2=parseInt(c.endDate.split('-')[1]);
+        var _cY2=parseInt(c.endDate.split('-')[0]);
+        var _dM2=_cM2===12?1:_cM2+1;
+        var _dY2=_cM2===12?_cY2+1:_cY2;
+        if(_dY2!==parseInt(yr) || _dM2!==m) return;
+      }
       var hasLabor=semiMonths.some(function(mm){return sCache[mm]&&sCache[mm][c.id+'_labor_done'];});
       if(!hasLabor) return;
       var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
@@ -8750,6 +8761,8 @@ function renderDashStatus(){
     ];
     annDefs.forEach(function(ad){
       actClients.forEach(function(c){
+        // 폐업자는 ④(폐업 다음다음달 마감월)에서 전담 처리 — 정기 3/10 계산에서 제외
+        if(c.status==='폐업') return;
         if(!isPayrollVisible(c, annDueDate, ad.tp)) return;
         var hasSal=annAll.some(function(mm){return aCache[mm]&&aCache[mm][c.id+'_'+ad.sal+'_done'];});
         if(!hasSal) return;
