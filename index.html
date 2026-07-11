@@ -57,7 +57,11 @@ body{font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif
 .btn-out:hover{background:rgba(255,255,255,.22)}
 
 .sidebar{position:fixed;left:0;top:56px;bottom:0;width:196px;background:#fff;border-right:1px solid #e8ecf0;overflow-y:auto;z-index:90}
-.nav-sec{padding:18px 18px 5px;font-size:10.5px;color:#aab;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.nav-sec{padding:18px 18px 5px;font-size:10.5px;color:#aab;font-weight:700;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between}
+.nav-sec:hover{color:#778}
+.sec-arw{font-size:9px;transition:transform .15s}
+.nav-sec.folded .sec-arw{transform:rotate(-90deg)}
+.nav-hide{display:none !important}
 .nav-item{display:flex;align-items:center;gap:9px;padding:10px 18px;cursor:pointer;color:#556;font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent}
 .nav-item:hover{background:#f4f6ff;color:#1A3169}
 .nav-item.active{background:#edf1ff;color:#1A3169;font-weight:700;border-left-color:#1A3169}
@@ -412,11 +416,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="nav-sec">메인</div>
+    <div class="nav-sec" data-sec="main" onclick="navToggleSec(this)">메인<span class="sec-arw">▾</span></div>
     <div class="nav-item active" id="nav-dashboard" onclick="go('dashboard')">
       <span class="nav-icon">🏠</span> 대시보드
     </div>
-    <div class="nav-sec">업무관리</div>
+    <div class="nav-sec" data-sec="work" onclick="navToggleSec(this)">업무관리<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-clients" onclick="go('clients')">
       <span class="nav-icon">🏢</span> 거래처 관리
       <span class="nav-cnt" id="nc-clients">0</span>
@@ -436,9 +440,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <div class="nav-item" id="nav-profit" onclick="go('profit')">
       <span class="nav-icon">📈</span> 중간손익
     </div>
-    <div class="nav-sec">분석/도구</div>
+    <div class="nav-sec" data-sec="tools" onclick="navToggleSec(this)">분석/도구<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-calc" onclick="go('calc')">
       <span class="nav-icon">🧮</span> 세액계산기
+    </div>
+    <div class="nav-item" id="nav-loanlimit" onclick="go('loanlimit')">
+      <span class="nav-icon">💸</span> 대여한도 계산기
     </div>
     <div class="nav-item" id="nav-bizcode" onclick="go('bizcode')">
       <span class="nav-icon">🔍</span> 업종코드 검색
@@ -449,14 +456,14 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <div class="nav-item" id="nav-contract" onclick="go('contract')">
       <span class="nav-icon">📄</span> 계약서 발급
     </div>
-    <div class="nav-sec">소통</div>
+    <div class="nav-sec" data-sec="comm" onclick="navToggleSec(this)">소통<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-kakao" onclick="go('kakao')">
       <span class="nav-icon">📤</span> 발송 센터
     </div>
     <div class="nav-item" id="nav-calendar" onclick="go('calendar')">
       <span class="nav-icon">📅</span> 마감 캘린더
     </div>
-    <div class="nav-sec">관리</div>
+    <div class="nav-sec" data-sec="admin" onclick="navToggleSec(this)">관리<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-staff" onclick="go('staff')" style="display:none">
       <span class="nav-icon">👥</span> 직원관리
     </div>
@@ -1592,6 +1599,101 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
       </div>
     </div>
 
+    <!-- ===== 특수관계인 금전대여 한도 계산기 ===== -->
+    <div id="pg-loanlimit" class="pg" style="display:none">
+      <div class="al al-i" style="margin-bottom:14px">
+        상증법 §45조의5(특정법인) · §41조의4(개인 간) 무상·저리 대여 증여의제 판정.
+        당좌대출이자율 <b>4.6%</b>는 법인세법 시행규칙 §43② 개정 시 입력값만 수정.
+        기준금액(1억/1천만원)은 공제가 아닌 <b>문턱</b>이므로 초과 시 이익 <b>전액</b> 과세.
+      </div>
+      <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;align-items:start">
+
+        <!-- 가족법인 (특정법인) -->
+        <div class="card">
+          <div class="card-hdr"><div class="card-ttl">🏢 가족법인 대여 (특정법인)</div></div>
+          <div class="fr">
+            <div class="fld"><label>당좌대출이자율 (%)</label>
+              <input class="fi" type="number" id="ll-rate0" value="4.6" step="0.1" oninput="llCalcCorp()"></div>
+            <div class="fld"><label>약정 이자율 (%) — 무이자면 0</label>
+              <input class="fi" type="number" id="ll-ag0" value="" placeholder="0" step="0.1" oninput="llCalcCorp()"></div>
+            <div class="fld"><label>현재 대여 잔액 (원)</label>
+              <input class="fi" type="text" id="ll-bal0" value="" placeholder="0" oninput="llFmt(this);llCalcCorp()"></div>
+            <div class="fld"><label>추가 대여 예정액 (원)</label>
+              <input class="fi" type="text" id="ll-add0" value="" placeholder="0" oninput="llFmt(this);llCalcCorp()"></div>
+          </div>
+          <div class="sdiv">주주 구성 (지배주주등)</div>
+          <table style="font-size:12.5px">
+            <thead><tr style="background:#1A3169;color:#fff">
+              <th style="padding:7px;width:24%">주주명</th><th style="padding:7px;width:18%">지분율(%)</th>
+              <th style="padding:7px;width:16%">대여자 본인</th><th style="padding:7px;width:22%">증여의제이익(연)</th>
+              <th style="padding:7px;width:20%">판정(1억 기준)</th></tr></thead>
+            <tbody id="llShBody"></tbody>
+          </table>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button class="btn btn-p btn-sm" onclick="llAddRow()">+ 주주 추가</button>
+            <button class="btn btn-s btn-sm" onclick="llDelRow()">− 마지막 행 삭제</button>
+          </div>
+          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+              <div><div style="font-size:11px;color:#889">대여 총 한도 (현재 약정 기준)</div>
+                <div id="ll-limit0" style="font-size:19px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div id="ll-limitF0" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+              <div><div style="font-size:11px;color:#889">잔액+예정액 합계</div>
+                <div id="ll-total0" style="font-size:19px;font-weight:700;color:#1A3169;margin-top:3px">—</div></div>
+              <div><div style="font-size:11px;color:#889">한도까지 여유액</div>
+                <div id="ll-room0" style="font-size:19px;font-weight:700;margin-top:3px">—</div>
+                <div id="ll-roomS0" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+            </div>
+            <div style="height:12px;background:#e1e8f3;border-radius:6px;overflow:hidden;margin-top:12px">
+              <div id="ll-bar0" style="height:100%;width:0%;background:#1E8449;transition:width .3s"></div></div>
+            <div id="ll-barTxt0" style="font-size:11px;color:#778;margin-top:4px"></div>
+          </div>
+          <div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.7;color:#554;margin-top:12px">
+            법인이익 = 잔액 × (당좌대출이자율 − 약정이자율), 주주별 이익 = 법인이익 × 지분율(대여자 본인 지분은 자기증여로 제외).
+            한도 = 1억 ÷ 최대 지분율 ÷ 이자율 차이. 무상·저리 대여는 <b>1년마다 새로 대출받은 것으로 보아 재계산</b>되므로
+            이자율·지분율 변동 시 기존 잔액에 그대로 적용됨. 지분 변동(증자·양도) 시 즉시 재계산할 것.
+          </div>
+        </div>
+
+        <!-- 개인 간 -->
+        <div class="card">
+          <div class="card-hdr"><div class="card-ttl">👨‍👦 개인 간 대여 (부모↔자녀)</div></div>
+          <div class="fr">
+            <div class="fld"><label>적정이자율 (%)</label>
+              <input class="fi" type="number" id="ll-rate1" value="4.6" step="0.1" oninput="llCalcPerson()"></div>
+            <div class="fld"><label>약정 이자율 (%) — 무이자면 0</label>
+              <input class="fi" type="number" id="ll-ag1" value="" placeholder="0" step="0.1" oninput="llCalcPerson()"></div>
+          </div>
+          <div class="fr">
+            <div class="fld"><label>대여 잔액 (원)</label>
+              <input class="fi" type="text" id="ll-bal1" value="" placeholder="0" oninput="llFmt(this);llCalcPerson()"></div>
+          </div>
+          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:6px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
+              <div><div style="font-size:11px;color:#889">연간 증여이익</div>
+                <div id="ll-gain1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div style="font-size:10.5px;color:#99a;margin-top:2px">잔액 × (적정−약정)</div></div>
+              <div><div style="font-size:11px;color:#889">대여 한도</div>
+                <div id="ll-limit1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div id="ll-limitF1" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+            </div>
+            <div style="text-align:center;margin-top:10px">
+              <span id="ll-judge1" style="font-size:15px;font-weight:700">—</span>
+              <span id="ll-judgeS1" style="font-size:11px;color:#889;margin-left:6px"></span>
+            </div>
+            <div style="height:12px;background:#e1e8f3;border-radius:6px;overflow:hidden;margin-top:10px">
+              <div id="ll-bar1" style="height:100%;width:0%;background:#1E8449;transition:width .3s"></div></div>
+            <div id="ll-barTxt1" style="font-size:11px;color:#778;margin-top:4px"></div>
+          </div>
+          <div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.7;color:#554;margin-top:12px">
+            기준: 연 1천만원 미만 비과세(상증령 §31조의4②). 무이자 한도 = 1천만 ÷ 4.6% = <b>217,391,304원</b>.
+            저리 약정 시 [잔액 × (4.6% − 약정율)]로 판정. 이자를 실제 지급하면 차용인이 <b>원천징수 27.5%</b>
+            (소득세 25%+지방세) 후 익월 10일까지 납부. 계약서·이체실적·상환실적 3요소 필수.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== 청년창업감면 판정 도구 ===== -->
     <div id="pg-yexempt" class="pg" style="display:none">
       <div class="card">
@@ -2274,6 +2376,7 @@ const PAGE_INFO={
   salary:{icon:'💰',lbl:'급여관리'},
   payroll:{icon:'📋',lbl:'지급명세서'},
   calc:{icon:'🧮',lbl:'세액계산기'},
+  loanlimit:{icon:'💸',lbl:'대여한도 계산기'},
   kakao:{icon:'📤',lbl:'발송 센터'},
   profit:{icon:'📈',lbl:'중간손익'},
   goji:{icon:'📨',lbl:'예정고지'},
@@ -2299,6 +2402,7 @@ function go(page){
   if(el) el.style.display='block';
   const nav=document.getElementById('nav-'+page);
   if(nav) nav.classList.add('active');
+  navRevealActive(page);
   // 페이지 전환 시 스크롤 맨 위로
   document.querySelector('.main').scrollTop=0;
   renderTabs();
@@ -2325,6 +2429,7 @@ function go(page){
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='calc'){loadPaySplitPrefs();paySplitCalc();}
+  if(page==='loanlimit'){llInit();}
   if(page==='staff'){loadStaffPage();}
   if(page==='contract'){ctInitPage();}
   if(page==='yexempt'){yeInitPage();}
@@ -9243,6 +9348,123 @@ function activatePayChk(cid, val){
   }
   updateSmsCount();
 }
+
+// ─── 특수관계인 금전대여 한도 계산기 ───
+var llInited=false;
+function llNum(s){return parseFloat(String(s).replace(/[^0-9.]/g,''))||0;}
+function llComma(n){return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function llFmt(el){var v=llNum(el.value);el.value=v?llComma(v):'';}
+function llEok(n){return (n/100000000).toFixed(2).replace(/\.00$/,'')+'억';}
+function llRowHTML(name,pct,lender){
+  return '<tr>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><input class="fi" style="text-align:center;padding:5px" type="text" value="'+name+'" placeholder="주주명"></td>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><input class="fi" style="text-align:center;padding:5px" type="number" value="'+pct+'" placeholder="0" step="0.1" oninput="llCalcCorp()"></td>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px;text-align:center"><input type="checkbox" '+(lender?'checked':'')+' onchange="llCalcCorp()"></td>'
+    +'<td class="ll-gTd" style="border:1px solid #e3e8f0;padding:5px;text-align:center">—</td>'
+    +'<td class="ll-jTd" style="border:1px solid #e3e8f0;padding:5px;text-align:center">—</td></tr>';
+}
+function llAddRow(){document.getElementById('llShBody').insertAdjacentHTML('beforeend',llRowHTML('','',false));llCalcCorp();}
+function llDelRow(){var b=document.getElementById('llShBody');if(b.rows.length>1){b.deleteRow(-1);llCalcCorp();}}
+function llInit(){
+  if(!llInited){
+    document.getElementById('llShBody').innerHTML=
+      llRowHTML('','',false)+llRowHTML('','',false)+llRowHTML('','',false);
+    llInited=true;
+  }
+  llCalcCorp();llCalcPerson();
+}
+function llCalcCorp(){
+  var r=llNum(document.getElementById('ll-rate0').value)/100;
+  var ag=llNum(document.getElementById('ll-ag0').value)/100;
+  var diff=Math.max(r-ag,0);
+  var total=llNum(document.getElementById('ll-bal0').value)+llNum(document.getElementById('ll-add0').value);
+  var gain=total*diff, maxPct=0;
+  document.querySelectorAll('#llShBody tr').forEach(function(tr){
+    var pct=llNum(tr.cells[1].querySelector('input').value)/100;
+    var isLender=tr.cells[2].querySelector('input').checked;
+    var g=isLender?0:gain*pct;
+    tr.querySelector('.ll-gTd').textContent=isLender?'자기증여 제외':llComma(g)+'원';
+    var j=tr.querySelector('.ll-jTd');
+    if(isLender){j.textContent='—';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center';}
+    else if(g>=100000000){j.textContent='과세 (1억 이상)';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center;color:#C0392B;font-weight:700';}
+    else{j.textContent='비과세';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center;color:#1E8449';}
+    if(!isLender&&pct>maxPct)maxPct=pct;
+  });
+  var limit=(maxPct>0&&diff>0)?100000000/maxPct/diff:(maxPct>0&&diff<=0&&r>0?Infinity:0);
+  var limitEl=document.getElementById('ll-limit0');
+  var limitFEl=document.getElementById('ll-limitF0');
+  if(limit===Infinity){
+    limitEl.textContent='제한 없음';
+    limitFEl.textContent='약정이자율 ≥ 당좌대출이자율';
+  }else{
+    limitEl.textContent=limit?llEok(limit):'—';
+    limitFEl.textContent=limit?('= 1억 ÷ '+(maxPct*100).toFixed(1)+'% ÷ '+(diff*100).toFixed(1)+'% = '+llComma(limit)+'원'):'';
+  }
+  var room=isFinite(limit)?limit-total:Infinity;
+  document.getElementById('ll-total0').textContent=llEok(total);
+  var roomEl=document.getElementById('ll-room0');
+  if(limit===Infinity){roomEl.textContent='제한 없음';roomEl.style.color='#1E8449';document.getElementById('ll-roomS0').textContent='';}
+  else{
+    roomEl.textContent=limit?(room>=0?llEok(room):'초과 '+llEok(-room)):'—';
+    roomEl.style.color=room>=0?'#1E8449':'#C0392B';
+    document.getElementById('ll-roomS0').textContent=limit?(room>=0?'한도 이내':'한도 초과 — 과세 위험'):'';
+  }
+  var pctUse=(isFinite(limit)&&limit)?Math.min(total/limit*100,100):0;
+  var bar=document.getElementById('ll-bar0');
+  bar.style.width=pctUse+'%';
+  bar.style.background=(isFinite(limit)&&total>limit)?'#C0392B':'#1E8449';
+  document.getElementById('ll-barTxt0').textContent=(isFinite(limit)&&limit)?('사용률 '+(total/limit*100).toFixed(1)+'%'):'';
+}
+function llCalcPerson(){
+  var r=llNum(document.getElementById('ll-rate1').value)/100;
+  var bal=llNum(document.getElementById('ll-bal1').value);
+  var ag=llNum(document.getElementById('ll-ag1').value)/100;
+  var diff=Math.max(r-ag,0);
+  var gain=bal*diff;
+  var limit=diff>0?10000000/diff:Infinity;
+  document.getElementById('ll-gain1').textContent=llComma(gain)+'원';
+  document.getElementById('ll-limit1').textContent=isFinite(limit)?llEok(limit):'제한 없음';
+  document.getElementById('ll-limitF1').textContent=isFinite(limit)?('= 1천만 ÷ '+(diff*100).toFixed(1)+'% = '+llComma(limit)+'원'):'약정이자율 ≥ 적정이자율';
+  var j=document.getElementById('ll-judge1');
+  if(gain>=10000000){j.textContent='과세';j.style.color='#C0392B';document.getElementById('ll-judgeS1').textContent='이익 전액이 증여재산가액에 산입';}
+  else{j.textContent='비과세';j.style.color='#1E8449';document.getElementById('ll-judgeS1').textContent='연 1천만원 미만';}
+  var pctUse=isFinite(limit)?Math.min(bal/limit*100,100):0;
+  var bar=document.getElementById('ll-bar1');
+  bar.style.width=pctUse+'%';
+  bar.style.background=gain>=10000000?'#C0392B':'#1E8449';
+  document.getElementById('ll-barTxt1').textContent=isFinite(limit)?('사용률 '+(bal/limit*100).toFixed(1)+'%'):'';
+}
+// ─── 사이드바 섹션 접기/펼치기 ───
+function navToggleSec(sec){
+  var folded=sec.classList.toggle('folded');
+  var el=sec.nextElementSibling;
+  while(el && !el.classList.contains('nav-sec')){
+    if(el.classList.contains('nav-item')) el.classList.toggle('nav-hide',folded);
+    el=el.nextElementSibling;
+  }
+  try{
+    var st=JSON.parse(localStorage.getItem('sn_navFold')||'{}');
+    st[sec.dataset.sec]=folded;
+    localStorage.setItem('sn_navFold',JSON.stringify(st));
+  }catch(e){}
+}
+function navRestoreFold(){
+  try{
+    var st=JSON.parse(localStorage.getItem('sn_navFold')||'{}');
+    document.querySelectorAll('.nav-sec[data-sec]').forEach(function(sec){
+      if(st[sec.dataset.sec]) navToggleSec(sec);
+    });
+  }catch(e){}
+}
+function navRevealActive(page){
+  var nav=document.getElementById('nav-'+page);
+  if(nav && nav.classList.contains('nav-hide')){
+    var el=nav.previousElementSibling;
+    while(el && !el.classList.contains('nav-sec')) el=el.previousElementSibling;
+    if(el && el.classList.contains('folded')) navToggleSec(el);
+  }
+}
+navRestoreFold();
 
 </script>
 <!-- 계약서 인쇄 전용 영역 (body 최상위 — 인쇄 시 다른 요소 모두 display:none) -->
