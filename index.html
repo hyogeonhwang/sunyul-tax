@@ -8672,9 +8672,14 @@ function renderDashStatus(){
     taxTypes.push({lbl:'부가세'+(isJunggan?' (예정)':' (확정)'), docKey:'tax_'+yr+'_vat_'+vatPd,
       deadline:vatDlMap[vatPd]||{month:m,day:25},
       filter:function(c){
-        if(c.type==='신고대리') return false;
         if(!isActiveInMonth(c, parseInt(yr), m)) return false;
-        if(!isMyClient(c, false)) return false;
+        // 담당자 판정: 신고체크 배부담당(assignee) 우선 → 없으면 거래처 담당자 (신고체크와 동일)
+        if(effectiveMgr){
+          var _vchk=DASH_TAX_CACHE['tax_'+yr+'_vat_'+vatPd]||{};
+          var _asg=_vchk[c.id]&&_vchk[c.id].assignee;
+          var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+          if(_eff!==effectiveMgr) return false;
+        }
         if(isJunggan){
           if(c.vatType==='면세') return false;
           if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
@@ -8684,7 +8689,7 @@ function renderDashStatus(){
           if(gojiData[c.id]?.status==='none'&&!c.vatExcept) return false;
           return true;
         }
-        // 확정 신고: 면세 제외, 법인(일반/간이) + 일반과세 개인
+        // 확정 신고: 면세 제외, 법인(일반/간이) + 일반과세 개인 (신고대리 포함 — 신고체크와 동일)
         if(c.vatType==='면세') return false;
         return c.type==='법인'||c.vatType==='일반';
       },
@@ -8699,10 +8704,20 @@ function renderDashStatus(){
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
-  // 종합소득세
+  // 종합소득세 (신고대리 포함 — 신고체크와 동일, 배부담당 우선)
   if(m===5) taxTypes.push({lbl:'종합소득세', docKey:'tax_'+yr+'_income_1',
     deadline:{month:5,day:31},
-    filter:function(c){return c.type!=='법인' && isActiveInMonth(c, parseInt(yr), m) && isMyClient(c, false);},
+    filter:function(c){
+      if(c.type==='법인') return false;
+      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
+      if(effectiveMgr){
+        var _ichk=DASH_TAX_CACHE['tax_'+yr+'_income_1']||{};
+        var _asg=_ichk[c.id]&&_ichk[c.id].assignee;
+        var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+        if(_eff!==effectiveMgr) return false;
+      }
+      return true;
+    },
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
