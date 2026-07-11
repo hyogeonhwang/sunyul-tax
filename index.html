@@ -6535,12 +6535,21 @@ function renderUrgentSection(){
     var incompleteClients=getIncompleteClientsForDeadline(e);
     var uid='urgent-'+e.lbl.replace(/\s/g,'_');
     var hasList=incompleteClients.length>0;
+    // 매월 지급명세서(t:'pay')는 그 달 급여 작업 전이면 대상 미확정 — "완료" 대신 구분 표시
+    var statusBadge;
+    if(hasList){
+      statusBadge='<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>';
+    } else if(e.t==='pay' && !hasPayTargets(e)){
+      statusBadge='<span style="font-size:11px;background:#eef0f4;color:#889;padding:1px 7px;border-radius:20px">대상 확정 전</span>';
+    } else {
+      statusBadge='<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>';
+    }
     return '<div style="margin-bottom:8px;border:0.5px solid #fcc;border-radius:8px;overflow:hidden">'
       +'<div onclick="toggleUrgentDetail(\''+uid+'\')" '
       +'style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fff5f5;'+(hasList?'cursor:pointer':'')+'">'
       +'<span style="font-size:13px;font-weight:600;color:#c0392b">🔴 '+e.lbl+'</span>'
       +'<div style="display:flex;align-items:center;gap:8px">'
-      +(hasList?'<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>':'<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>')
+      +statusBadge
       +'<span style="color:#e74c3c;font-size:12px;font-weight:700">'+m+'/'+e.d+(isCurMonth?' (D-'+dl+')':' 마감')+'</span>'
       +(hasList?'<span id="arr-'+uid+'" style="color:#aab;font-size:11px">▼</span>':'')
       +'</div></div>'
@@ -6555,6 +6564,19 @@ function renderUrgentSection(){
     urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
     console.error('renderUrgentSection error:', err);
   }
+}
+
+// 매월 지급명세서 대상이 확정됐는지 (귀속월 급여관리에 일용/사업 체크가 하나라도 있는지)
+function hasPayTargets(e){
+  var yr=String(DASH_YEAR||new Date().getFullYear());
+  var m=DASH_MONTH||(new Date().getMonth()+1);
+  var pyM=m===1?12:m-1;
+  var pyYr=m===1?(parseInt(yr)-1).toString():yr;
+  var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
+  return ALL.some(function(c){
+    if(c.type==='신고대리') return false;
+    return salCache[c.id+'_biz_done']||salCache[c.id+'_daily_done'];
+  });
 }
 
 function getIncompleteClientsForDeadline(e){
