@@ -2021,6 +2021,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="radio" name="calcolor" value="gray"> <span style="background:#f0f0f0;color:#555;padding:2px 10px;border-radius:4px;font-size:12px">회색</span></label>
           </div>
         </div>
+        <div style="margin-top:10px;padding:8px 12px;background:#EAF0F8;border-radius:6px">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:#1A3169">
+            <input type="checkbox" id="cal-dashboard" style="width:16px;height:16px;cursor:pointer">
+            <span><b>대시보드 마감에 표시</b> <span style="color:#889;font-size:11px">(체크 안 하면 마감캘린더에만 표시)</span></span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="mo-foot">
@@ -2953,10 +2959,18 @@ async function loadTax(){
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>{
       if(!c._whtMgr||c._whtMgr==='미배정') return false;
-      // 폐업자: 위에서 이미 pd 조건 걸었으니 통과 (급여 이력 있으면 표시)
+      // 폐업자: 위에서 이미 폐업월=pd 조건 걸었으니 통과
+      // - 매월납부: 폐업 그 달 급여 이력 있으면 표시
+      // - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 표시
       if(c.status==='폐업'){
         var _cM2 = parseInt(c.endDate.split('-')[1]);
-        // 폐업 그 달(귀속월) 급여 이력 있으면 표시
+        if(c.whtSemi==='Y'){
+          // 반기납부: 그 반기 이력 확인
+          var _isH1 = _cM2<=6;
+          var _halfMonths = _isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+          return hasSalaryInHalf(whtYr, _halfMonths, c.id);
+        }
+        // 매월납부: 폐업 그 달 이력
         return hasSalaryDone(whtYr, [_cM2], c.id, 'daily')
             || hasSalaryDone(whtYr, [_cM2], c.id, 'biz')
             || hasSalaryDone(whtYr, [_cM2], c.id, 'labor')
@@ -3408,6 +3422,30 @@ function getPayrollDeadlineForClosed(client, tp, defaultDueDate){
   return dueYr + '-' + String(dueMon).padStart(2,'0') + '-' + String(lastDay).padStart(2,'0');
 }
 
+// 폐업자 지급명세서 뱃지·행 스타일 렌더 (재사용)
+// 반환: {isClosed, badge, rowStyle, dueLbl}
+function getClosedPayrollBadge(c, tp, defaultDueDate){
+  var result = {isClosed:false, badge:'', rowStyle:'', dueLbl:''};
+  if(c.status !== '폐업' || !c.endDate) return result;
+  result.isClosed = true;
+  var closedDue = getPayrollDeadlineForClosed(c, tp, defaultDueDate);
+  // 마감일 표시 (M/D 형식)
+  var dueParts = closedDue.split('-');
+  var dueM = parseInt(dueParts[1]), dueD = parseInt(dueParts[2]);
+  result.dueLbl = dueM + '/' + dueD;
+  // 지연 여부: 오늘 > 마감일
+  var todayStr = new Date().toISOString().slice(0,10);
+  var isOverdue = todayStr > closedDue;
+  if(isOverdue){
+    result.badge = '<span style="background:#FCEBEB;color:#A32D2D;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">⚠️ 폐업·'+result.dueLbl+' 지남</span>';
+    result.rowStyle = 'background:#FFF4E5';  // 지연: 진한 주황
+  } else {
+    result.badge = '<span style="background:#FFF4CC;color:#8B5A00;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">폐업·'+result.dueLbl+' 마감</span>';
+    result.rowStyle = 'background:#FFFBEB';  // 정상: 연한 노랑
+  }
+  return result;
+}
+
 // 지급명세서 표시 여부 (이관/폐업/기장중지 별도 처리)
 // - 활성: 항상 표시
 // - 이관/기장중지: endDate >= 마감일이면 표시 (그 시점 우리 담당)
@@ -3463,26 +3501,37 @@ function hasSalaryInHalf(yr, halfMonths, cid){
 // yr, m: 신고 마감월 (예: 5월 마감 = 4월분 원천세)
 function isWhtTargetForMonth(c, yr, m){
   if(c.type==='신고대리') return false;
-  // 폐업자: 폐업일 속한 달의 다음달이 마감월
+  // 폐업자: 폐업일 속한 달의 다음달이 마감월과 일치
+  //   - 매월납부: 폐업 그 달 급여 이력 있으면 대상
+  //   - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 대상 (폐업월 자체 급여 무관)
   if(c.status==='폐업' && c.endDate){
     var closeYr = parseInt(c.endDate.split('-')[0]);
     var closeMon = parseInt(c.endDate.split('-')[1]);
     if(!closeYr||!closeMon) return false;
-    // 폐업월의 다음달이 마감월 = m
     var dueMon = closeMon===12 ? 1 : closeMon+1;
     var dueYr = closeMon===12 ? closeYr+1 : closeYr;
-    return dueYr===parseInt(yr) && dueMon===m;
+    if(dueYr!==parseInt(yr) || dueMon!==m) return false;
+    // 반기납부: 그 반기 이력
+    if(c.whtSemi==='Y'){
+      var isH1 = closeMon<=6;
+      var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+      return hasSalaryInHalf(String(closeYr), halfMonths, c.id);
+    }
+    // 매월납부: 폐업 그 달 이력만
+    return ['daily','biz','labor','retire'].some(function(tp){
+      return hasSalaryDone(String(closeYr), [closeMon], c.id, tp);
+    });
   }
   // 매월 납부자
   if(c.whtSemi!=='Y'){
     return c.whtYn==='Y';
   }
   // 반기 납부자: 반기 마감월만 대상
-  var isH1 = (m===7);   // 상반기(1~6월분) → 7월 마감
-  var isH2 = (m===1);   // 하반기(7~12월분) → 1월 마감
+  var isH1 = (m===7);
+  var isH2 = (m===1);
   if(!isH1 && !isH2) return false;
   var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
-  var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);  // 하반기는 전년도 이력
+  var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);
   return hasSalaryInHalf(halfYr, halfMonths, c.id);
 }
 
@@ -3621,8 +3670,10 @@ async function renderPayroll(){
       list.forEach(function(c){
         var k=c.id+'_'+lbl+'_'+pd;
         var isDone=chk[k];
-        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        var closed=getClosedPayrollBadge(c, tp, dueDateStr);
+        var rowBg=isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent');
+        html+='<tr style="border-top:1px solid #f0f2f7;'+rowBg+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
         html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
@@ -3676,8 +3727,10 @@ async function renderPayroll(){
       list.forEach(function(c){
         var k=c.id+'_'+pd;
         var isDone=chk[k];
-        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        var closed=getClosedPayrollBadge(c, 'labor', laborDueDate);
+        var rowBg=isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent');
+        html+='<tr style="border-top:1px solid #f0f2f7;'+rowBg+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_semi&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
         html+='</tr>';
@@ -3737,8 +3790,10 @@ async function renderPayroll(){
       list.forEach(function(c){
         var k=c.id+'_'+tp;
         var isDone=chk[k];
-        html+='<tr style="border-top:1px solid #f0f2f7;'+(isDone?'background:#f0faf4;border-left:3px solid #27ae60':'border-left:3px solid transparent')+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</td>';
+        var closed=getClosedPayrollBadge(c, tp, annualDueDate);
+        var rowBg=isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent');
+        html+='<tr style="border-top:1px solid #f0f2f7;'+rowBg+'">';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_annual&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
         html+='</tr>';
@@ -3910,25 +3965,32 @@ const DL_BASE=[
   {m:12,d:25,lbl:'부가세 2기 확정',t:'vat'},
   // 종합·법인세
   {m:5,d:31,lbl:'종합소득세 신고납부',t:'inc'},
+  {m:6,d:30,lbl:'종합소득세 신고납부(성실신고)',t:'inc'},
   {m:9,d:30,lbl:'법인세 중간예납',t:'inc'},
   // 지급명세서 (법정기한)
-  {m:1,d:31,lbl:'근로 간이(하반기)',t:'pay'},
-  {m:2,d:28,lbl:'이자·배당·기타 지급명세서',t:'pay'},
-  {m:3,d:10,lbl:'근로·사업·퇴직 지급명세서',t:'pay'},
-  {m:7,d:31,lbl:'근로 간이(상반기)',t:'pay'},
+  {m:1,d:31,lbl:'간이지급명세서(근로 하반기)',t:'pay'},
+  {m:2,d:28,lbl:'지급명세서(이자·배당·기타)',t:'pay'},
+  {m:3,d:10,lbl:'지급명세서(근로·사업·퇴직)',t:'pay'},
+  {m:7,d:31,lbl:'간이지급명세서(근로 상반기)',t:'pay'},
 ];
 
 // 매월 말일 지급명세서 마감 추가 (동적)
 function buildDL(y){
-  // DL_BASE 각 항목의 마감일을 주말·공휴일 감안해 조정
+  // DL_BASE 각 항목의 마감일을 주말 감안해 조정
   var dl=DL_BASE.slice().map(function(ev){
     var adj = adjustDeadline(y, ev.m, ev.d);
-    return Object.assign({}, ev, {m: adj.m, d: adj.d});
+    var newEv = Object.assign({}, ev, {m: adj.m, d: adj.d});
+    // adjust로 월이 밀린 경우 원칙 월(baseMon) 저장 → 원칙 월 대시보드에도 표시
+    if(adj.m !== ev.m) newEv.baseMon = ev.m;
+    return newEv;
   });
   for(var mo=1;mo<=12;mo++){
     var ld=lastDay(y,mo);
     var adjPay = adjustDeadline(y, mo, ld);
-    dl.push({m:adjPay.m,d:adjPay.d,lbl:'지급명세서 마감',t:'pay'});
+    // 마감월의 전월이 귀속월 (예: 6/30 마감 = 5월분)
+    var payBaseMon = mo===1?12:mo-1;
+    // baseMon: 원칙 마감 월 (주말 조정 전). 대시보드 필터가 원칙 월과 실제 월 둘 다에서 표시하도록.
+    dl.push({m:adjPay.m,d:adjPay.d,baseMon:mo,lbl:'간이지급명세서(일용·사업) '+payBaseMon+'월분',t:'pay'});
   }
   // 폐업부가세: 폐업일 다음달 25일 (같은 달은 1줄로 합침)
   var closeMonths={};
@@ -3977,10 +4039,16 @@ var calSeeded={};
 function refreshDLFromCal(){
   if(!Array.isArray(customEvents)) return;
   DL = customEvents
-    .filter(function(e){return e.isDL && e.date && e.date.startsWith(calY+'');})
+    .filter(function(e){
+      if(!e.date || !e.date.startsWith(calY+'')) return false;
+      // 자동 시딩된 기본 마감(isDL:true) 또는 효건님이 대시보드 표시 체크한 것만
+      return e.isDL || e.showOnDash;
+    })
     .map(function(e){
       var parts = e.date.split('-');
-      return {m: parseInt(parts[1]), d: parseInt(parts[2]), lbl: e.lbl, t: e.type};
+      var item = {m: parseInt(parts[1]), d: parseInt(parts[2]), lbl: e.lbl, t: e.type};
+      if(e.baseMon) item.baseMon = e.baseMon;
+      return item;
     });
 }
 
@@ -4005,21 +4073,22 @@ function loadCalEvents(){
 }
 
 async function seedDLForYear(y){
+  // 세션 내 이미 시딩했으면 return (라벨 변경 시엔 아래 검증에서 재시딩)
   if(calSeeded[y]) return;
   calSeeded[y]=true;
   // 자동 계산 결과 (주말·공휴일 감안된 최신 마감일)
   var dl=buildDL(y);
   var newKeys=new Set(dl.map(function(ev){
-    return y+'-'+String(ev.m).padStart(2,'0')+'-'+String(ev.d).padStart(2,'0')+'|'+ev.lbl;
+    // baseMon 포함해서 비교 (원칙 월 정보 변경도 감지)
+    return y+'-'+String(ev.m).padStart(2,'0')+'-'+String(ev.d).padStart(2,'0')+'|'+ev.lbl+'|'+(ev.baseMon||'');
   }));
   // 기존 자동 시딩 데이터 (isDL:true)
   var existing=customEvents.filter(function(e){return e.isDL&&e.date&&e.date.startsWith(y+'');});
-  var oldKeys=new Set(existing.map(function(e){return e.date+'|'+e.lbl;}));
-  // 정확히 일치하면 재시딩 불필요
+  var oldKeys=new Set(existing.map(function(e){return e.date+'|'+e.lbl+'|'+(e.baseMon||'');}));
+  // 하나라도 다르면 재시딩 (새 라벨/baseMon 반영)
   var isSame=newKeys.size===oldKeys.size && Array.from(newKeys).every(function(k){return oldKeys.has(k);});
   if(isSame) return;
-  // 기존 자동 시딩 데이터 삭제 후 최신 자동 계산 결과로 재시딩
-  // (효건님이 수동으로 만든 커스텀 이벤트는 isDL 없어서 보존됨)
+  // 재시딩 (효건님이 마감캘린더에서 수동 만든 것은 isDL 없어서 보존)
   var batch=db.batch();
   existing.forEach(function(e){
     if(e.id) batch.delete(db.collection('calEvents').doc(e.id));
@@ -4029,10 +4098,12 @@ async function seedDLForYear(y){
     var dd=String(ev.d).padStart(2,'0');
     var date=y+'-'+mo+'-'+dd;
     var ref=db.collection('calEvents').doc();
-    batch.set(ref,{date:date,lbl:ev.lbl,type:ev.t,isDL:true,year:y});
+    var docData={date:date,lbl:ev.lbl,type:ev.t,isDL:true,year:y};
+    if(ev.baseMon) docData.baseMon=ev.baseMon;
+    batch.set(ref,docData);
   });
   await batch.commit();
-  console.log(y+'년 마감일정 자동 갱신 (기존 '+existing.length+'개 → 새 '+dl.length+'개, 공휴일 감안)');
+  console.log(y+'년 마감일정 재시딩: 기존 '+existing.length+'개 → 새 '+dl.length+'개');
 }
 
 let editCalId=null;
@@ -4041,6 +4112,8 @@ function openCalModal(dateStr,id){
   document.getElementById('cal-date').value=dateStr||'';
   document.getElementById('cal-lbl').value='';
   document.getElementById('cal-type').value='vat';
+  var dashChk=document.getElementById('cal-dashboard');
+  if(dashChk) dashChk.checked=false;  // 기본값 미체크
   document.getElementById('calDelBtn').style.display='none';
   document.getElementById('moCalTtl').textContent='일정 추가';
   if(id){
@@ -4049,6 +4122,8 @@ function openCalModal(dateStr,id){
       document.getElementById('cal-date').value=ev.date;
       document.getElementById('cal-lbl').value=ev.lbl;
       document.getElementById('cal-type').value=ev.type||'vat';
+      // 자동 시딩(isDL) 또는 사용자가 명시 체크(showOnDash)한 경우
+      if(dashChk) dashChk.checked=!!ev.showOnDash;
       document.getElementById('calDelBtn').style.display='inline-block';
       document.getElementById('moCalTtl').textContent='일정 수정'+(ev.isDL?' (기본일정)':'');
     }
@@ -4070,7 +4145,8 @@ async function saveCalEvent(){
     var cr=document.querySelector('input[name="calcolor"]:checked');
     calColor=cr?cr.value:'pink';
   }
-  const data={date,lbl,type:calType,color:calColor};
+  const showOnDash = document.getElementById('cal-dashboard')?.checked || false;
+  const data={date,lbl,type:calType,color:calColor,showOnDash:showOnDash};
   if(editCalId) await db.collection('calEvents').doc(editCalId).update(data);
   else await db.collection('calEvents').add(data);
   closeCalModal();
@@ -4199,9 +4275,16 @@ function renderDash(){
   const agency=ALL.filter(c=>c.type==='신고대리' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
   const corp=ALL.filter(c=>c.type==='법인' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
   const myC=ALL.filter(c=>c.manager===info.name && isActiveInMonth(c, yr, m)).length;
-  const mDL=DL.filter(e=>e.m===m);
-  // 이번달 마감: 현재월이면 남은 마감, 그 외엔 전체 마감
-  const upcoming=isCurrentMonth?mDL.filter(e=>e.d>=d):mDL;
+  const mDL=DL.filter(e=>e.m===m || (e.baseMon && e.baseMon===m));
+  // 이번달 마감: 현재월이면 남은 마감, 그 외엔 전체 마감 (실제 마감일 기준 정렬)
+  const upcoming=(isCurrentMonth?mDL.filter(e=>{
+    // 실제 마감이 이번달이면 남은 것, 다른 달이면 무조건 표시
+    return e.m!==m || e.d>=d;
+  }):mDL).slice().sort(function(a,b){
+    // 실제 마감일(연월일) 기준 정렬
+    if(a.m!==b.m) return a.m-b.m;
+    return a.d-b.d;
+  });
 
   const se=document.getElementById('dashStats');
   if(se) se.innerHTML=`
@@ -4217,9 +4300,18 @@ function renderDash(){
   if(de){
     de.innerHTML=upcoming.length
       ?upcoming.slice(0,8).map(e=>{
+          // 실제 마감이 다른 달이면 (예: 5월분이 6/1 마감으로 밀림) 실제 월/일 표시
+          const showDiffMonth = e.baseMon && e.baseMon===m && e.m!==m;
           const dl=isCurrentMonth?(e.d-d):null;
           const cl=isCurrentMonth?(dl<=3?'td-err':dl<=7?'td-warn':''):'';
-          const rightText=isCurrentMonth?(m+'/'+e.d+' (D-'+dl+')'):(m+'/'+e.d+' 마감');
+          let rightText;
+          if(showDiffMonth){
+            rightText = e.m+'/'+e.d+' 마감';
+          } else if(isCurrentMonth){
+            rightText = m+'/'+e.d+' (D-'+dl+')';
+          } else {
+            rightText = m+'/'+e.d+' 마감';
+          }
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f5f6fa">
             <span style="font-size:13px">${e.lbl}</span>
             <span class="${cl}" style="font-size:12px;font-weight:700">${rightText}</span>
@@ -6390,6 +6482,48 @@ function renderUrgentSection(){
   // 현재월: D-3 이내 임박 마감, 그 외: 그 월 전체 마감
   var urgent=isCurMonth?mDL.filter(function(e){return e.d>=d&&e.d-d<=3;}):mDL;
 
+  // 폐업 지급명세서 자동 감지 (매월/반기 = 다음달 말일, 연간 = 다음다음달 말일)
+  // 대시보드 선택 월(m)에 마감이 걸리는 폐업자들을 집계
+  var closedPayrollUrgent = [];
+  try {
+    var yrDash = DASH_YEAR || new Date().getFullYear();
+    var closedClients = ALL.filter(function(c){return c.status==='폐업' && c.endDate;});
+    // 간이(매월/반기): 폐업 다음달 말일이 (yrDash, m)에 해당
+    var closedSemiOrMonthly = closedClients.filter(function(c){
+      var _cY = parseInt(c.endDate.split('-')[0]);
+      var _cM = parseInt(c.endDate.split('-')[1]);
+      if(!_cY||!_cM) return false;
+      var _dueM = _cM===12?1:_cM+1;
+      var _dueY = _cM===12?_cY+1:_cY;
+      return _dueY===parseInt(yrDash) && _dueM===m;
+    });
+    // 연간 지급명세서: 폐업 다음다음달 말일이 (yrDash, m)에 해당
+    var closedAnnual = closedClients.filter(function(c){
+      var _cY = parseInt(c.endDate.split('-')[0]);
+      var _cM = parseInt(c.endDate.split('-')[1]);
+      if(!_cY||!_cM) return false;
+      var _dueM = _cM+2, _dueY = _cY;
+      while(_dueM>12){_dueM-=12;_dueY++;}
+      return _dueY===parseInt(yrDash) && _dueM===m;
+    });
+    if(closedSemiOrMonthly.length){
+      // 그 달 말일 계산
+      var lastDayOfM = new Date(parseInt(yrDash), m, 0).getDate();
+      closedPayrollUrgent.push({m:m, d:lastDayOfM, lbl:'폐업 간이지급명세서', t:'closedSemi', clients:closedSemiOrMonthly});
+    }
+    if(closedAnnual.length){
+      var lastDayOfM2 = new Date(parseInt(yrDash), m, 0).getDate();
+      closedPayrollUrgent.push({m:m, d:lastDayOfM2, lbl:'폐업 지급명세서(연간)', t:'closedAnnual', clients:closedAnnual});
+    }
+  } catch(e){}
+  // 현재월이면 D-3 이내만, 그 외 월이면 다 표시
+  if(isCurMonth){
+    closedPayrollUrgent = closedPayrollUrgent.filter(function(e){return e.d>=d && e.d-d<=3;});
+  }
+  urgent = urgent.concat(closedPayrollUrgent);
+  // 날짜순 정렬
+  urgent.sort(function(a,b){return a.d-b.d;});
+
   if(!urgent.length){
     urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
     return;
@@ -6427,6 +6561,28 @@ function getIncompleteClientsForDeadline(e){
   // 대시보드 선택 시점 기반
   var yr=String(DASH_YEAR||new Date().getFullYear());
   var m=DASH_MONTH||(new Date().getMonth()+1);
+
+  // 폐업 지급명세서: 이벤트에 clients 목록이 이미 있으므로 미완료만 필터
+  if(e.t==='closedSemi' || e.t==='closedAnnual'){
+    if(!e.clients) return [];
+    var docId = e.t==='closedSemi' ? (yr+'_semi') : (yr+'_annual');
+    var chk = DASH_TAX_CACHE['payroll_'+ (e.t==='closedSemi'?'semi':'annual') +'_'+yr] || {};
+    return e.clients.filter(function(c){
+      // 매월/반기(semi)는 pd별 체크, 연간은 tp별 체크
+      // 간이(closedSemi): 어느 하나라도 미완료면 표시
+      if(e.t==='closedSemi'){
+        var pdList = m<=6?['1']:['2']; // 반기(labor) 완료 여부
+        return !chk[c.id+'_'+pdList[0]];
+      } else {
+        // 연간: 근로/사업/퇴직 중 하나라도 미완료
+        return !chk[c.id+'_alabor'] || !chk[c.id+'_abiz'] || !chk[c.id+'_retire'];
+      }
+    }).map(function(c){
+      // 담당자 표시 (원천세 담당 우선)
+      var mgr = (c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+      return {name:c.name, manager:mgr};
+    });
+  }
 
   if(e.t==='vat'){
     // 폐업부가세: 폐업일 다음달이 이번 달인 폐업 거래처 중 미신고
@@ -6475,17 +6631,26 @@ function getIncompleteClientsForDeadline(e){
     return ALL.filter(function(c){
       if(c.type==='신고대리') return false;
       // 폐업자: 폐업일 속한 달(귀속) = whtBaseM일 때 대상 (whtSemi 무관, 최우선)
-      // 예: 4월말 폐업 → 4월분 원천세 (5/10 마감) → whtBaseM=4일 때 표시
+      // - 매월납부: 폐업 그 달 급여 이력 있으면 대상
+      // - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 대상
       if(c.status==='폐업'){
         if(!c.endDate) return false;
         var _cY=parseInt(c.endDate.split('-')[0]);
         var _cM=parseInt(c.endDate.split('-')[1]);
         if(!_cY||!_cM) return false;
         if(_cY!==parseInt(whtBaseY) || _cM!==parseInt(whtBaseM)) return false;
-        // 폐업 그 달 급여 이력 확인
-        var _cSC=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][_cM]||{};
-        var _closeHasRec=_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done'];
-        if(!_closeHasRec) return false;
+        var _hasClosedRec = false;
+        if(c.whtSemi==='Y'){
+          // 반기납부: 그 반기 이력
+          var _isH1u = _cM<=6;
+          var _halfMonthsU = _isH1u ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+          _hasClosedRec = hasSalaryInHalf(whtBaseY, _halfMonthsU, c.id);
+        } else {
+          // 매월납부: 폐업 그 달 이력
+          var _cSC=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][_cM]||{};
+          _hasClosedRec = !!(_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done']);
+        }
+        if(!_hasClosedRec) return false;
         // 폐업자: 신고체크만 완료로 인정
         return !(whtChk[c.id]&&whtChk[c.id].done);
       }
@@ -8426,16 +8591,22 @@ function renderDashStatus(){
       // 신고대리 제외
       if(c.type==='신고대리') return false;
       if(!isMyClient(c, true)) return false;
-      // 폐업자: 폐업일이 속한 달(귀속월) = prevM2일 때 대상 (whtSemi 무관, 최우선 판정)
-      // 예: 4월말 폐업 → 4월분 원천세 → 대시보드 5월 조회 시(prevM2=4) 표시
+      // 폐업자: 폐업일 속한 달(귀속) = prevM2일 때 대상 (whtSemi 무관, 최우선)
+      // - 매월납부: 폐업 그 달 급여 이력 있으면 대상
+      // - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 대상
       if(c.status==='폐업'){
         if(!c.endDate) return false;
         var _cY=parseInt(c.endDate.split('-')[0]);
         var _cM=parseInt(c.endDate.split('-')[1]);
         if(!_cY||!_cM) return false;
-        // 폐업일 속한 달이 대상월과 일치해야 표시 (5/10 마감 = 4월분)
         if(_cY!==parseInt(prevYr2) || _cM!==parseInt(prevM2)) return false;
-        // 폐업 그 달 급여 이력이 있으면 대상
+        // 반기납부: 그 반기 이력
+        if(c.whtSemi==='Y'){
+          var _isH1c = _cM<=6;
+          var _halfMonthsC = _isH1c ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+          return hasSalaryInHalf(prevYr2, _halfMonthsC, c.id);
+        }
+        // 매월납부: 폐업 그 달 이력
         var _closeSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
         return !!(_closeSC&&(_closeSC[c.id+'_no_salary']||_closeSC[c.id+'_daily_done']||_closeSC[c.id+'_biz_done']||_closeSC[c.id+'_labor_done']||_closeSC[c.id+'_retire_done']));
       }
@@ -8774,12 +8945,19 @@ function renderDashStatus(){
           if(c.type==='신고대리') return false;
           if(!isMyClient(c, true)) return false;
           // 폐업자: 폐업일 속한 달(귀속) = prevM2일 때 원천세 대상 (whtSemi 무관)
+          // - 매월납부: 폐업 그 달 급여 이력
+          // - 반기납부: 그 반기 안에 급여 이력
           if(c.status==='폐업'){
             if(!c.endDate) return false;
             var _cY=parseInt(c.endDate.split('-')[0]);
             var _cM=parseInt(c.endDate.split('-')[1]);
             if(!_cY||!_cM) return false;
             if(_cY!==parseInt(prevYr2) || _cM!==parseInt(prevM2)) return false;
+            if(c.whtSemi==='Y'){
+              var _isH1x = _cM<=6;
+              var _halfMonthsX = _isH1x ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+              return hasSalaryInHalf(prevYr2, _halfMonthsX, c.id);
+            }
             var _cSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
             return !!(_cSC&&(_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done']));
           }
