@@ -1349,38 +1349,51 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
         <!-- 개인 간 -->
         <div class="card">
-          <div class="card-hdr"><div class="card-ttl">👨‍👦 개인 간 대여 (부모↔자녀)</div></div>
+          <div class="card-hdr"><div class="card-ttl">👨‍👦 개인 간 대여 (부모↔자녀) — 대여자별 판정</div></div>
           <div class="fr">
             <div class="fld"><label>적정이자율 (%)</label>
               <input class="fi" type="number" id="ll-rate1" value="4.6" step="0.1" oninput="llCalcPerson()"></div>
-            <div class="fld"><label>약정 이자율 (%) — 무이자면 0</label>
+            <div class="fld"><label>약정 이자율 (%) — 무이자면 0 · 전체 공통</label>
               <input class="fi" type="number" id="ll-ag1" value="" placeholder="0" step="0.1" oninput="llCalcPerson()"></div>
           </div>
-          <div class="fr">
-            <div class="fld"><label>대여 잔액 (원)</label>
-              <input class="fi" type="text" id="ll-bal1" value="" placeholder="0" oninput="llFmt(this);llCalcPerson()"></div>
+
+          <table style="font-size:12.5px;margin-top:4px">
+            <thead><tr style="background:#1A3169;color:#fff">
+              <th style="padding:7px;width:24%">대여자 (관계)</th><th style="padding:7px;width:34%">금액(원)</th>
+              <th style="padding:7px;width:22%">이자차익(연)</th><th style="padding:7px;width:20%">판정(1천만 기준)</th></tr></thead>
+            <tbody id="llPBody"></tbody>
+          </table>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button class="btn btn-p btn-sm" onclick="llPAdd()">+ 대여자 추가</button>
+            <button class="btn btn-s btn-sm" onclick="llPDel()">− 마지막 행 삭제</button>
           </div>
-          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:6px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
-              <div><div style="font-size:11px;color:#889">연간 증여이익</div>
-                <div id="ll-gain1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
-                <div style="font-size:10.5px;color:#99a;margin-top:2px">잔액 × (적정−약정)</div></div>
-              <div><div style="font-size:11px;color:#889">대여 한도</div>
+
+          <div id="llPWarn"></div>
+
+          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+              <div><div style="font-size:11px;color:#889">1인당 대여 한도</div>
                 <div id="ll-limit1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
                 <div id="ll-limitF1" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+              <div><div style="font-size:11px;color:#889">대여 총액</div>
+                <div id="ll-total1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div></div>
+              <div><div style="font-size:11px;color:#889">이자차익 합계(연)</div>
+                <div id="ll-gain1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div></div>
             </div>
-            <div style="text-align:center;margin-top:10px">
-              <span id="ll-judge1" style="font-size:15px;font-weight:700">—</span>
-              <span id="ll-judgeS1" style="font-size:11px;color:#889;margin-left:6px"></span>
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:8px;padding:9px 12px;margin-top:10px">
+              <span style="font-size:11.5px;color:#889">매월 이체할 이자 총액 (약정 기준)</span>
+              <b id="ll-month1" style="font-size:15px;color:#1A3169">—</b>
             </div>
             <div style="height:12px;background:#e1e8f3;border-radius:6px;overflow:hidden;margin-top:10px">
               <div id="ll-bar1" style="height:100%;width:0%;background:#1E8449;transition:width .3s"></div></div>
             <div id="ll-barTxt1" style="font-size:11px;color:#778;margin-top:4px"></div>
           </div>
+
           <div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.7;color:#554;margin-top:12px">
             기준: 연 1천만원 미만 비과세(상증령 §31조의4②). 무이자 한도 = 1천만 ÷ 4.6% = <b>217,391,304원</b>.
-            저리 약정 시 [잔액 × (4.6% − 약정율)]로 판정. 이자를 실제 지급하면 차용인이 <b>원천징수 27.5%</b>
-            (소득세 25%+지방세) 후 익월 10일까지 납부. 계약서·이체실적·상환실적 3요소 필수.
+            <b>대여자별 각각 판정이 우세 해석</b>(서면-2016-상속증여-4687 취지, 서면-2018-상속증여-2137은 기참조 회신) — 다만 부·모는 동일인 합산 견해도 실무에 있어 고액이면 사전 검토.
+            분산 대여 시 자금은 <b>각자 본인 계좌에서</b>(부부간 이체 후 대여 금지), 상환도 각자 계좌로 분리.
+            이자를 실제 지급하면 차용인이 <b>원천징수 27.5%</b>(소득세 25%+지방세) 후 익월 10일까지 납부. 계약서·이체실적·상환실적 3요소 필수.
           </div>
         </div>
       </div>
@@ -9475,10 +9488,12 @@ function llRowHTML(name,pct,lender){
 }
 function llAddRow(){document.getElementById('llShBody').insertAdjacentHTML('beforeend',llRowHTML('','',false));llCalcCorp();}
 function llDelRow(){var b=document.getElementById('llShBody');if(b.rows.length>1){b.deleteRow(-1);llCalcCorp();}}
+var llInited=false;
 function llInit(){
   if(!llInited){
     document.getElementById('llShBody').innerHTML=
       llRowHTML('','',false)+llRowHTML('','',false)+llRowHTML('','',false);
+      document.getElementById('llPBody').innerHTML=llPRowHTML('아버지','')+llPRowHTML('어머니','');
     llInited=true;
   }
   llCalcCorp();llCalcPerson();
@@ -9525,24 +9540,65 @@ function llCalcCorp(){
   bar.style.background=(isFinite(limit)&&total>limit)?'#C0392B':'#1E8449';
   document.getElementById('ll-barTxt0').textContent=(isFinite(limit)&&limit)?('사용률 '+(total/limit*100).toFixed(1)+'%'):'';
 }
+var LL_RELS=['아버지','어머니','조부','조모','외조부','외조모','장인','장모','배우자','형제자매','자녀','기타'];
+var LL_GROUPS={'아버지':'부모','어머니':'부모','조부':'조부모','조모':'조부모','외조부':'외조부모','외조모':'외조부모'};
+function llPRowHTML(rel,amt){
+  var opts=LL_RELS.map(function(r){return '<option'+(r===rel?' selected':'')+'>'+r+'</option>';}).join('');
+  return '<tr>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><select onchange="llCalcPerson()" style="width:100%;border:none;padding:5px 2px;text-align:center;font-size:12.5px;font-family:inherit;background:transparent">'+opts+'</select></td>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><input class="fi" style="text-align:center;padding:5px" type="text" value="'+(amt||'')+'" placeholder="0" oninput="llFmt(this);llCalcPerson()"></td>'
+    +'<td class="llPg" style="border:1px solid #e3e8f0;padding:5px;text-align:center;font-size:12px">—</td>'
+    +'<td class="llPj" style="border:1px solid #e3e8f0;padding:5px;text-align:center;font-weight:700;font-size:12px">—</td></tr>';
+}
+function llPAdd(){document.getElementById('llPBody').insertAdjacentHTML('beforeend',llPRowHTML('어머니',''));llCalcPerson();}
+function llPDel(){var b=document.getElementById('llPBody');if(b.rows.length>1){b.deleteRow(-1);llCalcPerson();}}
+
 function llCalcPerson(){
+  var body=document.getElementById('llPBody');
+  if(!body)return;
   var r=llNum(document.getElementById('ll-rate1').value)/100;
-  var bal=llNum(document.getElementById('ll-bal1').value);
   var ag=llNum(document.getElementById('ll-ag1').value)/100;
   var diff=Math.max(r-ag,0);
-  var gain=bal*diff;
+  var total=0,gainTotal=0,maxAmt=0,groups={};
+  body.querySelectorAll('tr').forEach(function(tr){
+    var rel=tr.cells[0].querySelector('select').value;
+    var amt=llNum(tr.cells[1].querySelector('input').value);
+    var g=amt*diff;
+    total+=amt;gainTotal+=g;
+    if(amt>maxAmt)maxAmt=amt;
+    var gTd=tr.querySelector('.llPg'),jTd=tr.querySelector('.llPj');
+    gTd.textContent=amt?llComma(g)+'원':'—';
+    if(!amt){jTd.textContent='—';jTd.style.color='';}
+    else if(g>=10000000){jTd.textContent='과세';jTd.style.color='#C0392B';}
+    else{jTd.textContent='비과세';jTd.style.color='#1E8449';}
+    var grp=LL_GROUPS[rel];
+    if(grp&&amt){
+      if(!groups[grp])groups[grp]={amt:0,members:[],eachOk:true};
+      groups[grp].amt+=amt;groups[grp].members.push(rel);
+      if(g>=10000000)groups[grp].eachOk=false;
+    }
+  });
+  var warn='';
+  Object.keys(groups).forEach(function(k){
+    var gr=groups[k];
+    if(gr.members.length<2)return;
+    var comb=gr.amt*diff;
+    if(comb>=10000000&&gr.eachOk){
+      warn+='<div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:9px 12px;font-size:11.5px;line-height:1.6;color:#8a6d1f;margin-top:10px">ℹ️ <b>'+gr.members.join('·')+'</b> 각각은 비과세지만 합산 시 연 '+llComma(comb)+'원 — 각각 판정이 우세 해석이나 부부 합산 견해도 있어 고액이면 검토 권장.</div>';
+    }
+  });
+  document.getElementById('llPWarn').innerHTML=warn;
   var limit=diff>0?10000000/diff:Infinity;
-  document.getElementById('ll-gain1').textContent=llComma(gain)+'원';
   document.getElementById('ll-limit1').textContent=isFinite(limit)?llEok(limit):'제한 없음';
   document.getElementById('ll-limitF1').textContent=isFinite(limit)?('= 1천만 ÷ '+(diff*100).toFixed(1)+'% = '+llComma(limit)+'원'):'약정이자율 ≥ 적정이자율';
-  var j=document.getElementById('ll-judge1');
-  if(gain>=10000000){j.textContent='과세';j.style.color='#C0392B';document.getElementById('ll-judgeS1').textContent='이익 전액이 증여재산가액에 산입';}
-  else{j.textContent='비과세';j.style.color='#1E8449';document.getElementById('ll-judgeS1').textContent='연 1천만원 미만';}
-  var pctUse=isFinite(limit)?Math.min(bal/limit*100,100):0;
+  document.getElementById('ll-total1').textContent=total?llEok(total):'—';
+  document.getElementById('ll-gain1').textContent=total?llComma(gainTotal)+'원':'—';
+  document.getElementById('ll-month1').textContent=!total?'—':(ag>0?llComma(total*ag/12)+'원/월':'무이자 약정');
+  var pctUse=(isFinite(limit)&&maxAmt)?Math.min(maxAmt/limit*100,100):0;
   var bar=document.getElementById('ll-bar1');
   bar.style.width=pctUse+'%';
-  bar.style.background=gain>=10000000?'#C0392B':'#1E8449';
-  document.getElementById('ll-barTxt1').textContent=isFinite(limit)?('사용률 '+(bal/limit*100).toFixed(1)+'%'):'';
+  bar.style.background=(maxAmt*diff)>=10000000?'#C0392B':(pctUse>=80?'#C9A84C':'#1E8449');
+  document.getElementById('ll-barTxt1').textContent=(isFinite(limit)&&maxAmt)?('최대 대여자 기준 한도 사용률 '+(maxAmt/limit*100).toFixed(1)+'%'):'';
 }
 // ─── 사이드바 섹션 접기/펼치기 ───
 function navToggleSec(sec){
