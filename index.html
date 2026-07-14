@@ -513,7 +513,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.12</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.13</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -2183,6 +2183,7 @@ function mgrMatch(mgr, mgrF){
 // 담당자 필터 드롭다운 공용 세팅: admin이면 옵션 채우고 표시, 직원이면 숨김
 // opts: {reset:true → 선택값 초기화, unassigned:false → 미배정 옵션 제외, everyone:true → 직원에게도 표시}
 function setupMgrFilter(id, opts){
+  try{
   opts=opts||{};
   var sel=document.getElementById(id);
   if(!sel) return;
@@ -2196,6 +2197,7 @@ function setupMgrFilter(id, opts){
   sel.innerHTML=html;
   sel.value=prev||'';
   sel.style.display='inline-block';
+  }catch(e){ console.error('setupMgrFilter 오류('+id+'):', e); }
 }
 let ALL=[], TMPLS=[], platRows=[], editCId=null, editTId=null, selTI=-1;
 let cType='전체', pyTab='monthly';
@@ -7278,19 +7280,24 @@ function toggleSalaryDayOther(val){
 
 // 직원이면 본인 담당 업체만 필터링, 관리자면 필터 드롭다운 적용
 // useWht=true이면 원천세 담당자(whtManager) 기준으로 필터
+// admin 필터는 화면 그룹핑과 동일한 '유효 담당자' 기준: 유효한 배부담당(assignee) 우선, 없으면 거래처 담당자
 function myClientsFilter(clients, filterSelId, useWht, assigneeChk){
   var mgrF=filterSelId?document.getElementById(filterSelId)?.value||'':'';
-  function effMgr(c){ return useWht&&c.whtSep&&c.whtManager ? c.whtManager : c.manager; }
+  function baseMgr(c){ return useWht&&c.whtSep&&c.whtManager ? c.whtManager : c.manager; }
+  function effMgr(c){
+    var a=assigneeChk&&assigneeChk[c.id]?assigneeChk[c.id].assignee:'';
+    // '미배정'/'배정 안함'/빈값으로 저장된 배부담당은 무시 (그룹핑 로직과 동일 기준)
+    if(!useWht&&a&&a!=='미배정'&&a!=='배정 안함') return a;
+    return baseMgr(c);
+  }
   if(ROLE==='admin'){
-    if(mgrF) return clients.filter(function(c){
-      return mgrMatch(effMgr(c),mgrF) || (assigneeChk&&assigneeChk[c.id]?.assignee===mgrF);
-    });
+    if(mgrF) return clients.filter(function(c){ return mgrMatch(effMgr(c),mgrF); });
     return clients;
   }
   var myName=USERS[ME?.email]?.name||'';
   return clients.filter(function(c){
     // 기본 담당자이거나, 배부담당으로 배정된 업체 포함
-    return effMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
+    return baseMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
   });
 }
 
