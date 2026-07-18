@@ -9686,7 +9686,13 @@ function initReport(){
       .sort(function(a,b){return (a.name||'').localeCompare(b.name||'','ko');})
       .map(function(c){return {id:c.id, name:c.name||'', rep:c.rep||''};});
   }
-  if(RPT_CID) rptRender(); else rptLoadHome();
+  // 탭 진입 시 항상 거래처 목록부터 (직전 선택 초기화)
+  RPT_CID=''; RPT_DOC=null; RPT_STAGE=null;
+  var inp=document.getElementById('rpt-client-inp'); if(inp) inp.value='';
+  var bar=document.getElementById('rpt-meta-bar'); if(bar) bar.style.display='none';
+  var pv=document.getElementById('rpt-preview'); if(pv) pv.style.display='none';
+  var view=document.getElementById('rpt-view'); if(view) view.innerHTML='';
+  rptLoadHome();
 }
 
 // 첫 화면: 저장된 리포트 거래처 목록
@@ -9694,6 +9700,8 @@ async function rptLoadHome(){
   if(RPT_CID) return;
   var empty=document.getElementById('rpt-empty');
   if(!empty) return;
+  empty.style.display='flex';   // 홈 목록은 안내 영역에 그려지므로 반드시 표시
+  var view=document.getElementById('rpt-view'); if(view) view.innerHTML='';
   try{
     var qs=await db.collection('reportData').get();
     if(RPT_CID) return;   // 로딩 중 다른 거래처 선택 시 무시
