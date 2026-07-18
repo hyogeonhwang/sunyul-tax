@@ -58,7 +58,11 @@ body{font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif
 .btn-out:hover{background:rgba(255,255,255,.22)}
 
 .sidebar{position:fixed;left:0;top:56px;bottom:0;width:196px;background:#fff;border-right:1px solid #e8ecf0;overflow-y:auto;z-index:90}
-.nav-sec{padding:18px 18px 5px;font-size:10.5px;color:#aab;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.nav-sec{padding:18px 18px 5px;font-size:10.5px;color:#aab;font-weight:700;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between}
+.nav-sec:hover{color:#778}
+.sec-arw{font-size:9px;transition:transform .15s}
+.nav-sec.folded .sec-arw{transform:rotate(-90deg)}
+.nav-hide{display:none !important}
 .nav-item{display:flex;align-items:center;gap:9px;padding:10px 18px;cursor:pointer;color:#556;font-size:13px;font-weight:500;transition:all .15s;border-left:3px solid transparent}
 .nav-item:hover{background:#f4f6ff;color:#1A3169}
 .nav-item.active{background:#edf1ff;color:#1A3169;font-weight:700;border-left-color:#1A3169}
@@ -413,11 +417,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="nav-sec">메인</div>
+    <div class="nav-sec" data-sec="main" onclick="navToggleSec(this)">메인<span class="sec-arw">▾</span></div>
     <div class="nav-item active" id="nav-dashboard" onclick="go('dashboard')">
       <span class="nav-icon">🏠</span> 대시보드
     </div>
-    <div class="nav-sec">업무관리</div>
+    <div class="nav-sec" data-sec="work" onclick="navToggleSec(this)">업무관리<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-clients" onclick="go('clients')">
       <span class="nav-icon">🏢</span> 거래처 관리
       <span class="nav-cnt" id="nc-clients">0</span>
@@ -437,12 +441,15 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <div class="nav-item" id="nav-profit" onclick="go('profit')">
       <span class="nav-icon">📈</span> 중간손익
     </div>
-    <div class="nav-sec">분석/도구</div>
     <div class="nav-item" id="nav-report" onclick="go('report')">
       <span class="nav-icon">📊</span> 결산 리포트
     </div>
+    <div class="nav-sec" data-sec="tools" onclick="navToggleSec(this)">분석/도구<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-calc" onclick="go('calc')">
       <span class="nav-icon">🧮</span> 세액계산기
+    </div>
+    <div class="nav-item" id="nav-loanlimit" onclick="go('loanlimit')">
+      <span class="nav-icon">💸</span> 대여한도 계산기
     </div>
     <div class="nav-item" id="nav-bizcode" onclick="go('bizcode')">
       <span class="nav-icon">🔍</span> 업종코드 검색
@@ -453,14 +460,14 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     <div class="nav-item" id="nav-contract" onclick="go('contract')">
       <span class="nav-icon">📄</span> 계약서 발급
     </div>
-    <div class="nav-sec">소통</div>
+    <div class="nav-sec" data-sec="comm" onclick="navToggleSec(this)">소통<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-kakao" onclick="go('kakao')">
       <span class="nav-icon">📤</span> 발송 센터
     </div>
     <div class="nav-item" id="nav-calendar" onclick="go('calendar')">
       <span class="nav-icon">📅</span> 마감 캘린더
     </div>
-    <div class="nav-sec">관리</div>
+    <div class="nav-sec" data-sec="admin" onclick="navToggleSec(this)">관리<span class="sec-arw">▾</span></div>
     <div class="nav-item" id="nav-staff" onclick="go('staff')" style="display:none">
       <span class="nav-icon">👥</span> 직원관리
     </div>
@@ -510,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황</div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.13</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -837,8 +844,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
     </div>
 
     <!-- ===== 중간손익 ===== -->
-<!-- ===== 결산 리포트 (v1) ===== -->
-    <div id="pg-report" class="pg" style="display:none">
+        <div id="pg-report" class="pg" style="display:none">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:nowrap">
         <div style="font-size:14px;font-weight:500;color:#1A3169;white-space:nowrap">📊 결산 리포트</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap;margin-left:auto">
@@ -894,6 +900,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div id="rpt-view"></div>
       </div>
     </div>
+
 
     <div id="pg-profit" class="pg" style="display:none">
       <!-- 상단 필터바 -->
@@ -1342,6 +1349,101 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             </div>
           </div>
           <div id="ps-result" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="pg-loanlimit" class="pg" style="display:none">
+      <div class="al al-i" style="margin-bottom:14px">
+        상증법 §45조의5(특정법인) · §41조의4(개인 간) 무상·저리 대여 증여의제 판정.
+        당좌대출이자율 <b>4.6%</b>는 법인세법 시행규칙 §43② 개정 시 입력값만 수정.
+        기준금액(1억/1천만원)은 공제가 아닌 <b>문턱</b>이므로 초과 시 이익 <b>전액</b> 과세.
+      </div>
+      <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;align-items:start">
+
+        <!-- 가족법인 (특정법인) -->
+        <div class="card">
+          <div class="card-hdr"><div class="card-ttl">🏢 가족법인 대여 (특정법인)</div></div>
+          <div class="fr">
+            <div class="fld"><label>당좌대출이자율 (%)</label>
+              <input class="fi" type="number" id="ll-rate0" value="4.6" step="0.1" oninput="llCalcCorp()"></div>
+            <div class="fld"><label>약정 이자율 (%) — 무이자면 0</label>
+              <input class="fi" type="number" id="ll-ag0" value="" placeholder="0" step="0.1" oninput="llCalcCorp()"></div>
+            <div class="fld"><label>현재 대여 잔액 (원)</label>
+              <input class="fi" type="text" id="ll-bal0" value="" placeholder="0" oninput="llFmt(this);llCalcCorp()"></div>
+            <div class="fld"><label>추가 대여 예정액 (원)</label>
+              <input class="fi" type="text" id="ll-add0" value="" placeholder="0" oninput="llFmt(this);llCalcCorp()"></div>
+          </div>
+          <div class="sdiv">주주 구성 (지배주주등)</div>
+          <table style="font-size:12.5px">
+            <thead><tr style="background:#1A3169;color:#fff">
+              <th style="padding:7px;width:24%">주주명</th><th style="padding:7px;width:18%">지분율(%)</th>
+              <th style="padding:7px;width:16%">대여자 본인</th><th style="padding:7px;width:22%">증여의제이익(연)</th>
+              <th style="padding:7px;width:20%">판정(1억 기준)</th></tr></thead>
+            <tbody id="llShBody"></tbody>
+          </table>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button class="btn btn-p btn-sm" onclick="llAddRow()">+ 주주 추가</button>
+            <button class="btn btn-s btn-sm" onclick="llDelRow()">− 마지막 행 삭제</button>
+          </div>
+          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+              <div><div style="font-size:11px;color:#889">대여 총 한도 (현재 약정 기준)</div>
+                <div id="ll-limit0" style="font-size:19px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div id="ll-limitF0" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+              <div><div style="font-size:11px;color:#889">잔액+예정액 합계</div>
+                <div id="ll-total0" style="font-size:19px;font-weight:700;color:#1A3169;margin-top:3px">—</div></div>
+              <div><div style="font-size:11px;color:#889">한도까지 여유액</div>
+                <div id="ll-room0" style="font-size:19px;font-weight:700;margin-top:3px">—</div>
+                <div id="ll-roomS0" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+            </div>
+            <div style="height:12px;background:#e1e8f3;border-radius:6px;overflow:hidden;margin-top:12px">
+              <div id="ll-bar0" style="height:100%;width:0%;background:#1E8449;transition:width .3s"></div></div>
+            <div id="ll-barTxt0" style="font-size:11px;color:#778;margin-top:4px"></div>
+          </div>
+          <div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.7;color:#554;margin-top:12px">
+            법인이익 = 잔액 × (당좌대출이자율 − 약정이자율), 주주별 이익 = 법인이익 × 지분율(대여자 본인 지분은 자기증여로 제외).
+            한도 = 1억 ÷ 최대 지분율 ÷ 이자율 차이. 무상·저리 대여는 <b>1년마다 새로 대출받은 것으로 보아 재계산</b>되므로
+            이자율·지분율 변동 시 기존 잔액에 그대로 적용됨. 지분 변동(증자·양도) 시 즉시 재계산할 것.
+          </div>
+        </div>
+
+        <!-- 개인 간 -->
+        <div class="card">
+          <div class="card-hdr"><div class="card-ttl">👨‍👦 개인 간 대여 (부모↔자녀)</div></div>
+          <div class="fr">
+            <div class="fld"><label>적정이자율 (%)</label>
+              <input class="fi" type="number" id="ll-rate1" value="4.6" step="0.1" oninput="llCalcPerson()"></div>
+            <div class="fld"><label>약정 이자율 (%) — 무이자면 0</label>
+              <input class="fi" type="number" id="ll-ag1" value="" placeholder="0" step="0.1" oninput="llCalcPerson()"></div>
+          </div>
+          <div class="fr">
+            <div class="fld"><label>대여 잔액 (원)</label>
+              <input class="fi" type="text" id="ll-bal1" value="" placeholder="0" oninput="llFmt(this);llCalcPerson()"></div>
+          </div>
+          <div style="background:#f7f9fc;border-radius:10px;padding:14px;margin-top:6px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
+              <div><div style="font-size:11px;color:#889">연간 증여이익</div>
+                <div id="ll-gain1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div style="font-size:10.5px;color:#99a;margin-top:2px">잔액 × (적정−약정)</div></div>
+              <div><div style="font-size:11px;color:#889">대여 한도</div>
+                <div id="ll-limit1" style="font-size:18px;font-weight:700;color:#1A3169;margin-top:3px">—</div>
+                <div id="ll-limitF1" style="font-size:10.5px;color:#99a;margin-top:2px"></div></div>
+            </div>
+            <div style="text-align:center;margin-top:10px">
+              <span id="ll-judge1" style="font-size:15px;font-weight:700">—</span>
+              <span id="ll-judgeS1" style="font-size:11px;color:#889;margin-left:6px"></span>
+            </div>
+            <div style="height:12px;background:#e1e8f3;border-radius:6px;overflow:hidden;margin-top:10px">
+              <div id="ll-bar1" style="height:100%;width:0%;background:#1E8449;transition:width .3s"></div></div>
+            <div id="ll-barTxt1" style="font-size:11px;color:#778;margin-top:4px"></div>
+          </div>
+          <div style="background:#FFF8E7;border:1px solid #EAD9A8;border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:1.7;color:#554;margin-top:12px">
+            기준: 연 1천만원 미만 비과세(상증령 §31조의4②). 무이자 한도 = 1천만 ÷ 4.6% = <b>217,391,304원</b>.
+            저리 약정 시 [잔액 × (4.6% − 약정율)]로 판정. 이자를 실제 지급하면 차용인이 <b>원천징수 27.5%</b>
+            (소득세 25%+지방세) 후 익월 10일까지 납부. 계약서·이체실적·상환실적 3요소 필수.
+          </div>
         </div>
       </div>
     </div>
@@ -2134,6 +2236,31 @@ function mgrSortIndex(name){
 function sortByMgrOrder(names){
   return names.slice().sort(function(a,b){return mgrSortIndex(a)-mgrSortIndex(b);});
 }
+// 담당자 필터 매칭 공용 함수 ('미배정' 선택 시 담당자 없는 업체 매칭)
+function mgrMatch(mgr, mgrF){
+  if(!mgrF) return true;
+  if(mgrF==='미배정') return !mgr || mgr==='미배정';
+  return mgr===mgrF;
+}
+// 담당자 필터 드롭다운 공용 세팅: admin이면 옵션 채우고 표시, 직원이면 숨김
+// opts: {reset:true → 선택값 초기화, unassigned:false → 미배정 옵션 제외, everyone:true → 직원에게도 표시}
+function setupMgrFilter(id, opts){
+  try{
+  opts=opts||{};
+  var sel=document.getElementById(id);
+  if(!sel) return;
+  if(!opts.everyone && (typeof ROLE==='undefined'||ROLE!=='admin')){ sel.value=''; sel.style.display='none'; return; }
+  var prev=opts.reset?'':sel.value;
+  var names=(typeof STAFF_LIST!=='undefined'&&STAFF_LIST&&STAFF_LIST.length)
+    ? STAFF_LIST : Object.values(USERS).map(function(u){return u.name;});
+  var html='<option value="">전체 담당자</option>'
+    + sortByMgrOrder(names).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+  if(opts.unassigned!==false) html+='<option value="미배정">미배정</option>';
+  sel.innerHTML=html;
+  sel.value=prev||'';
+  sel.style.display='inline-block';
+  }catch(e){ console.error('setupMgrFilter 오류('+id+'):', e); }
+}
 let ALL=[], TMPLS=[], platRows=[], editCId=null, editTId=null, selTI=-1;
 let cType='전체', pyTab='monthly';
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
@@ -2156,8 +2283,8 @@ auth.onAuthStateChanged(u=>{
     if(ROLE==='admin'){
       document.getElementById('nav-settings').style.display='flex';
       document.getElementById('nav-staff').style.display='flex';
-      var txMf=document.getElementById('txMgrFilter'); if(txMf) txMf.style.display='block';
-      var pyMf=document.getElementById('pyMgrFilter'); if(pyMf) pyMf.style.display='block';
+      setupMgrFilter('txMgrFilter');
+      setupMgrFilter('pyMgrFilter');
     }
     document.getElementById('nav-leave').style.display='flex';
 
@@ -2288,6 +2415,7 @@ function resetAllState(){
   var cs=document.getElementById('cSearch'); if(cs) cs.value='';
   var csClr=document.getElementById('cSearchClr'); if(csClr) csClr.style.display='none';
   var cm=document.getElementById('cManager'); if(cm) cm.value='';
+  setupMgrFilter('cManager',{everyone:true,reset:true}); // 거래처 관리: 직원 포함 전원 표시, 재직자 기준 동적 생성
   var cst=document.getElementById('cStatus'); if(cst) cst.value='';
   cType='전체';
   document.querySelectorAll('#typeTabs .tab').forEach(function(b,i){b.classList.toggle('on',i===0);});
@@ -2296,17 +2424,17 @@ function resetAllState(){
   var txType=document.getElementById('txType'); if(txType) txType.value='all';
   var txYear=document.getElementById('txYear'); if(txYear) txYear.value=new Date().getFullYear();
   var txContent=document.getElementById('txContent'); if(txContent) txContent.innerHTML='';
-  var txMgrF=document.getElementById('txMgrFilter'); if(txMgrF){txMgrF.value='';txMgrF.style.display='none';}
+  setupMgrFilter('txMgrFilter',{reset:true}); // admin이면 표시 유지, 직원이면 숨김
   updateTxPeriod();
 
   // ⑤ 지급명세서 초기화
   var pyType=document.getElementById('pyType'); if(pyType) pyType.value='all';
   var pyBody=document.getElementById('pyBody'); if(pyBody) pyBody.innerHTML='';
-  var pyMgrF=document.getElementById('pyMgrFilter'); if(pyMgrF){pyMgrF.value='';pyMgrF.style.display='none';}
+  setupMgrFilter('pyMgrFilter',{reset:true});
 
   // ⑥ 급여관리 초기화
   var salBody=document.getElementById('sal-body'); if(salBody) salBody.innerHTML='';
-  var salMgrF=document.getElementById('sal-mgr-filter'); if(salMgrF){salMgrF.value='';salMgrF.style.display='none';}
+  setupMgrFilter('sal-mgr-filter',{reset:true});
   var salMonth=document.getElementById('sal-month'); if(salMonth) salMonth.innerHTML='';
 
   // ⑦ 연차관리 초기화
@@ -2336,6 +2464,7 @@ const PAGE_INFO={
   salary:{icon:'💰',lbl:'급여관리'},
   payroll:{icon:'📋',lbl:'지급명세서'},
   calc:{icon:'🧮',lbl:'세액계산기'},
+  loanlimit:{icon:'💸',lbl:'대여한도 계산기'},
   kakao:{icon:'📤',lbl:'발송 센터'},
   profit:{icon:'📈',lbl:'중간손익'},
   report:{icon:'📊',lbl:'결산 리포트'},
@@ -2364,6 +2493,7 @@ function go(page){
   if(nav) nav.classList.add('active');
   // 페이지 전환 시 스크롤 맨 위로
   document.querySelector('.main').scrollTop=0;
+  navRevealActive(page);  // 접힌 섹션의 메뉴로 이동 시 자동 펼침
   renderTabs();
   if(page==='taxcheck'){
     var txTypeEl=document.getElementById('txType');
@@ -2389,6 +2519,7 @@ function go(page){
   if(page==='settings'){loadCloseHistory();updateBizStatus(null);loadBizDataFromDB();renderAcctTable();}
   if(page==='leave'){initLeavePage();}
   if(page==='calc'){loadPaySplitPrefs();paySplitCalc();}
+  if(page==='loanlimit'){llInit();}
   if(page==='staff'){loadStaffPage();}
   if(page==='contract'){ctInitPage();}
   if(page==='yexempt'){yeInitPage();}
@@ -2939,6 +3070,7 @@ function onTxSearchInput(){
 }
 
 async function loadTax(){
+  setupMgrFilter('txMgrFilter'); // 담당자 필터 옵션 세팅 (admin만 표시)
   const yr=document.getElementById('txYear')?.value;
   const tp=document.getElementById('txType')?.value;
   const pd=document.getElementById('txPeriod')?.value;
@@ -3433,15 +3565,8 @@ function bulkAssign(key,mgr){
 
 // =================== PAYROLL ===================
 async function loadPayroll(){
-  // 담당자 필터 동적 생성 (admin만, USERS 객체 기반 5명 전체)
-  var pyMgrSel=document.getElementById('pyMgrFilter');
-  if(pyMgrSel&&ROLE==='admin'){
-    var prevVal=pyMgrSel.value;
-    var userNames=Object.values(USERS).map(function(u){return u.name;});
-    pyMgrSel.innerHTML='<option value="">전체 담당자</option>'
-      +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
-    if(prevVal) pyMgrSel.value=prevVal;
-  }
+  // 담당자 필터 동적 생성 + 표시 (admin만)
+  setupMgrFilter('pyMgrFilter');
   updatePyPeriod();
   renderPayroll();
 }
@@ -6249,6 +6374,7 @@ function loadStaffPage(){
     renderStaffList();
     // STAFF_LIST도 재직자 기준으로 동기화
     STAFF_LIST = STAFFS.filter(function(s){return s.status==='재직';}).map(function(s){return s.name;});
+    setupMgrFilter('cManager',{everyone:true}); // 거래처 관리 드롭다운도 갱신
   }).catch(function(){renderStaffList();});
   }); // initDefaultStaff
 }
@@ -6397,6 +6523,7 @@ async function deleteStaff(id){
     STAFFS=STAFFS.filter(function(x){return x.id!==id;});
     // STAFF_LIST도 재동기화 (재직자 기준)
     STAFF_LIST=STAFFS.filter(function(x){return x.status==='재직';}).map(function(x){return x.name;});
+    setupMgrFilter('cManager',{everyone:true}); // 거래처 관리 드롭다운도 갱신
     renderStaffList();
     alert('"'+s.name+'" 직원이 삭제되었습니다.');
   }catch(e){
@@ -6599,12 +6726,21 @@ function renderUrgentSection(){
     var incompleteClients=getIncompleteClientsForDeadline(e);
     var uid='urgent-'+e.lbl.replace(/\s/g,'_');
     var hasList=incompleteClients.length>0;
+    // 매월 지급명세서(t:'pay')는 그 달 급여 작업 전이면 대상 미확정 — "완료" 대신 구분 표시
+    var statusBadge;
+    if(hasList){
+      statusBadge='<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>';
+    } else if(e.t==='pay' && !hasPayTargets(e)){
+      statusBadge='<span style="font-size:11px;background:#eef0f4;color:#889;padding:1px 7px;border-radius:20px">대상 확정 전</span>';
+    } else {
+      statusBadge='<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>';
+    }
     return '<div style="margin-bottom:8px;border:0.5px solid #fcc;border-radius:8px;overflow:hidden">'
       +'<div onclick="toggleUrgentDetail(\''+uid+'\')" '
       +'style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fff5f5;'+(hasList?'cursor:pointer':'')+'">'
       +'<span style="font-size:13px;font-weight:600;color:#c0392b">🔴 '+e.lbl+'</span>'
       +'<div style="display:flex;align-items:center;gap:8px">'
-      +(hasList?'<span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미완료 '+incompleteClients.length+'개</span>':'<span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:1px 7px;border-radius:20px">완료</span>')
+      +statusBadge
       +'<span style="color:#e74c3c;font-size:12px;font-weight:700">'+m+'/'+e.d+(isCurMonth?' (D-'+dl+')':' 마감')+'</span>'
       +(hasList?'<span id="arr-'+uid+'" style="color:#aab;font-size:11px">▼</span>':'')
       +'</div></div>'
@@ -6621,6 +6757,19 @@ function renderUrgentSection(){
   }
 }
 
+// 매월 지급명세서 대상이 확정됐는지 (귀속월 급여관리에 일용/사업 체크가 하나라도 있는지)
+function hasPayTargets(e){
+  var yr=String(DASH_YEAR||new Date().getFullYear());
+  var m=DASH_MONTH||(new Date().getMonth()+1);
+  var pyM=m===1?12:m-1;
+  var pyYr=m===1?(parseInt(yr)-1).toString():yr;
+  var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
+  return ALL.some(function(c){
+    if(c.type==='신고대리') return false;
+    return salCache[c.id+'_biz_done']||salCache[c.id+'_daily_done'];
+  });
+}
+
 function getIncompleteClientsForDeadline(e){
   // 대시보드 선택 시점 기반
   var yr=String(DASH_YEAR||new Date().getFullYear());
@@ -6629,20 +6778,26 @@ function getIncompleteClientsForDeadline(e){
   // 폐업 지급명세서: 이벤트에 clients 목록이 이미 있으므로 미완료만 필터
   if(e.t==='closedSemi' || e.t==='closedAnnual'){
     if(!e.clients) return [];
-    var docId = e.t==='closedSemi' ? (yr+'_semi') : (yr+'_annual');
     var chk = DASH_TAX_CACHE['payroll_'+ (e.t==='closedSemi'?'semi':'annual') +'_'+yr] || {};
+    var salCacheY = SALARY_CACHE[yr] || {};
+    var allMons = [1,2,3,4,5,6,7,8,9,10,11,12];
     return e.clients.filter(function(c){
-      // 매월/반기(semi)는 pd별 체크, 연간은 tp별 체크
-      // 간이(closedSemi): 어느 하나라도 미완료면 표시
       if(e.t==='closedSemi'){
-        var pdList = m<=6?['1']:['2']; // 반기(labor) 완료 여부
-        return !chk[c.id+'_'+pdList[0]];
+        // 폐업월 속한 반기 기준
+        var _cM = parseInt((c.endDate||'').split('-')[1])||0;
+        var half = _cM<=6 ? '1' : '2';
+        return !chk[c.id+'_'+half];
       } else {
-        // 연간: 근로/사업/퇴직 중 하나라도 미완료
-        return !chk[c.id+'_alabor'] || !chk[c.id+'_abiz'] || !chk[c.id+'_retire'];
+        // 연간: 그 해 이력이 있는 유형만 완료 여부 판정
+        var defs=[{tp:'abiz',sal:'biz'},{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'}];
+        var pending=false;
+        defs.forEach(function(d){
+          var hasSal = allMons.some(function(mm){return salCacheY[mm]&&salCacheY[mm][c.id+'_'+d.sal+'_done'];});
+          if(hasSal && !chk[c.id+'_'+d.tp]) pending=true;
+        });
+        return pending;
       }
     }).map(function(c){
-      // 담당자 표시 (원천세 담당 우선)
       var mgr = (c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
       return {name:c.name, manager:mgr};
     });
@@ -6916,22 +7071,8 @@ function initSalaryMonth(){
       sel.appendChild(opt);
     }
   }
-  // 매번 권한 체크해서 담당자 필터 표시/숨김
-  var mgrSel=document.getElementById('sal-mgr-filter');
-  if(mgrSel){
-    mgrSel.style.display=ROLE==='admin'?'block':'none';
-    if(ROLE==='admin'){
-      // USERS 객체 기반으로 5명 전체 동적 생성 (황효건/김서지/안지윤/유승희/김희진)
-      var prevVal=mgrSel.value;
-      var userNames=Object.values(USERS).map(function(u){return u.name;});
-      mgrSel.innerHTML='<option value="">전체 담당자</option>'
-        +userNames.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
-        +'<option value="미배정">미배정</option>';
-      if(prevVal) mgrSel.value=prevVal;
-    } else {
-      mgrSel.value=''; // 직원이면 필터 초기화
-    }
-  }
+  // 매번 권한 체크해서 담당자 필터 표시/숨김 (공용 함수)
+  setupMgrFilter('sal-mgr-filter');
 }
 
 async function renderSalary(){
@@ -7203,19 +7344,24 @@ function toggleSalaryDayOther(val){
 
 // 직원이면 본인 담당 업체만 필터링, 관리자면 필터 드롭다운 적용
 // useWht=true이면 원천세 담당자(whtManager) 기준으로 필터
+// admin 필터는 화면 그룹핑과 동일한 '유효 담당자' 기준: 유효한 배부담당(assignee) 우선, 없으면 거래처 담당자
 function myClientsFilter(clients, filterSelId, useWht, assigneeChk){
   var mgrF=filterSelId?document.getElementById(filterSelId)?.value||'':'';
-  function effMgr(c){ return useWht&&c.whtSep&&c.whtManager ? c.whtManager : c.manager; }
+  function baseMgr(c){ return useWht&&c.whtSep&&c.whtManager ? c.whtManager : c.manager; }
+  function effMgr(c){
+    var a=assigneeChk&&assigneeChk[c.id]?assigneeChk[c.id].assignee:'';
+    // '미배정'/'배정 안함'/빈값으로 저장된 배부담당은 무시 (그룹핑 로직과 동일 기준)
+    if(!useWht&&a&&a!=='미배정'&&a!=='배정 안함') return a;
+    return baseMgr(c);
+  }
   if(ROLE==='admin'){
-    if(mgrF) return clients.filter(function(c){
-      return effMgr(c)===mgrF || (assigneeChk&&assigneeChk[c.id]?.assignee===mgrF);
-    });
+    if(mgrF) return clients.filter(function(c){ return mgrMatch(effMgr(c),mgrF); });
     return clients;
   }
   var myName=USERS[ME?.email]?.name||'';
   return clients.filter(function(c){
     // 기본 담당자이거나, 배부담당으로 배정된 업체 포함
-    return effMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
+    return baseMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
   });
 }
 
@@ -7315,8 +7461,7 @@ var PROFIT_MODE = 'a';
 function initProfit(){
   var yr = document.getElementById('profit-year');
   if(yr) PROFIT_YEAR = yr.value;
-  var mgrSel = document.getElementById('profit-mgr');
-  if(mgrSel) mgrSel.style.display = 'block';
+  setupMgrFilter('profit-mgr'); // 담당자 필터 옵션 세팅 (admin만 표시)
   loadProfit();
 }
 
@@ -7335,7 +7480,7 @@ function renderProfit(){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;  // 중간손익은 신고대리 제외
     if(myName&&c.manager!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
+    if(ROLE==='admin'&&mgrF&&!mgrMatch(c.manager,mgrF)) return false;
     if(q&&!(c.name||'').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -7954,7 +8099,7 @@ function renderSendList(){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;  // 신고대리는 문자 발송 대상 아님
     if(myName&&c.manager!==myName) return false;
-    if(mgrF&&c.manager!==mgrF) return false;
+    if(mgrF&&!mgrMatch(c.manager,mgrF)) return false;
     if(sendQ&&!(c.name||'').toLowerCase().includes(sendQ)) return false;
     if(typeF==='법인') return c.type==='법인';
     if(typeF==='개인') return c.type!=='법인';
@@ -8186,14 +8331,8 @@ async function sendDeadlineSMS(){
 
 // 발송센터 초기화 시 담당자 필터 동적 로드
 function initSendCenter(){
+  setupMgrFilter('send-mgr-filter'); // 담당자 필터 (admin만 표시)
   renderSendList();
-  // 담당자 필터
-  var mgrSel=document.getElementById('send-mgr-filter');
-  if(mgrSel&&ROLE==='admin'){
-    mgrSel.innerHTML='<option value="">전체 담당자</option>'
-      +STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
-      +'<option value="미배정">미배정</option>';
-  }
 }
 
 
@@ -8207,13 +8346,7 @@ function initGoji(){
   if(yr) GOJI_YEAR = yr.value;
   var tp = document.getElementById('goji-type');
   if(tp) GOJI_TYPE = tp.value;
-  var mgrSel = document.getElementById('goji-mgr');
-  if(mgrSel) mgrSel.style.display = 'block';
-  if(ROLE==='admin' && mgrSel){
-    mgrSel.innerHTML = '<option value="">전체 담당자</option>'
-      + STAFF_LIST.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('')
-      + '<option value="미배정">미배정</option>';
-  }
+  setupMgrFilter('goji-mgr');
 }
 
 async function loadGoji(){
@@ -8241,7 +8374,7 @@ function renderGoji(){
   var matched = ALL.filter(function(c){
     if(!GOJI_DATA[c.id]?.amt) return false;
     if(myName&&c.manager!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&c.manager!==mgrF) return false;
+    if(ROLE==='admin'&&mgrF&&!mgrMatch(c.manager,mgrF)) return false;
     if(q&&!(c.name||'').toLowerCase().includes(q)&&!(c.bizNo||'').includes(q)) return false;
     return true;
   });
@@ -8586,16 +8719,12 @@ async function loadDashTaxCache(){
   var pyYr0=m===1?(parseInt(yr)-1).toString():yr;
   var pyDoc=await db.collection('payrollChecks').doc(pyYr0+'_monthly').get();
   DASH_TAX_CACHE['payroll_monthly_'+pyYr0] = pyDoc.exists ? pyDoc.data() : {};
-  // 반기(근로간이) 캐시 — 1월/7월 마감
-  if(m===1||m===7){
-    var pySemiDoc=await db.collection('payrollChecks').doc(yr+'_semi').get();
-    DASH_TAX_CACHE['payroll_semi_'+yr] = pySemiDoc.exists ? pySemiDoc.data() : {};
-  }
-  // 연간(사업/근로/퇴직) 캐시 — 3월 마감
-  if(m===3){
-    var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
-    DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
-  }
+  // 반기(근로간이) 캐시 — 정기 1월/7월 + 폐업자 마감월(어느 달이든 가능)이므로 항상 로드
+  var pySemiDoc=await db.collection('payrollChecks').doc(yr+'_semi').get();
+  DASH_TAX_CACHE['payroll_semi_'+yr] = pySemiDoc.exists ? pySemiDoc.data() : {};
+  // 연간(사업/근로/퇴직) 캐시 — 정기 3월 + 폐업자 마감월이므로 항상 로드
+  var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
+  DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
 
   // 예정고지 데이터 캐시 (부가세 예정달에만)
   var vatPdMap2={1:4,4:1,7:2,10:3};
@@ -8712,9 +8841,14 @@ function renderDashStatus(){
     taxTypes.push({lbl:'부가세'+(isJunggan?' (예정)':' (확정)'), docKey:'tax_'+yr+'_vat_'+vatPd,
       deadline:vatDlMap[vatPd]||{month:m,day:25},
       filter:function(c){
-        if(c.type==='신고대리') return false;
         if(!isActiveInMonth(c, parseInt(yr), m)) return false;
-        if(!isMyClient(c, false)) return false;
+        // 담당자 판정: 신고체크 배부담당(assignee) 우선 → 없으면 거래처 담당자 (신고체크와 동일)
+        if(effectiveMgr){
+          var _vchk=DASH_TAX_CACHE['tax_'+yr+'_vat_'+vatPd]||{};
+          var _asg=_vchk[c.id]&&_vchk[c.id].assignee;
+          var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+          if(_eff!==effectiveMgr) return false;
+        }
         if(isJunggan){
           if(c.vatType==='면세') return false;
           if(c.type!=='법인'&&!(c.vatType==='일반'&&c.vatCycle==='분기')) return false;
@@ -8724,7 +8858,7 @@ function renderDashStatus(){
           if(gojiData[c.id]?.status==='none'&&!c.vatExcept) return false;
           return true;
         }
-        // 확정 신고: 면세 제외, 법인(일반/간이) + 일반과세 개인
+        // 확정 신고: 면세 제외, 법인(일반/간이) + 일반과세 개인 (신고대리 포함 — 신고체크와 동일)
         if(c.vatType==='면세') return false;
         return c.type==='법인'||c.vatType==='일반';
       },
@@ -8739,10 +8873,20 @@ function renderDashStatus(){
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
-  // 종합소득세
+  // 종합소득세 (신고대리 포함 — 신고체크와 동일, 배부담당 우선)
   if(m===5) taxTypes.push({lbl:'종합소득세', docKey:'tax_'+yr+'_income_1',
     deadline:{month:5,day:31},
-    filter:function(c){return c.type!=='법인' && isActiveInMonth(c, parseInt(yr), m) && isMyClient(c, false);},
+    filter:function(c){
+      if(c.type==='법인') return false;
+      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
+      if(effectiveMgr){
+        var _ichk=DASH_TAX_CACHE['tax_'+yr+'_income_1']||{};
+        var _asg=_ichk[c.id]&&_ichk[c.id].assignee;
+        var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+        if(_eff!==effectiveMgr) return false;
+      }
+      return true;
+    },
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
@@ -8763,15 +8907,17 @@ function renderDashStatus(){
   });
 
   // ① 매월: 일용직 / 사업소득 (전월분) — 급여관리 daily/biz 체크 기준
+  // 마감일: 다음달 말일 (예: 6월 조회 = 5월분 = 6/30 마감)
+  var pyMonthlyDue = yr+'-'+String(m).padStart(2,'0')+'-'+String(new Date(parseInt(yr),m,0).getDate()).padStart(2,'0');
   actClients.forEach(function(c){
     var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
-    if(mChkForPy[c.id+'_daily_done']){
+    if(mChkForPy[c.id+'_daily_done'] && isPayrollVisible(c, pyMonthlyDue, 'daily')){
       pyTotalCalc++;
       var dOk=!!pyMonChk[c.id+'_일용직_'+pyM];
       if(dOk) pyDoneCalc++;
       pyDetailRows.push({id:c.id,name:c.name,grp:'일용직 ('+pyM+'월분)',mgr:effMgr,done:dOk});
     }
-    if(mChkForPy[c.id+'_biz_done']){
+    if(mChkForPy[c.id+'_biz_done'] && isPayrollVisible(c, pyMonthlyDue, 'biz')){
       pyTotalCalc++;
       var bOk=!!pyMonChk[c.id+'_사업소득_'+pyM];
       if(bOk) pyDoneCalc++;
@@ -8782,11 +8928,21 @@ function renderDashStatus(){
   // ② 반기: 근로소득 간이 — 1월=하반기(전년 7~12), 7월=상반기(올해 1~6) 마감
   // payrollChecks/{yr}_semi 의 키: {cid}_{반기}  (반기: '1'=상반기, '2'=하반기)
   if(m===1||m===7){
-    var semiHalf, semiMonths, semiYr;
-    if(m===7){ semiHalf='1'; semiMonths=[1,2,3,4,5,6]; semiYr=yr; }       // 상반기(올해 1~6), 7/31 마감
-    else     { semiHalf='2'; semiMonths=[7,8,9,10,11,12]; semiYr=String(parseInt(yr)-1); } // 하반기(전년 7~12), 1/31 마감
+    var semiHalf, semiMonths, semiYr, semiDueDate;
+    if(m===7){ semiHalf='1'; semiMonths=[1,2,3,4,5,6]; semiYr=yr; semiDueDate=yr+'-07-31'; }
+    else     { semiHalf='2'; semiMonths=[7,8,9,10,11,12]; semiYr=String(parseInt(yr)-1); semiDueDate=yr+'-01-31'; }
     var sCache=SALARY_CACHE[semiYr]||{};
     actClients.forEach(function(c){
+      if(!isPayrollVisible(c, semiDueDate, 'labor')) return;
+      // 폐업자: 실효 마감(폐업 다음달 말일)이 이 조회월(1월/7월)과 일치할 때만 여기서 처리
+      // (조기 마감 폐업자는 ⑤에서 마감월에 이미 처리됨 — 중복 방지)
+      if(c.status==='폐업' && c.endDate){
+        var _cM2=parseInt(c.endDate.split('-')[1]);
+        var _cY2=parseInt(c.endDate.split('-')[0]);
+        var _dM2=_cM2===12?1:_cM2+1;
+        var _dY2=_cM2===12?_cY2+1:_cY2;
+        if(_dY2!==parseInt(yr) || _dM2!==m) return;
+      }
       var hasLabor=semiMonths.some(function(mm){return sCache[mm]&&sCache[mm][c.id+'_labor_done'];});
       if(!hasLabor) return;
       var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
@@ -8803,6 +8959,7 @@ function renderDashStatus(){
     var annYr=String(parseInt(yr)-1); // 직전연도 급여관리 기준
     var aCache=SALARY_CACHE[annYr]||{};
     var annAll=[1,2,3,4,5,6,7,8,9,10,11,12];
+    var annDueDate = yr+'-03-10';  // 연간 지급명세서 마감
     var annDefs=[
       {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
       {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
@@ -8810,6 +8967,9 @@ function renderDashStatus(){
     ];
     annDefs.forEach(function(ad){
       actClients.forEach(function(c){
+        // 폐업자는 ④(폐업 다음다음달 마감월)에서 전담 처리 — 정기 3/10 계산에서 제외
+        if(c.status==='폐업') return;
+        if(!isPayrollVisible(c, annDueDate, ad.tp)) return;
         var hasSal=annAll.some(function(mm){return aCache[mm]&&aCache[mm][c.id+'_'+ad.sal+'_done'];});
         if(!hasSal) return;
         var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
@@ -8818,6 +8978,63 @@ function renderDashStatus(){
         if(ok) pyDoneCalc++;
         pyDetailRows.push({id:c.id,name:c.name,grp:ad.lbl,mgr:effMgr,done:ok});
       });
+    });
+  }
+  // ④ 폐업자 연간: 폐업 다음다음달 말일이 조회월과 일치하면 연간 처리현황에 포함
+  //   예: 4월 폐업 → 연간 마감 6/30 → 6월 조회 시 표시
+  var closedAnnYr = yr;
+  var closedAnnCache = SALARY_CACHE[closedAnnYr]||{};
+  var closedAnnMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
+  var closedAnnDefs = [
+    {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
+    {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
+    {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'}
+  ];
+  actClients.forEach(function(c){
+    if(c.status !== '폐업' || !c.endDate) return;
+    var _cY = parseInt(c.endDate.split('-')[0]);
+    var _cM = parseInt(c.endDate.split('-')[1]);
+    if(!_cY||!_cM) return;
+    var _dueM = _cM + 2, _dueY = _cY;
+    while(_dueM > 12){ _dueM -= 12; _dueY++; }
+    if(_dueY !== parseInt(yr) || _dueM !== m) return;
+    // 3월 조회에서 이미 카운트됐으면 스킵 (일반 3/10 마감과 중복 방지)
+    if(m===3 && _cY < parseInt(yr)) return;
+    var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+    closedAnnDefs.forEach(function(ad){
+      var hasSal = closedAnnMonths.some(function(mm){return closedAnnCache[mm]&&closedAnnCache[mm][c.id+'_'+ad.sal+'_done'];});
+      if(!hasSal) return;
+      pyTotalCalc++;
+      var ok=!!pyAnnChk[c.id+'_'+ad.tp];
+      if(ok) pyDoneCalc++;
+      pyDetailRows.push({id:c.id,name:c.name,grp:ad.lbl+' (폐업)',mgr:effMgr,done:ok});
+    });
+  });
+
+  // ⑤ 폐업자 반기(근로소득 간이): 폐업 다음달 말일이 조회월과 일치하면 반기 처리현황에 포함
+  //   예: 4월 폐업 → 반기 마감 5/31 → 5월 조회 시 표시
+  //   단, 1월/7월 정기 반기 계산과 중복되지 않게 조회월이 1월/7월이면 스킵 (②에서 이미 처리)
+  if(m!==1 && m!==7){
+    actClients.forEach(function(c){
+      if(c.status !== '폐업' || !c.endDate) return;
+      var _cY = parseInt(c.endDate.split('-')[0]);
+      var _cM = parseInt(c.endDate.split('-')[1]);
+      if(!_cY||!_cM) return;
+      var _dueM = _cM===12?1:_cM+1;
+      var _dueY = _cM===12?_cY+1:_cY;
+      if(_dueY !== parseInt(yr) || _dueM !== m) return;
+      // 폐업월이 속한 반기의 근로소득 이력 확인
+      var _isH1 = _cM<=6;
+      var _semiHalf = _isH1 ? '1' : '2';
+      var _semiMonths = _isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
+      var _sCache = SALARY_CACHE[String(_cY)]||{};
+      var hasLabor = _semiMonths.some(function(mm){return _sCache[mm]&&_sCache[mm][c.id+'_labor_done'];});
+      if(!hasLabor) return;
+      var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
+      pyTotalCalc++;
+      var ok=!!pySemiChk[c.id+'_'+_semiHalf];
+      if(ok) pyDoneCalc++;
+      pyDetailRows.push({id:c.id,name:c.name,grp:'근로소득 간이 ('+(_isH1?'상반기':'하반기')+', 폐업)',mgr:effMgr,done:ok});
     });
   }
 
@@ -9308,6 +9525,120 @@ function activatePayChk(cid, val){
   updateSmsCount();
 }
 
+function llNum(s){return parseFloat(String(s).replace(/[^0-9.]/g,''))||0;}
+function llComma(n){return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function llFmt(el){var v=llNum(el.value);el.value=v?llComma(v):'';}
+function llEok(n){return (n/100000000).toFixed(2).replace(/\.00$/,'')+'억';}
+function llRowHTML(name,pct,lender){
+  return '<tr>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><input class="fi" style="text-align:center;padding:5px" type="text" value="'+name+'" placeholder="주주명"></td>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px"><input class="fi" style="text-align:center;padding:5px" type="number" value="'+pct+'" placeholder="0" step="0.1" oninput="llCalcCorp()"></td>'
+    +'<td style="border:1px solid #e3e8f0;padding:5px;text-align:center"><input type="checkbox" '+(lender?'checked':'')+' onchange="llCalcCorp()"></td>'
+    +'<td class="ll-gTd" style="border:1px solid #e3e8f0;padding:5px;text-align:center">—</td>'
+    +'<td class="ll-jTd" style="border:1px solid #e3e8f0;padding:5px;text-align:center">—</td></tr>';
+}
+function llAddRow(){document.getElementById('llShBody').insertAdjacentHTML('beforeend',llRowHTML('','',false));llCalcCorp();}
+function llDelRow(){var b=document.getElementById('llShBody');if(b.rows.length>1){b.deleteRow(-1);llCalcCorp();}}
+function llInit(){
+  if(!llInited){
+    document.getElementById('llShBody').innerHTML=
+      llRowHTML('','',false)+llRowHTML('','',false)+llRowHTML('','',false);
+    llInited=true;
+  }
+  llCalcCorp();llCalcPerson();
+}
+function llCalcCorp(){
+  var r=llNum(document.getElementById('ll-rate0').value)/100;
+  var ag=llNum(document.getElementById('ll-ag0').value)/100;
+  var diff=Math.max(r-ag,0);
+  var total=llNum(document.getElementById('ll-bal0').value)+llNum(document.getElementById('ll-add0').value);
+  var gain=total*diff, maxPct=0;
+  document.querySelectorAll('#llShBody tr').forEach(function(tr){
+    var pct=llNum(tr.cells[1].querySelector('input').value)/100;
+    var isLender=tr.cells[2].querySelector('input').checked;
+    var g=isLender?0:gain*pct;
+    tr.querySelector('.ll-gTd').textContent=isLender?'자기증여 제외':llComma(g)+'원';
+    var j=tr.querySelector('.ll-jTd');
+    if(isLender){j.textContent='—';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center';}
+    else if(g>=100000000){j.textContent='과세 (1억 이상)';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center;color:#C0392B;font-weight:700';}
+    else{j.textContent='비과세';j.style.cssText='border:1px solid #e3e8f0;padding:5px;text-align:center;color:#1E8449';}
+    if(!isLender&&pct>maxPct)maxPct=pct;
+  });
+  var limit=(maxPct>0&&diff>0)?100000000/maxPct/diff:(maxPct>0&&diff<=0&&r>0?Infinity:0);
+  var limitEl=document.getElementById('ll-limit0');
+  var limitFEl=document.getElementById('ll-limitF0');
+  if(limit===Infinity){
+    limitEl.textContent='제한 없음';
+    limitFEl.textContent='약정이자율 ≥ 당좌대출이자율';
+  }else{
+    limitEl.textContent=limit?llEok(limit):'—';
+    limitFEl.textContent=limit?('= 1억 ÷ '+(maxPct*100).toFixed(1)+'% ÷ '+(diff*100).toFixed(1)+'% = '+llComma(limit)+'원'):'';
+  }
+  var room=isFinite(limit)?limit-total:Infinity;
+  document.getElementById('ll-total0').textContent=llEok(total);
+  var roomEl=document.getElementById('ll-room0');
+  if(limit===Infinity){roomEl.textContent='제한 없음';roomEl.style.color='#1E8449';document.getElementById('ll-roomS0').textContent='';}
+  else{
+    roomEl.textContent=limit?(room>=0?llEok(room):'초과 '+llEok(-room)):'—';
+    roomEl.style.color=room>=0?'#1E8449':'#C0392B';
+    document.getElementById('ll-roomS0').textContent=limit?(room>=0?'한도 이내':'한도 초과 — 과세 위험'):'';
+  }
+  var pctUse=(isFinite(limit)&&limit)?Math.min(total/limit*100,100):0;
+  var bar=document.getElementById('ll-bar0');
+  bar.style.width=pctUse+'%';
+  bar.style.background=(isFinite(limit)&&total>limit)?'#C0392B':'#1E8449';
+  document.getElementById('ll-barTxt0').textContent=(isFinite(limit)&&limit)?('사용률 '+(total/limit*100).toFixed(1)+'%'):'';
+}
+function llCalcPerson(){
+  var r=llNum(document.getElementById('ll-rate1').value)/100;
+  var bal=llNum(document.getElementById('ll-bal1').value);
+  var ag=llNum(document.getElementById('ll-ag1').value)/100;
+  var diff=Math.max(r-ag,0);
+  var gain=bal*diff;
+  var limit=diff>0?10000000/diff:Infinity;
+  document.getElementById('ll-gain1').textContent=llComma(gain)+'원';
+  document.getElementById('ll-limit1').textContent=isFinite(limit)?llEok(limit):'제한 없음';
+  document.getElementById('ll-limitF1').textContent=isFinite(limit)?('= 1천만 ÷ '+(diff*100).toFixed(1)+'% = '+llComma(limit)+'원'):'약정이자율 ≥ 적정이자율';
+  var j=document.getElementById('ll-judge1');
+  if(gain>=10000000){j.textContent='과세';j.style.color='#C0392B';document.getElementById('ll-judgeS1').textContent='이익 전액이 증여재산가액에 산입';}
+  else{j.textContent='비과세';j.style.color='#1E8449';document.getElementById('ll-judgeS1').textContent='연 1천만원 미만';}
+  var pctUse=isFinite(limit)?Math.min(bal/limit*100,100):0;
+  var bar=document.getElementById('ll-bar1');
+  bar.style.width=pctUse+'%';
+  bar.style.background=gain>=10000000?'#C0392B':'#1E8449';
+  document.getElementById('ll-barTxt1').textContent=isFinite(limit)?('사용률 '+(bal/limit*100).toFixed(1)+'%'):'';
+}
+// ─── 사이드바 섹션 접기/펼치기 ───
+function navToggleSec(sec){
+  var folded=sec.classList.toggle('folded');
+  var el=sec.nextElementSibling;
+  while(el && !el.classList.contains('nav-sec')){
+    if(el.classList.contains('nav-item')) el.classList.toggle('nav-hide',folded);
+    el=el.nextElementSibling;
+  }
+  try{
+    var st=JSON.parse(localStorage.getItem('sn_navFold')||'{}');
+    st[sec.dataset.sec]=folded;
+    localStorage.setItem('sn_navFold',JSON.stringify(st));
+  }catch(e){}
+}
+function navRestoreFold(){
+  try{
+    var st=JSON.parse(localStorage.getItem('sn_navFold')||'{}');
+    document.querySelectorAll('.nav-sec[data-sec]').forEach(function(sec){
+      if(st[sec.dataset.sec]) navToggleSec(sec);
+    });
+  }catch(e){}
+}
+function navRevealActive(page){
+  var nav=document.getElementById('nav-'+page);
+  if(nav && nav.classList.contains('nav-hide')){
+    var el=nav.previousElementSibling;
+    while(el && !el.classList.contains('nav-sec')) el=el.previousElementSibling;
+    if(el && el.classList.contains('folded')) navToggleSec(el);
+  }
+}
+navRestoreFold();
 </script>
 <!-- 계약서 인쇄 전용 영역 (body 최상위 — 인쇄 시 다른 요소 모두 display:none) -->
 <div id="ct-print-area-wrap" style="display:none">
