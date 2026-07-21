@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.14</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.15</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -9172,8 +9172,10 @@ function renderDashStatus(){
   taxTypes.forEach(function(t){
     var dl=t.deadline;
     if(!dl) return;
-    var dlDate=new Date(now.getFullYear(),dl.month-1,dl.day);
-    var daysLeft=Math.ceil((dlDate-now)/(1000*60*60*24));
+    var _adl=adjustDeadline(now.getFullYear(),dl.month,dl.day); // 주말이면 익영업일로 보정
+    var dlDate=new Date(_adl.y,_adl.m-1,_adl.d);
+    var _today=new Date(now.getFullYear(),now.getMonth(),now.getDate()); // 시각 제거(자정 기준)
+    var daysLeft=Math.round((dlDate-_today)/(1000*60*60*24));
     if(daysLeft>=0&&daysLeft<=7){
       var chk=DASH_TAX_CACHE[t.docKey]||{};
       var targets=t._fixedTotal!==undefined?null:ALL.filter(function(c){return t.filter(c)&&!(chk[c.id]&&chk[c.id].skip);});
@@ -9202,8 +9204,10 @@ function renderDashStatus(){
     // 마감일까지 남은 일수
     var dlBadge='';
     if(t.deadline){
-      var dlDate=new Date(now.getFullYear(),t.deadline.month-1,t.deadline.day);
-      var daysLeft=Math.ceil((dlDate-now)/(1000*60*60*24));
+      var _adl2=adjustDeadline(now.getFullYear(),t.deadline.month,t.deadline.day); // 주말이면 익영업일로 보정
+      var dlDate=new Date(_adl2.y,_adl2.m-1,_adl2.d);
+      var _today2=new Date(now.getFullYear(),now.getMonth(),now.getDate()); // 시각 제거(자정 기준)
+      var daysLeft=Math.round((dlDate-_today2)/(1000*60*60*24));
       if(daysLeft>=0&&daysLeft<=7&&pct<100)
         dlBadge='<span style="margin-left:6px;background:#FAEEDA;color:#854F0B;font-size:10px;padding:1px 6px;border-radius:10px">D-'+daysLeft+'</span>';
     }
