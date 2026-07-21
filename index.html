@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.13</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.14</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3231,8 +3231,10 @@ async function loadTax(){
 
   if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>해당 조건의 거래처가 없습니다<br><small style="font-size:12px;color:#aab">거래처 등록 시 과세유형·신고주기를 확인해주세요</small></div></div>';return;}
 
-  const done=clients.filter(c=>chk[c.id]?.done).length;
-  const pct=Math.round(done/clients.length*100);
+  const activeList=clients.filter(c=>!chk[c.id]?.skip);
+  const skipCnt=clients.length-activeList.length;
+  const done=activeList.filter(c=>chk[c.id]?.done).length;
+  const pct=activeList.length?Math.round(done/activeList.length*100):0;
 
   const mgrs={};
   clients.forEach(c=>{
@@ -3248,24 +3250,27 @@ async function loadTax(){
   let html=`
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
       <div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:${pct}%;transition:width .3s"></div></div></div>
-      <span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169;white-space:nowrap">${done}/${clients.length} 완료 (${pct}%)</span>
+      <span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169;white-space:nowrap">${done}/${activeList.length} 완료 (${pct}%)${skipCnt?` <span style="font-weight:500;color:#99a">· 제외 ${skipCnt}</span>`:''}</span>
     </div>`;
 
   const mgrKeys=Object.keys(mgrs);
   Object.entries(mgrs).sort((a,b)=>mgrSortIndex(a[0])-mgrSortIndex(b[0])).forEach(([mgr,list])=>{
     list=sortClientsByType(list);
-    const mdone=list.filter(c=>chk[c.id]?.done).length;
+    // 제외(자체신고) 행은 그룹 맨 아래로
+    list=list.filter(c=>!chk[c.id]?.skip).concat(list.filter(c=>chk[c.id]?.skip));
+    const mActive=list.filter(c=>!chk[c.id]?.skip);
+    const mdone=mActive.filter(c=>chk[c.id]?.done).length;
     const mgrId='mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
-    const allDone=mdone===list.length&&list.length>0;
+    const allDone=mdone===mActive.length&&mActive.length>0;
     html+=`<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:${allDone?'#f0faf4':'#f7f8fb'};cursor:pointer;user-select:none;min-height:44px"
            onclick="toggleMgrGroup('${mgrId}')">
         <span style="font-size:13px;color:#889;width:16px;flex-shrink:0" id="arr-${mgrId}">▼</span>
         <span style="font-size:13px;font-weight:700;color:#1A3169;min-width:80px">담당: ${mgr}</span>
-        <span class="mgr-cnt" style="font-size:12px;font-weight:600;color:${allDone?'#27ae60':'#889'};white-space:nowrap">(${mdone}/${list.length} 완료)${allDone?' ✅':''}</span>
+        <span class="mgr-cnt" style="font-size:12px;font-weight:600;color:${allDone?'#27ae60':'#889'};white-space:nowrap">(${mdone}/${mActive.length} 완료)${allDone?' ✅':''}${list.length>mActive.length?` <span style="color:#aab;font-weight:500">제외 ${list.length-mActive.length}</span>`:''}</span>
         <div style="flex:1">
           <div style="background:#e8ecf4;border-radius:3px;height:5px;overflow:hidden">
-            <div style="background:${allDone?'#27ae60':'#1A3169'};width:${list.length?Math.round(mdone/list.length*100):0}%;height:100%;border-radius:3px"></div>
+            <div style="background:${allDone?'#27ae60':'#1A3169'};width:${mActive.length?Math.round(mdone/mActive.length*100):0}%;height:100%;border-radius:3px"></div>
           </div>
         </div>
         ${ROLE==='admin'&&tp!=='wht'?`<button class="btn btn-s btn-xs" onclick="event.stopPropagation();bulkAssign('${key}','${mgr}')">일괄배부</button>`:''}        ${tp!=='wht'&&tp!=='biz'?`<button class="btn btn-s btn-xs" style="background:#185FA5;color:#fff;border-color:#185FA5;font-size:11px" id="pay-sms-btn-${mgr}" onclick="event.stopPropagation();sendTaxPaySMS('${key}','${tp}','${mgr}')">납부안내 발송</button>`:''}
@@ -3298,15 +3303,18 @@ async function loadTax(){
               var isGoji=gojiStatus==='goji';
               var isNone=gojiStatus==='none'&&!c.vatExcept;
               var isExcept=gojiStatus==='none'&&c.vatExcept;
+              var isSkip=!!(chk[c.id]&&chk[c.id].skip);
               return `
               <tr data-cid="${c.id}" style="border-top:1px solid #f0f2f7;
-                ${isGoji?'background:#EAF3DE22;border-left:3px solid #27ae60;opacity:0.75':
+                ${isSkip?'background:#f4f5f8;border-left:3px solid #b8bdc9;opacity:0.55':
+                  isGoji?'background:#EAF3DE22;border-left:3px solid #27ae60;opacity:0.75':
                   isNone?'background:#f7f8fb;border-left:3px solid #e0e2e8;opacity:0.6':
                   isExcept?'background:#FAEEDA22;border-left:3px solid #EF9F27':
                   chk[c.id]?.done?'background:#f0faf4;border-left:3px solid #27ae60':
                   'border-left:3px solid transparent'};transition:background .2s">
-                <td style="padding:8px 10px" onmouseenter="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='inline-block'" onmouseleave="if(this.querySelector('.reassign-btn'))this.querySelector('.reassign-btn').style.display='none'">
+                <td style="padding:8px 10px" onmouseenter="this.querySelectorAll('.reassign-btn').forEach(function(b){b.style.display='inline-block'})" onmouseleave="this.querySelectorAll('.reassign-btn').forEach(function(b){b.style.display='none'})">
                   <strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>
+                  ${isSkip?'<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#e8eaef;color:#667;margin-left:6px;font-weight:600">자체신고 제외</span>':''}
                   ${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}
                   ${isGoji
                     ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#EAF3DE;color:#3B6D11;margin-left:6px">예정고지</span>'
@@ -3317,9 +3325,14 @@ async function loadTax(){
                           : '')
                   }
                   <span class="cross-warn" data-warn-cid="${c.id}" style="display:none;color:#e74c3c;font-size:11px;margin-left:6px" title="누락 위험">⚠️</span>
-                  ${ROLE==='admin'&&mgr!=='미배정'?`<span class="reassign-btn" style="display:none;margin-left:8px;">
+                  ${ROLE==='admin'&&mgr!=='미배정'&&!isSkip?`<span class="reassign-btn" style="display:none;margin-left:8px;">
                     <button onclick="event.stopPropagation();openReassignMenu(event,'${key}','${c.id}','${mgr}')" style="padding:1px 7px;font-size:11px;background:#f0f2f7;border:0.5px solid #dde;border-radius:4px;cursor:pointer;color:#667">↻ 배부변경</button>
                   </span>`:''}
+                  ${tp!=='wht'?(isSkip
+                    ?`<button onclick="event.stopPropagation();toggleTaxSkip('${key}','${c.id}',false)" style="margin-left:8px;padding:1px 7px;font-size:11px;background:#fff;border:0.5px solid #b8bdc9;border-radius:4px;cursor:pointer;color:#556;font-weight:600">↩ 복원</button>`
+                    :`<span class="reassign-btn" style="display:none;margin-left:4px;">
+                    <button onclick="event.stopPropagation();toggleTaxSkip('${key}','${c.id}',true)" style="padding:1px 7px;font-size:11px;background:#fdf3f3;border:0.5px solid #ecc;border-radius:4px;cursor:pointer;color:#a55">🚫 이번 신고 제외</button>
+                  </span>`):''}
                 </td>
                 <td style="padding:8px 10px;font-family:monospace;font-size:11.5px">${c.bizNo||'-'}</td>
                 <td style="padding:8px 10px;text-align:center">${tb_type(c.type)}</td>
@@ -3331,12 +3344,14 @@ async function loadTax(){
                   </select>
                 </td>`)}
                 <td class="cc" style="padding:8px 10px">
-                  ${(isGoji||isNone)
+                  ${isSkip
+                    ? '<input type="checkbox" disabled style="opacity:0.3" title="자체신고 제외 업체">'
+                    : (isGoji||isNone)
                     ? '<input type="checkbox" checked disabled style="opacity:0.4" title="'+(isGoji?'예정고지 납부':'신고불필요')+'">'
                     : `<input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)">`
                   }
                 </td>
-                ${(tp!=='wht'&&tp!=='biz'&&!isGoji&&!isNone)?`
+                ${(tp!=='wht'&&tp!=='biz'&&!isGoji&&!isNone&&!isSkip)?`
                 <td style="padding:6px 10px;text-align:right">
                   <input type="text" value="${chk[c.id]?.payAmt?Number(chk[c.id].payAmt).toLocaleString():''}" 
                     placeholder="납부금액" 
@@ -3353,7 +3368,7 @@ async function loadTax(){
                     onchange="updateSmsCount()"
                     style="width:16px;height:16px;cursor:${chk[c.id]?.payAmt?'pointer':'not-allowed'};accent-color:#27ae60">`
                   }
-                </td>`:(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none'?'<td></td><td></td>':'')}
+                </td>`:((tp!=='wht'&&tp!=='biz')&&(_gojiMap[c.id]?.status==='goji'||_gojiMap[c.id]?.status==='none'||isSkip)?'<td></td><td></td>':'')}
                 ${ROLE==='admin'&&mgr==='미배정'?`<td style="padding:8px 10px">
                   <select style="font-size:12px;border:1px solid #dde;border-radius:5px;padding:3px 6px" onchange="saveTax('${key}','${c.id}','assignee',this.value)">
                     <option value="">배정 안함</option>
@@ -3372,6 +3387,38 @@ async function loadTax(){
 }
 
 // 배부변경 fixed 드롭다운
+// ===== 이번 신고 회차 제외/복원 (자체신고 등 우리가 신고하지 않는 경우) =====
+// taxChecks 문서에 skip:true 저장 → 해당 회차만 진행률·대시보드 카운트에서 제외, 다음 회차엔 자동 복귀
+async function toggleTaxSkip(key,cid,on){
+  if(on){
+    var c=ALL.find(function(x){return x.id===cid;});
+    if(!confirm('"'+(c?c.name:'')+'" 업체를 이번 신고에서 제외할까요?\n\n· 자체신고 등 우리가 신고하지 않는 경우에 사용\n· 이번 회차만 적용 (다음 신고에는 자동으로 다시 표시)\n· 진행률·대시보드 카운트에서 제외됩니다')) return;
+  }
+  try{
+    if(!_taxChkCache[cid]) _taxChkCache[cid]={};
+    if(on){ _taxChkCache[cid].skip=true; }
+    else { delete _taxChkCache[cid].skip; }
+    if(on){
+      await db.collection('taxChecks').doc(key).set({[cid]:{skip:true}},{merge:true});
+    } else {
+      await db.collection('taxChecks').doc(key).update({[cid+'.skip']:firebase.firestore.FieldValue.delete()});
+    }
+    // 대시보드 캐시 즉시 반영
+    if(DASH_TAX_CACHE[key]){
+      if(!DASH_TAX_CACHE[key][cid]) DASH_TAX_CACHE[key][cid]={};
+      if(on) DASH_TAX_CACHE[key][cid].skip=true; else delete DASH_TAX_CACHE[key][cid].skip;
+    }
+    if(curPage==='dashboard'||openTabs.includes('dashboard')) renderDashStatus();
+    showToast(on?'🚫 이번 신고에서 제외했습니다':'↩️ 신고 대상으로 복원했습니다');
+    // 재렌더 (스크롤 위치 유지)
+    var _mainEl=document.querySelector('.main');
+    var _sy=_mainEl?_mainEl.scrollTop:window.scrollY;
+    var p=loadTax();
+    var _restore=function(){requestAnimationFrame(function(){ if(_mainEl)_mainEl.scrollTop=_sy; else window.scrollTo(0,_sy); });};
+    if(p&&typeof p.then==='function') p.then(_restore); else setTimeout(_restore,150);
+  }catch(e){ console.error('toggleTaxSkip 오류:',e); alert('저장 중 오류가 발생했습니다: '+e.message); }
+}
+
 var _raMenu={key:'',cid:'',mgr:''};
 function openReassignMenu(e,key,cid,mgr){
   e.stopPropagation();
@@ -3517,16 +3564,18 @@ async function saveTax(key,cid,field,val){
     clients=clients.filter(c=>c.whtYn==='Y'&&c._whtMgr&&c._whtMgr!=='미배정');
   }
   if(!clients.length) return;
-  const done=clients.filter(c=>chk[c.id]?.done).length;
-  const pct=Math.round(done/clients.length*100);
+  const activeR=clients.filter(c=>!chk[c.id]?.skip);
+  const done=activeR.filter(c=>chk[c.id]?.done).length;
+  const pct=activeR.length?Math.round(done/activeR.length*100):0;
   // 전체 진행바 업데이트
   const pb=document.querySelector('#txContent .pgfill');
   if(pb) pb.style.width=pct+'%';
   const pt=document.querySelector('#txContent .pct-text');
-  if(pt) pt.textContent=done+'/'+clients.length+' 완료 ('+pct+'%)';
+  if(pt) pt.textContent=done+'/'+activeR.length+' 완료 ('+pct+'%)';
   // 담당자별 진행바 업데이트
   const mgrGroups={};
   clients.forEach(c=>{
+    if(chk[c.id]?.skip) return; // 제외 업체는 카운트 제외
     var assignee=chk[c.id]?.assignee;
     var effM=tp==='wht'
       ?(c._whtMgr||c.manager||'미배정')
@@ -9127,7 +9176,7 @@ function renderDashStatus(){
     var daysLeft=Math.ceil((dlDate-now)/(1000*60*60*24));
     if(daysLeft>=0&&daysLeft<=7){
       var chk=DASH_TAX_CACHE[t.docKey]||{};
-      var targets=t._fixedTotal!==undefined?null:ALL.filter(function(c){return t.filter(c);});
+      var targets=t._fixedTotal!==undefined?null:ALL.filter(function(c){return t.filter(c)&&!(chk[c.id]&&chk[c.id].skip);});
       var total=t._fixedTotal!==undefined?t._fixedTotal:(targets?targets.length:0);
       if(!total) return;
       var done=t._fixedDone!==undefined?t._fixedDone:(targets?targets.filter(function(c){return t.getDone(chk,c);}).length:0);
@@ -9142,7 +9191,7 @@ function renderDashStatus(){
     if(t._fixedTotal!==undefined){
       total=t._fixedTotal; done=t._fixedDone;
     } else {
-      var targets=ALL.filter(function(c){return t.filter(c);});
+      var targets=ALL.filter(function(c){return t.filter(c)&&!(chk[c.id]&&chk[c.id].skip);});
       total=targets.length;
       if(!total) return '';
       done=targets.filter(function(c){return t.getDone(chk,c);}).length;
