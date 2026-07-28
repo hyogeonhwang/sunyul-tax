@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.22</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.23</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -1889,7 +1889,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         </div>
         <div class="fr">
           <div class="fld"><label>주민등록번호</label>
-            <div class="pw-wr"><input class="fi pw" type="password" id="f-ssn" placeholder="000000-0000000"><button class="pw-eye" onclick="tPw('f-ssn')">👁</button></div>
+            <div class="pw-wr"><input class="fi pw" type="password" id="f-ssn" placeholder="000000-0000000" oninput="fmtSsnInput(this)"><button class="pw-eye" onclick="tPw('f-ssn')">👁</button></div>
           </div>
           <div class="fld"><label>계약일</label>
               <div class="date-wrap">
@@ -2743,6 +2743,9 @@ function editClient(id){
     const el=document.getElementById(id);
     if(el&&c[k]!==undefined) el.value=c[k];
   });
+  // 주민번호는 하이픈 형식으로 표시 (기존 하이픈 없이 저장된 값도 자동 정리)
+  var _ssnEl=document.getElementById('f-ssn');
+  if(_ssnEl&&_ssnEl.value) fmtSsnInput(_ssnEl);
   const ps=c.payrollSettings||{};
   ['daily','biz','labor','abiz','alabor','retire','int','div','other'].forEach(k=>{
     const el=document.getElementById('ps-'+k);
@@ -2937,7 +2940,7 @@ function parseSheet(wb, sheetName, type){
       name,type,
       rep:ri>=0?String(r[ri]||'').trim():'',
       bizNo:bn,
-      ssn:si>=0?String(r[si]||'').trim():'',
+      ssn:si>=0?(function(_s){_s=String(_s||'').replace(/[^0-9]/g,'').slice(0,13);return _s.length>6?_s.slice(0,6)+'-'+_s.slice(6):_s;})(r[si]):'',
       mobile:moi>=0?String(r[moi]||'').trim():'',
       phone:phi>=0?String(r[phi]||'').trim():'',
       email:ei>=0?String(r[ei]||'').trim():'',
@@ -5115,6 +5118,12 @@ function fmtPhoneInput(el){
     else if(raw.length>=4)   out=raw.slice(0,3)+'-'+raw.slice(3);  // 입력 중
   }
   el.value=out;
+}
+
+// 주민등록번호 자동 하이픈 (앞 6자리-뒤 7자리, 예: 950507-2072814)
+function fmtSsnInput(el){
+  var raw=(el.value||'').replace(/[^0-9]/g,'').slice(0,13);
+  el.value = raw.length>6 ? raw.slice(0,6)+'-'+raw.slice(6) : raw;
 }
 
 function fmtDateInput(el){
