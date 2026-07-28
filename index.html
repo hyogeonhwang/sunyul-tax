@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.23</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.24</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -6836,23 +6836,28 @@ function renderUrgentSection(){
   try {
     var yrDash = DASH_YEAR || new Date().getFullYear();
     var closedClients = ALL.filter(function(c){return c.status==='폐업' && c.endDate;});
-    // 간이(매월/반기): 폐업 다음달 말일이 (yrDash, m)에 해당
+    // 간이(매월/반기): 폐업 다음달 말일이 (yrDash, m)에 해당 + 실제 급여실적이 있어야 함
     var closedSemiOrMonthly = closedClients.filter(function(c){
       var _cY = parseInt(c.endDate.split('-')[0]);
       var _cM = parseInt(c.endDate.split('-')[1]);
       if(!_cY||!_cM) return false;
       var _dueM = _cM===12?1:_cM+1;
       var _dueY = _cM===12?_cY+1:_cY;
-      return _dueY===parseInt(yrDash) && _dueM===m;
+      if(!(_dueY===parseInt(yrDash) && _dueM===m)) return false;
+      // 폐업연도 폐업월까지 실제 급여실적(일용/사업/근로/퇴직)이 있어야 지급명세서 대상 (급여없음만 있으면 제외)
+      var _months=[]; for(var _i=1;_i<=_cM;_i++) _months.push(_i);
+      return hasSalaryInHalf(String(_cY), _months, c.id);
     });
-    // 연간 지급명세서: 폐업 다음다음달 말일이 (yrDash, m)에 해당
+    // 연간 지급명세서: 폐업 다음다음달 말일이 (yrDash, m)에 해당 + 실제 급여실적 필수
     var closedAnnual = closedClients.filter(function(c){
       var _cY = parseInt(c.endDate.split('-')[0]);
       var _cM = parseInt(c.endDate.split('-')[1]);
       if(!_cY||!_cM) return false;
       var _dueM = _cM+2, _dueY = _cY;
       while(_dueM>12){_dueM-=12;_dueY++;}
-      return _dueY===parseInt(yrDash) && _dueM===m;
+      if(!(_dueY===parseInt(yrDash) && _dueM===m)) return false;
+      var _months=[]; for(var _i=1;_i<=_cM;_i++) _months.push(_i);
+      return hasSalaryInHalf(String(_cY), _months, c.id);
     });
     if(closedSemiOrMonthly.length){
       // 그 달 말일 계산
