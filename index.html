@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.26</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.28</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3255,7 +3255,13 @@ async function loadTax(){
 
   if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>해당 조건의 거래처가 없습니다<br><small style="font-size:12px;color:#aab">거래처 등록 시 과세유형·신고주기를 확인해주세요</small></div></div>';return;}
 
-  const activeList=clients.filter(c=>!chk[c.id]?.skip);
+  // corp 중간예납(pd=2)은 '가결산신고'로 분류된 법인만 진행률 대상 (고지납부·대상아님·미분류 제외)
+  var _isCorpMid = (tp==='corp' && pd==='2');
+  const activeList=clients.filter(c=>{
+    if(chk[c.id]?.skip) return false;
+    if(_isCorpMid && chk[c.id]?.corpMidType!=='가결산신고') return false;
+    return true;
+  });
   const skipCnt=clients.length-activeList.length;
   const done=activeList.filter(c=>chk[c.id]?.done).length;
   const pct=activeList.length?Math.round(done/activeList.length*100):0;
@@ -3282,7 +3288,11 @@ async function loadTax(){
     list=sortClientsByType(list);
     // 제외(자체신고) 행은 그룹 맨 아래로
     list=list.filter(c=>!chk[c.id]?.skip).concat(list.filter(c=>chk[c.id]?.skip));
-    const mActive=list.filter(c=>!chk[c.id]?.skip);
+    const mActive=list.filter(c=>{
+      if(chk[c.id]?.skip) return false;
+      if(_isCorpMid && chk[c.id]?.corpMidType!=='가결산신고') return false;
+      return true;
+    });
     const mdone=mActive.filter(c=>chk[c.id]?.done).length;
     const mgrId='mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
     const allDone=mdone===mActive.length&&mActive.length>0;
@@ -3306,6 +3316,7 @@ async function loadTax(){
             <col style="width:140px">
             <col style="width:70px">
             ${tp!=='wht'?'<col style="width:110px">':''}
+            ${(tp==='corp'&&pd==='2')?'<col style="width:110px">':''}
             <col style="width:70px">
             ${ROLE==='admin'&&mgr==='미배정'?'<col style="width:120px">':''}
             <col style="width:160px">
@@ -3315,6 +3326,7 @@ async function loadTax(){
             <th style="padding:7px 10px;text-align:left">사업자번호</th>
             <th style="padding:7px 10px;text-align:center">유형</th>
             ${(tp==='wht'||tp==='biz')?'':'<th style="padding:7px 10px;text-align:center">자료수취</th>'}
+            ${(tp==='corp'&&pd==='2')?'<th style="padding:7px 10px;text-align:center">중간예납 구분</th>':''}
             <th style="padding:7px 10px;text-align:center">신고완료</th>
             ${tp!=='wht'?'<th style="padding:7px 10px;text-align:right">납부금액</th>':''}
             ${(tp!=='wht'&&tp!=='biz')?`<th style="padding:7px 10px;text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:5px">발송선택<input type="checkbox" id="pay-all-chk-${mgr}" onchange="paySelectAll(this.checked,'${mgr}')" style="width:13px;height:13px;cursor:pointer"></div></th>`:''}
@@ -3367,6 +3379,14 @@ async function loadTax(){
                     <option value="N" ${chk[c.id]?.recv==='N'?'selected':''}>자료없음</option>
                   </select>
                 </td>`)}
+                ${(tp==='corp'&&pd==='2')?(`<td class="cc" style="padding:8px 10px">
+                  <select style="font-size:11px;border:1px solid ${chk[c.id]?.corpMidType==='가결산신고'?'#1A3169':'#dde'};border-radius:5px;padding:2px 4px;font-weight:${chk[c.id]?.corpMidType==='가결산신고'?'700':'400'};color:${chk[c.id]?.corpMidType==='가결산신고'?'#1A3169':chk[c.id]?.corpMidType==='고지납부'?'#a05500':chk[c.id]?.corpMidType==='대상아님'?'#889':'#445'}" onchange="saveTax('${key}','${c.id}','corpMidType',this.value)">
+                    <option value="" ${!chk[c.id]?.corpMidType?'selected':''}>미분류</option>
+                    <option value="가결산신고" ${chk[c.id]?.corpMidType==='가결산신고'?'selected':''}>가결산신고</option>
+                    <option value="고지납부" ${chk[c.id]?.corpMidType==='고지납부'?'selected':''}>고지납부</option>
+                    <option value="대상아님" ${chk[c.id]?.corpMidType==='대상아님'?'selected':''}>대상아님</option>
+                  </select>
+                </td>`):''}
                 <td class="cc" style="padding:8px 10px">
                   ${isSkip
                     ? '<input type="checkbox" disabled style="opacity:0.3" title="자체신고 제외 업체">'
@@ -3512,6 +3532,14 @@ async function saveTax(key,cid,field,val){
   // 행 스타일 즉시 반영
   updateTaxRow(cid, _taxChkCache[cid]);
   // 대시보드 처리현황 갱신 (현재 페이지 무관하게 캐시 업데이트)
+  // 법인세 중간예납 구분 저장 시 대시보드 캐시 갱신 (진행률은 다음 조회/렌더 때 반영)
+  if(field==='corpMidType'){
+    if(!DASH_TAX_CACHE[key]) DASH_TAX_CACHE[key]={};
+    if(!DASH_TAX_CACHE[key][cid]) DASH_TAX_CACHE[key][cid]={};
+    DASH_TAX_CACHE[key][cid].corpMidType=val;
+    if(curPage==='dashboard'||openTabs.includes('dashboard')) renderDashStatus();
+  }
+
   if(field==='done'){
     // DASH_TAX_CACHE 즉시 업데이트
     var dkParts=key.split('_'); // tax_yr_tp_pd
@@ -8764,6 +8792,9 @@ async function loadDashStatus(yr, m, statusEl){
   if(m===3) taxTypes.push({lbl:'법인세 신고', key:'corp', docKey:'tax_'+yr+'_corp_'+yr,
     filter: function(c){return c.type==='법인';}
   });
+  if(m===8) taxTypes.push({lbl:'법인세 중간예납', key:'corp2', docKey:'tax_'+yr+'_corp_2',
+    filter: function(c){return c.type==='법인';}
+  });
   if(m===5||m===11) taxTypes.push({lbl:'종합소득세', key:'income', docKey:'tax_'+yr+'_income_'+yr,
     filter: function(c){return c.type!=='법인';}
   });
@@ -8865,6 +8896,7 @@ async function loadDashTaxCache(){
   if(vatPdMap[m]) keys.push('tax_'+yr+'_vat_'+vatPdMap[m]);
   // 법인세
   if(m===3) keys.push('tax_'+yr+'_corp_1');
+  if(m===8) keys.push('tax_'+yr+'_corp_2'); // 법인세 중간예납
   // 종합소득세
   if(m===5) keys.push('tax_'+yr+'_income_1');
   // 폐업부가세 (신고체크 key: tax_{년}_close_ , pd 비어있음)
@@ -9046,6 +9078,26 @@ function renderDashStatus(){
   if(m===3) taxTypes.push({lbl:'법인세', docKey:'tax_'+yr+'_corp_1',
     deadline:{month:3,day:31},
     filter:function(c){return c.type==='법인' && isActiveInMonth(c, parseInt(yr), m) && contractOKByDue(c, parseInt(yr), 3, 31) && isMyClient(c, false);},
+    getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
+  });
+
+  // 법인세 중간예납 (8월, 마감 8/31) — 신고체크 corp 중간예납(pd=2)과 동일 docKey
+  if(m===8) taxTypes.push({lbl:'법인세 중간예납', docKey:'tax_'+yr+'_corp_2',
+    deadline:{month:8,day:31},
+    filter:function(c){
+      if(c.type!=='법인') return false;
+      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
+      if(!contractOKByDue(c, parseInt(yr), 8, 31)) return false; // 중간예납 마감 8/31 이후 계약 제외
+      // 신고체크에서 '가결산신고'로 분류된 법인만 (고지납부·대상아님·미분류 제외)
+      var _cchk=DASH_TAX_CACHE['tax_'+yr+'_corp_2']||{};
+      if(!(_cchk[c.id]&&_cchk[c.id].corpMidType==='가결산신고')) return false;
+      if(effectiveMgr){
+        var _asg=_cchk[c.id]&&_cchk[c.id].assignee;
+        var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+        if(_eff!==effectiveMgr) return false;
+      }
+      return true;
+    },
     getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
   });
 
