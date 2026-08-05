@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.24</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.25</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -2250,7 +2250,9 @@ function setupMgrFilter(id, opts){
   opts=opts||{};
   var sel=document.getElementById(id);
   if(!sel) return;
-  if(!opts.everyone && (typeof ROLE==='undefined'||ROLE!=='admin')){ sel.value=''; sel.style.display='none'; return; }
+  var isAdmin = (typeof ROLE!=='undefined' && ROLE==='admin');
+  var myNm = isAdmin ? '' : (typeof ME!=='undefined' && ME && typeof USERS!=='undefined' && USERS[ME.email] ? USERS[ME.email].name : '');
+  // everyone 옵션이거나 admin/직원 모두 드롭다운 표시 (직원도 필터로 전체·타인 조회 가능)
   var prev=opts.reset?'':sel.value;
   var names=(typeof STAFF_LIST!=='undefined'&&STAFF_LIST&&STAFF_LIST.length)
     ? STAFF_LIST : Object.values(USERS).map(function(u){return u.name;});
@@ -2258,7 +2260,12 @@ function setupMgrFilter(id, opts){
     + sortByMgrOrder(names).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
   if(opts.unassigned!==false) html+='<option value="미배정">미배정</option>';
   sel.innerHTML=html;
-  sel.value=prev||'';
+  // 직원: reset이거나 기존 선택이 없으면 자기 이름을 기본값으로. admin: 기존 로직(빈값=전체)
+  if(!isAdmin && myNm){
+    sel.value = (opts.reset || !prev) ? myNm : prev;
+  } else {
+    sel.value = prev||'';
+  }
   sel.style.display='inline-block';
   }catch(e){ console.error('setupMgrFilter 오류('+id+'):', e); }
 }
@@ -7297,8 +7304,8 @@ async function renderSalary(){
     if(dayF&&fmtSalDay(c.salaryDay)!==fmtSalDay(dayF)) return false;
     // 원천담당자: whtSep=true이면 whtManager, 아니면 manager
     var effMgr = (c.whtSep&&c.whtManager) ? c.whtManager : c.manager;
-    if(ROLE!=='admin'&&effMgr!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&effMgr!==mgrF) return false;
+    // 담당자 필터값 기준 (직원은 기본값이 자기 이름, 전체·타인 선택 가능)
+    if(mgrF && !mgrMatch(effMgr, mgrF)) return false;
     return true;
   });
 
@@ -7525,14 +7532,11 @@ function myClientsFilter(clients, filterSelId, useWht, assigneeChk){
     if(!useWht&&a&&a!=='미배정'&&a!=='배정 안함') return a;
     return baseMgr(c);
   }
-  if(ROLE==='admin'){
-    if(mgrF) return clients.filter(function(c){ return mgrMatch(effMgr(c),mgrF); });
-    return clients;
-  }
-  var myName=USERS[ME?.email]?.name||'';
+  // admin·직원 공통: 담당자 필터값(mgrF) 기준. 직원은 기본값이 자기 이름이라 자연히 자기 것만,
+  // '전체 담당자'(빈값)나 타인 선택 시 그 범위가 보임. (배부담당 배정분도 포함)
+  if(!mgrF) return clients; // 전체 담당자
   return clients.filter(function(c){
-    // 기본 담당자이거나, 배부담당으로 배정된 업체 포함
-    return baseMgr(c)===myName || (assigneeChk&&assigneeChk[c.id]?.assignee===myName);
+    return mgrMatch(effMgr(c),mgrF) || (assigneeChk&&assigneeChk[c.id]?.assignee===mgrF);
   });
 }
 
@@ -7650,8 +7654,7 @@ function renderProfit(){
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;  // 중간손익은 신고대리 제외
-    if(myName&&c.manager!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&!mgrMatch(c.manager,mgrF)) return false;
+    if(mgrF&&!mgrMatch(c.manager,mgrF)) return false; // 담당자 필터값 기준(직원 기본=자기이름)
     if(q&&!(c.name||'').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -8269,8 +8272,7 @@ function renderSendList(){
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;  // 신고대리는 문자 발송 대상 아님
-    if(myName&&c.manager!==myName) return false;
-    if(mgrF&&!mgrMatch(c.manager,mgrF)) return false;
+    if(mgrF&&!mgrMatch(c.manager,mgrF)) return false; // 담당자 필터값 기준(직원 기본=자기이름)
     if(sendQ&&!(c.name||'').toLowerCase().includes(sendQ)) return false;
     if(typeF==='법인') return c.type==='법인';
     if(typeF==='개인') return c.type!=='법인';
@@ -8400,11 +8402,10 @@ var _curDeadlineType=null;
 
 function renderDeadlineClients(t){
   if(!t) return;
-  var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
   var dQ=(document.getElementById('deadline-search')?.value||'').toLowerCase();
   var clients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
-    if(myName&&c.manager!==myName) return false;
+    // 마감 캘린더 상세는 담당자 필터 UI가 없는 조회용 화면 → 직원도 전체 표시
     if(dQ&&!(c.name||'').toLowerCase().includes(dQ)) return false;
     if(t.filter==='wht') return c.whtYn==='Y';
     if(t.filter==='vat') return c.vatType==='일반'||c.type==='법인';
@@ -8544,8 +8545,7 @@ function renderGoji(){
   // 매칭된 업체 (GOJI_DATA에 amt가 있는 업체)
   var matched = ALL.filter(function(c){
     if(!GOJI_DATA[c.id]?.amt) return false;
-    if(myName&&c.manager!==myName) return false;
-    if(ROLE==='admin'&&mgrF&&!mgrMatch(c.manager,mgrF)) return false;
+    if(mgrF&&!mgrMatch(c.manager,mgrF)) return false; // 담당자 필터값 기준(직원 기본=자기이름)
     if(q&&!(c.name||'').toLowerCase().includes(q)&&!(c.bizNo||'').includes(q)) return false;
     return true;
   });
