@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.28</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.29</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -547,7 +547,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         </div>
         <div class="fbar">
           <div style="position:relative;flex:1">
-            <input class="si" id="cSearch" placeholder="🔍 상호 · 사업자번호 · 대표자 검색"
+            <input class="si" id="cSearch" autocomplete="off" placeholder="🔍 상호 · 사업자번호 · 대표자 검색"
               oninput="renderClients();document.getElementById('cSearchClr').style.display=this.value?'flex':'none'"
               style="width:100%;padding-right:32px">
             <span id="cSearchClr" onclick="document.getElementById('cSearch').value='';renderClients();this.style.display='none'"
@@ -646,7 +646,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div style="font-size:10px;color:#aab">변수: {업체명} {신고유형} {금액} {납부기한}</div>
         </div>
         <div style="margin-bottom:10px;position:relative">
-          <input class="si" id="tx-search" placeholder="🔍 업체명 검색..." oninput="onTxSearchInput()" style="width:100%;padding-right:32px">
+          <input class="si" id="tx-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="onTxSearchInput()" style="width:100%;padding-right:32px">
           <span id="tx-search-clr" onclick="document.getElementById('tx-search').value='';onTxSearchInput();this.style.display='none'"
             style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
         </div>
@@ -682,7 +682,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           </div>
         </div>
         <div style="margin-bottom:10px;position:relative">
-          <input class="si" id="sal-search" placeholder="🔍 업체명 검색..." oninput="renderSalary()" style="width:100%;padding-right:32px">
+          <input class="si" id="sal-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderSalary()" style="width:100%;padding-right:32px">
           <span id="sal-search-clr" onclick="document.getElementById('sal-search').value='';renderSalary();this.style.display='none'"
             style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
         </div>
@@ -719,7 +719,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           </div>
         </div>
         <div style="margin-bottom:10px;position:relative">
-          <input class="si" id="py-search" placeholder="🔍 업체명 검색..." oninput="renderPayroll()" style="width:100%;padding-right:32px">
+          <input class="si" id="py-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderPayroll()" style="width:100%;padding-right:32px">
           <span id="py-search-clr" onclick="document.getElementById('py-search').value='';renderPayroll();this.style.display='none'"
             style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
         </div>
@@ -776,7 +776,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
                 <option value="wht">원천세 업체</option>
               </select>
               <div style="position:relative">
-                <input class="si" id="send-search" placeholder="🔍 업체명 검색..." oninput="renderSendList()" style="font-size:12px;padding-right:24px;width:150px">
+                <input class="si" id="send-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderSendList()" style="font-size:12px;padding-right:24px;width:150px">
                 <span onclick="document.getElementById('send-search').value='';renderSendList()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:13px">✕</span>
               </div>
               <span style="font-size:11px;color:#889">→ 총 <b id="send-count" style="color:#1A3169">0</b>개 업체</span>
@@ -808,7 +808,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <div style="padding:10px 12px;font-size:11px;font-weight:500;color:#889;border-bottom:0.5px solid #e8ecf4">업체 선택</div>
             <div style="padding:8px 10px;border-bottom:0.5px solid #e8ecf4">
               <div style="position:relative">
-                <input class="si" id="indiv-search" placeholder="🔍 업체명 검색..." oninput="renderIndivList()" style="width:100%;font-size:12px;padding-right:24px">
+                <input class="si" id="indiv-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderIndivList()" style="width:100%;font-size:12px;padding-right:24px">
                 <span onclick="document.getElementById('indiv-search').value='';renderIndivList()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:13px">✕</span>
               </div>
             </div>
@@ -956,7 +956,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             style="position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:10;width:24px;height:48px;border:0.5px solid #e8ecf4;border-radius:0 8px 8px 0;background:#fff;cursor:pointer;font-size:11px;color:#1A3169;display:flex;align-items:center;justify-content:center;padding:0">◀</button>
           <div style="padding:12px 14px;border-bottom:0.5px solid #f0f2f7;background:#f7f8fb">
             <div style="position:relative">
-              <input class="si" id="profit-search" placeholder="🔍 업체명 검색..." oninput="renderProfit()" style="width:100%;padding-left:10px">
+              <input class="si" id="profit-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderProfit()" style="width:100%;padding-left:10px">
             </div>
             <div id="profit-summary" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"></div>
           </div>
@@ -1150,7 +1150,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 
       <!-- 검색 -->
       <div style="position:relative;margin-bottom:10px">
-        <input class="si" id="goji-search" placeholder="🔍 업체명 검색..." oninput="renderGoji()" style="width:100%;padding-right:32px">
+        <input class="si" id="goji-search" autocomplete="off" placeholder="🔍 업체명 검색..." oninput="renderGoji()" style="width:100%;padding-right:32px">
         <span id="goji-search-clr" onclick="document.getElementById('goji-search').value='';renderGoji();this.style.display='none'"
           style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aab;font-size:16px">✕</span>
       </div>
@@ -1690,7 +1690,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           상세 판정은 좌측 메뉴 <b>🌱 청년창업감면</b> 도구 이용.
         </div>
         <div style="position:relative;margin-bottom:16px">
-          <input class="fi" type="text" id="biz-search"
+          <input class="fi" type="text" id="biz-search" autocomplete="off"
             placeholder="업종명 또는 업종코드 6자리로 검색 (예: 학원, 809007)"
             oninput="searchBiz(this.value)"
             style="font-size:14px;padding:12px 44px 12px 16px;border-radius:10px">
@@ -1780,7 +1780,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <!-- STEP 2: 업종 -->
         <div class="sdiv">② 업종 (KSIC 기준)</div>
         <div style="margin:8px 0 14px">
-          <input type="text" id="ye-biz-search" class="fi" placeholder="업종명 또는 업종코드로 검색 (예: 음식점, 525101)" oninput="yeSearchBiz(this.value)" style="width:100%;max-width:520px">
+          <input type="text" id="ye-biz-search" autocomplete="off" class="fi" placeholder="업종명 또는 업종코드로 검색 (예: 음식점, 525101)" oninput="yeSearchBiz(this.value)" style="width:100%;max-width:520px">
           <div id="ye-biz-result" style="margin-top:6px;max-height:200px;overflow-y:auto;border:1px solid #e8ecf4;border-radius:6px;display:none"></div>
           <div id="ye-biz-selected" style="margin-top:8px;padding:10px;background:#f0f3f9;border-radius:6px;display:none">
             <div style="font-size:11px;color:#889;margin-bottom:3px">선택된 업종</div>
