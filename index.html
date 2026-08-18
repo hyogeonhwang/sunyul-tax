@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.36</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.47</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -10439,7 +10439,7 @@ function rptBuildHtml(ym, forPrint){
   // 결손 시 이월결손금 자동 행 (저장 데이터 아님 — 표시 전용)
   if((tax.loss || (meta.carryLoss||0)>0) && !(meta.taxCards||[]).some(function(c){return c.name.indexOf('이월결손')>=0;})){
     h+='<tr style="border-bottom:0.5px solid #e5e9f0;background:#FDF6E3">'
-      +'<td style="padding:5px 8px;font-weight:600;color:#1A2A4A">이월결손금 관리 <span style="background:#8A6D1F;color:#fff;font-size:9px;padding:1px 6px;border-radius:4px;vertical-align:1px">자동</span></td>'
+      +'<td style="padding:5px 8px;font-weight:600;color:#1A2A4A;white-space:nowrap">이월결손금 관리 <span style="display:inline-block;background:#8A6D1F;color:#fff;font-size:9px;padding:1px 6px;border-radius:4px;vertical-align:1px;white-space:nowrap">자동</span></td>'
       +'<td style="padding:5px 8px;color:#2C4A7C">15년 이월 · 중소 100% 공제</td>'
       +'<td style="padding:3px 8px;text-align:center;color:#8A6D1F;font-weight:700">해당</td>'
       +'<td style="padding:3px 8px;color:#778">결손 인식 — 신고 시 명세 관리 필수</td>'
@@ -10548,7 +10548,7 @@ function rptBuildHtml(ym, forPrint){
         acc:dmap, q:Math.ceil((+mm.slice(5))/3), y:mm.slice(0,4)});
       if(dd.sales>maxS) maxS=dd.sales;
     });
-    h+='<div style="'+(forPrint?'page-break-before:always;padding-top:4mm;':'margin-top:20px;border-top:2px solid #1A2A4A;padding-top:12px;')+'">';
+    h+='<div class="rpt-p2" style="'+(forPrint?'page-break-before:always;padding-top:2mm;':'margin-top:20px;border-top:2px solid #1A2A4A;padding-top:12px;')+'">';
     h+='<div style="background:'+NA+';border-radius:10px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(forPrint?'9px':'10px')+'">'
       +'<div style="font-size:14px;font-weight:800;color:#fff"><span style="color:'+GO+'">2면</span> · 기간 분석 — 월별 흐름 & 기수 누적</div>'
       +'<div style="font-size:10px;color:#8a93a5">'+msAll[0]+' ~ '+ym+' · 매달 쌓일수록 깊어집니다</div></div>';
@@ -10697,12 +10697,13 @@ function rptBuildHtml(ym, forPrint){
       }
       h+='</div>';
     }
-    h+='</div>';   // 2면 컨테이너 닫기
+    // 푸터: 인쇄 시 콘텐츠와 큰 간격 두고 용지 하단 쪽으로 배치 (콘텐츠 양에 따라 위치 조정 가능)
+    // 푸터: 콘텐츠 바로 뒤 자연 배치, 약간의 상단 여백, 페이지 넘김 시 안 잘리게
+    h+='<div style="'+(forPrint?'break-inside:avoid;margin-top:16px;':'margin-top:14px;')+'background:'+NA+';border-radius:8px;padding:'+(forPrint?'9px 18px':'7px 14px')+';display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="color:'+GO+';font-weight:800;font-size:10.5px;letter-spacing:1px">세무법인 선율</span>'
+      +'<span style="color:#8a93a5;font-size:9px">본 자료는 기장 자료 기준 요약·개산이며 개별 세무·법률 자문 의견이 아닙니다.</span></div>';
+    h+='</div>';   // 2면 컨테이너 닫기 (푸터 포함)
   }
-  // 푸터: 문서 맨 끝 1회, 마지막 콘텐츠 뒤에 자연 배치 (페이지 잘림 방지)
-  h+='<div style="'+(forPrint?'break-inside:avoid;margin-top:34px;':'margin-top:14px;')+'background:'+NA+';border-radius:8px;padding:'+(forPrint?'11px 18px':'7px 14px')+';display:flex;justify-content:space-between;align-items:center">'
-    +'<span style="color:'+GO+';font-weight:800;font-size:10.5px;letter-spacing:1px">세무법인 선율</span>'
-    +'<span style="color:#8a93a5;font-size:9px">본 자료는 기장 자료 기준 요약·개산이며 개별 세무·법률 자문 의견이 아닙니다.</span></div>';
   h+='</div>';
   return h;
 }
@@ -10812,8 +10813,10 @@ function rptPrint(){
   var w=window.open('','_blank');
   w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>결산브리핑</title>'
     +'<style>*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
-    +'body{font-family:"Malgun Gothic",sans-serif;margin:0;padding:8mm 10mm 6mm;color:#1A2A4A}@page{size:A4;margin:8mm}'
-    +'table{page-break-inside:avoid}</style></head><body>'
+    +'body{font-family:"Malgun Gothic",sans-serif;margin:0;padding:0 10mm;color:#1A2A4A;zoom:0.95}@page{size:A4;margin:8mm}'
+    +'table{page-break-inside:avoid}'
+    +'.rpt-p2 table td,.rpt-p2 table th{padding-top:2px !important;padding-bottom:2px !important}'
+    +'</style></head><body>'
     +rptBuildHtml(ym,true)+'</body></html>');
   w.document.close();
   setTimeout(function(){ w.print(); },400);
