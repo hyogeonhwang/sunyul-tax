@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.35</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.36</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -10010,7 +10010,7 @@ var RPT_RATES={ corpY2026:[[200000000,0.10],[Infinity,0.20]], corpOld:[[20000000
          [300000000,0.38,19940000],[500000000,0.40,25940000],[1000000000,0.42,35940000],[Infinity,0.45,65940000]] };
 var RPT_CARD_TMPL={
   indiv:[
-    {name:'노란우산공제', limit:'연 600/400/200만 (소득 구간별)', status:'미확인', note:"'26년 50개월 제한 폐지"},
+    {name:'노란우산공제', limit:'소득금액 4천↓600만 / ~6천 500만 / ~1억 400만 / 1억↑200만', status:'미확인', note:"2025년 납입분부터 4단계 한도"},
     {name:'연금저축+IRP', limit:'600만+합산 900만 · 13.2/16.5%', status:'미확인', note:'12/31까지 납입분'},
     {name:'통합고용세액공제', limit:"1인당 연 수백~2,000만 ('26 개편·연차 차등)", status:'미확인', note:'채용 전 설계 필수'},
     {name:'중소기업 특별세액감면', limit:'업종·규모별 5~30% (~2028년 연장)', status:'미확인', note:'감면 배제·중복 검토'}],
@@ -10018,7 +10018,7 @@ var RPT_CARD_TMPL={
     {name:'통합고용세액공제', limit:"1인당 연 수백~2,000만 ('26 개편·연차 차등)", status:'미확인', note:'채용 전 설계 필수'},
     {name:'중소기업 특별세액감면', limit:'업종·규모별 5~30% (~2028년 연장)', status:'미확인', note:'타 감면 중복 검토'},
     {name:'기업업무추진비 한도', limit:'', status:'미확인', note:'기본한도 기준 개산 · 수입금액분 별도'},
-    {name:'[대표 개인] 노란우산공제', limit:'연 600/400/200만 구간별 · 급여요건 충족 시', status:'미확인', note:'대표 개인 소득공제'},
+    {name:'[대표 개인] 노란우산공제', limit:'근로소득금액 4천↓600만 / ~6천 500만 / ~1억 400만 / 1억↑200만', status:'미확인', note:'법인대표 총급여 8천만원 이하만 공제 · 초과 시 공제 불가'},
     {name:'[대표 개인] 연금저축+IRP', limit:'600만+합산 900만 · 13.2/16.5%', status:'미확인', note:'12/31까지 납입분'}]
 };
 function rptToast(msg){
