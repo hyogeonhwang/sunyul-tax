@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.31</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.34</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3146,9 +3146,28 @@ async function loadTax(){
     });
   }
   if(tp==='simp') clients=clients.filter(c=>c.vatType==='간이');
-  if(tp==='biz') clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
+  if(tp==='biz'){
+    clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
+    // 폐업자 합류: 폐업연도가 귀속연도(yr)와 같은 면세 개인사업자 (익년 2/10 사업장현황신고 대상)
+    var _closedBiz=ALL.filter(function(c){
+      if(c.status!=='폐업'||!c.endDate) return false;
+      if(c.type==='법인'||!(c.vatType==='면세'||c.type==='면세')) return false;
+      return parseInt(String(c.endDate).split('-')[0])===parseInt(yr);
+    });
+    if(txQ) _closedBiz=_closedBiz.filter(function(c){return (c.name||'').toLowerCase().includes(txQ);});
+    _closedBiz.forEach(function(cc){ if(!clients.some(function(x){return x.id===cc.id;})) clients.push(cc); });
+  }
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
-  if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
+  if(tp==='income'){
+    clients=clients.filter(c=>c.type!=='법인');
+    // 폐업자 합류: 폐업연도가 귀속연도(yr)와 같은 개인사업자 (익년 5/31 종소세 대상)
+    var _closedInc=ALL.filter(function(c){
+      if(c.status!=='폐업'||!c.endDate||c.type==='법인'||c.type==='신고대리') return false;
+      return parseInt(String(c.endDate).split('-')[0])===parseInt(yr);
+    });
+    if(txQ) _closedInc=_closedInc.filter(function(c){return (c.name||'').toLowerCase().includes(txQ);});
+    _closedInc.forEach(function(cc){ if(!clients.some(function(x){return x.id===cc.id;})) clients.push(cc); });
+  }
   // 계약일 필터: 부가세·간이·사업장현황·법인세·종소세는 세목 마감일 기준으로 계약이 마감 이후면 제외
   if(['vat','simp','biz','corp','income'].indexOf(tp)>=0){
     var _dueTC=taxDueDate(tp, yr, pd);
@@ -3218,7 +3237,7 @@ async function loadTax(){
   }
   // 폐업 부가세: 폐업 업체만, 별도 렌더링
   if(tp==='close'){
-    var closeClients=ALL.filter(function(c){return c.status==='폐업'&&c.endDate;});
+    var closeClients=ALL.filter(function(c){return c.status==='폐업'&&c.endDate&&c.type!=='면세'&&c.vatType!=='면세';}); // 면세사업자는 부가세 신고 의무 없음
     if(txQ) closeClients=closeClients.filter(function(c){return (c.name||'').toLowerCase().includes(txQ);});
     closeClients=myClientsFilter(closeClients,'txMgrFilter');
     if(!closeClients.length){el.innerHTML='<div class="es"><div class="es-ic">✅</div><div>폐업 업체가 없습니다</div></div>';return;}
@@ -3357,6 +3376,7 @@ async function loadTax(){
                   'border-left:3px solid transparent'};transition:background .2s">
                 <td style="padding:8px 10px" onmouseenter="this.querySelectorAll('.reassign-btn').forEach(function(b){b.style.display='inline-block'})" onmouseleave="this.querySelectorAll('.reassign-btn').forEach(function(b){b.style.display='none'})">
                   <strong style="color:#1A3169;cursor:pointer;text-decoration:underline;text-underline-offset:2px" onclick="editClient('${c.id}')">${c.name}</strong>
+                  ${c.status==='폐업'?`<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fdecec;color:#c0392b;margin-left:6px;font-weight:600">폐업 ${c.endDate?String(c.endDate).slice(2).replace(/-/g,'.'):''}</span>`:''}
                   ${isSkip?'<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#e8eaef;color:#667;margin-left:6px;font-weight:600">자체신고 제외</span>':''}
                   ${tp==='wht'&&c.whtSemi==='Y'?'<span class="bdg" style="background:#fff0dc;color:#a05500;font-size:10px;margin-left:4px">반기</span>':''}
                   ${isGoji
@@ -3596,6 +3616,7 @@ async function saveTax(key,cid,field,val){
     return;
   }
   const chk=_taxChkCache;
+  const yr=document.getElementById('txYear')?.value||String(new Date().getFullYear());
   const tp=document.getElementById('txType')?.value;
   const pd=document.getElementById('txPeriod')?.value||'1';
   let clients=ALL.filter(c=>c.status==='활성');
@@ -3615,9 +3636,24 @@ async function saveTax(key,cid,field,val){
     });
   }
   if(tp==='simp') clients=clients.filter(c=>c.vatType==='간이');
-  if(tp==='biz') clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
+  if(tp==='biz'){
+    clients=clients.filter(c=>c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세'));
+    var _cbz=ALL.filter(function(c){
+      if(c.status!=='폐업'||!c.endDate) return false;
+      if(c.type==='법인'||!(c.vatType==='면세'||c.type==='면세')) return false;
+      return parseInt(String(c.endDate).split('-')[0])===parseInt(yr);
+    });
+    _cbz.forEach(function(cc){ if(!clients.some(function(x){return x.id===cc.id;})) clients.push(cc); });
+  }
   if(tp==='corp') clients=clients.filter(c=>c.type==='법인');
-  if(tp==='income') clients=clients.filter(c=>c.type!=='법인');
+  if(tp==='income'){
+    clients=clients.filter(c=>c.type!=='법인');
+    var _cin=ALL.filter(function(c){
+      if(c.status!=='폐업'||!c.endDate||c.type==='법인'||c.type==='신고대리') return false;
+      return parseInt(String(c.endDate).split('-')[0])===parseInt(yr);
+    });
+    _cin.forEach(function(cc){ if(!clients.some(function(x){return x.id===cc.id;})) clients.push(cc); });
+  }
   // 계약일 필터 (진행률 재계산 시에도 loadTax와 동일 기준 적용)
   if(['vat','simp','biz','corp','income'].indexOf(tp)>=0){
     var _dueSV=taxDueDate(tp, yr, pd);
@@ -4324,6 +4360,8 @@ const DL_BASE=[
   {m:2,d:28,lbl:'지급명세서(이자·배당·기타)',t:'pay'},
   {m:3,d:10,lbl:'지급명세서(근로·사업·퇴직)',t:'pay'},
   {m:7,d:31,lbl:'간이지급명세서(근로 상반기)',t:'pay'},
+  // 사업장현황신고 (면세사업자, 전년도 귀속분)
+  {m:2,d:10,lbl:'사업장현황신고',t:'inc'},
 ];
 
 // 매월 말일 지급명세서 마감 추가 (동적)
@@ -4346,7 +4384,7 @@ function buildDL(y){
   }
   // 폐업부가세: 폐업일 다음달 25일 (같은 달은 1줄로 합침)
   var closeMonths={};
-  (ALL||[]).filter(function(c){return c.status==='폐업'&&c.endDate;}).forEach(function(c){
+  (ALL||[]).filter(function(c){return c.status==='폐업'&&c.endDate&&c.type!=='면세'&&c.vatType!=='면세';}).forEach(function(c){
     var p=String(c.endDate).split('-');
     var ey=parseInt(p[0]), em=parseInt(p[1]);
     if(!ey||!em) return;
@@ -7022,6 +7060,7 @@ function getIncompleteClientsForDeadline(e){
       var closeChk=DASH_TAX_CACHE['tax_'+yr+'_close_']||{};
       return ALL.filter(function(c){
         if(c.status!=='폐업'||!c.endDate) return false;
+        if(c.type==='면세'||c.vatType==='면세') return false; // 면세사업자는 부가세 신고 의무 없음 → 폐업부가세 대상 아님
         var p=String(c.endDate).split('-');
         var ey=parseInt(p[0]), em=parseInt(p[1]);
         if(!ey||!em) return false;
@@ -8814,6 +8853,9 @@ async function loadDashStatus(yr, m, statusEl){
   if(m===5||m===11) taxTypes.push({lbl:'종합소득세', key:'income', docKey:'tax_'+yr+'_income_'+yr,
     filter: function(c){return c.type!=='법인';}
   });
+  if(m===2) taxTypes.push({lbl:'사업장현황신고', key:'biz', docKey:'tax_'+(parseInt(yr)-1)+'_biz_1',
+    filter: function(c){return c.type!=='법인'&&(c.vatType==='면세'||c.type==='면세');}
+  });
 
   // 병렬로 Firebase 조회
   var docs = await Promise.all(taxTypes.map(function(t){
@@ -8915,6 +8957,7 @@ async function loadDashTaxCache(){
   if(m===8) keys.push('tax_'+yr+'_corp_2'); // 법인세 중간예납
   // 종합소득세
   if(m===5) keys.push('tax_'+yr+'_income_1');
+  if(m===2) keys.push('tax_'+(parseInt(yr)-1)+'_biz_1'); // 사업장현황신고 (전년도 귀속)
   // 폐업부가세 (신고체크 key: tax_{년}_close_ , pd 비어있음)
   keys.push('tax_'+yr+'_close_');
   // 지급명세서 (매월 - payrollChecks 컬렉션)
@@ -9118,11 +9161,40 @@ function renderDashStatus(){
   });
 
   // 종합소득세 (신고대리 포함 — 신고체크와 동일, 배부담당 우선)
+  // 사업장현황신고 (2월, 마감 2/10) — 전년도(yr-1) 귀속분. 면세 개인사업자 + 그해 폐업자
+  if(m===2){
+    var _bizYr=(parseInt(yr)-1).toString(); // 귀속연도 = 조회연도-1
+    taxTypes.push({lbl:'사업장현황신고', docKey:'tax_'+_bizYr+'_biz_1',
+      deadline:{month:2,day:10},
+      filter:function(c){
+        if(c.type==='법인') return false;
+        if(!(c.vatType==='면세'||c.type==='면세')) return false; // 면세 개인사업자만
+        // 활성이거나, 귀속연도(_bizYr)에 폐업한 면세사업자
+        var _ok=false;
+        if(c.status==='활성') _ok=true;
+        else if(c.status==='폐업'&&c.endDate&&parseInt(String(c.endDate).split('-')[0])===parseInt(_bizYr)) _ok=true;
+        if(!_ok) return false;
+        if(effectiveMgr){
+          var _bchk=DASH_TAX_CACHE['tax_'+_bizYr+'_biz_1']||{};
+          var _asg=_bchk[c.id]&&_bchk[c.id].assignee;
+          var _eff=(_asg&&_asg!=='미배정'&&_asg!=='배정 안함')?_asg:(c.manager||'미배정');
+          if(_eff!==effectiveMgr) return false;
+        }
+        return true;
+      },
+      getDone:function(chk,c){return !!(chk[c.id]&&chk[c.id].done);}
+    });
+  }
+
   if(m===5) taxTypes.push({lbl:'종합소득세', docKey:'tax_'+yr+'_income_1',
     deadline:{month:5,day:31},
     filter:function(c){
       if(c.type==='법인') return false;
-      if(!isActiveInMonth(c, parseInt(yr), m)) return false;
+      // 활성이거나, 귀속연도(yr)에 폐업한 개인사업자
+      var _ok=false;
+      if(c.status==='활성' && isActiveInMonth(c, parseInt(yr), m)) _ok=true;
+      else if(c.status==='폐업'&&c.endDate&&parseInt(String(c.endDate).split('-')[0])===parseInt(yr)) _ok=true;
+      if(!_ok) return false;
       if(!contractOKByDue(c, parseInt(yr), 5, 31)) return false; // 종소세 마감 5/31 이후 계약 제외
       if(effectiveMgr){
         var _ichk=DASH_TAX_CACHE['tax_'+yr+'_income_1']||{};
@@ -9796,9 +9868,10 @@ function activatePayChk(cid, val){
   var amt = parseInt(val)||0;
   var chkEl = document.querySelector('.pay-sms-chk[data-cid="'+cid+'"]');
   if(chkEl){
-    chkEl.disabled = !amt;
-    if(amt) chkEl.checked = true;
-    else chkEl.checked = false;
+    chkEl.disabled = !amt;        // 금액 있으면 선택 가능하게 활성화
+    chkEl.style.cursor = amt?'pointer':'not-allowed';
+    if(!amt) chkEl.checked = false; // 금액 지우면 자동 해제 (발송 불가하므로)
+    // 금액이 있어도 자동 체크하지 않음 — 발송 여부는 사용자가 직접 선택
   }
   updateSmsCount();
 }
