@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.47</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.49</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -6371,10 +6371,11 @@ function typeSortIndex(type){
   return order[type]||99;
 }
 function sortClientsByType(list){
+  // 유형 순서(법인→일반→면세→신고대리) 우선, 같은 유형 안에서는 엑셀 입력 순서(no)
   return list.slice().sort(function(a,b){
     var ta=typeSortIndex(a.type), tb=typeSortIndex(b.type);
     if(ta!==tb) return ta-tb;
-    return (a.name||'').localeCompare(b.name||'');
+    return (a.no||0)-(b.no||0);
   });
 }
 var LEAVE_DATA = {}; // {userId: {totalDays, entries:[{id,date,days,reason}]}}
