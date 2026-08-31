@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.49</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.52</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -2228,14 +2228,17 @@ const auth = firebase.auth();
 let ME = null, ROLE = 'staff';
 const ADMIN_EMAIL = 'hg'+'@'+'sunyul.com'; // 대표 전용 — 이 이메일만 관리자 권한
 const USERS = {
-  ['sj@sunyul.com']:{name:'김서지',role:'staff',title:'사원'},
-  ['jy@sunyul.com']:{name:'안지윤',role:'staff',title:'사원'},
   ['sh@sunyul.com']:{name:'유승희',role:'staff',title:'사원'},
   ['hg@sunyul.com']:{name:'황효건',role:'admin',title:'대표세무사'},
   ['hj@sunyul.com']:{name:'김희진',role:'staff',title:'세무사'},
+  ['yl@sunyul.com']:{name:'정예림',role:'staff',title:'사원'},
+  ['de@sunyul.com']:{name:'임다은',role:'staff',title:'사원'},
+  // 퇴사자 (과거 기록 이름 표시용 — 로그인은 Firebase Auth에서 관리)
+  ['sj@sunyul.com']:{name:'김서지',role:'staff',title:'사원'},
+  ['jy@sunyul.com']:{name:'안지윤',role:'staff',title:'사원'},
 };
 // 담당자 표시 순서 공용 기준 (모든 드롭다운/그룹 목록이 이 순서를 따름)
-const MGR_ORDER = ['김서지','안지윤','유승희','황효건','김희진'];
+const MGR_ORDER = ['유승희','정예림','임다은','황효건','김희진'];
 function mgrSortIndex(name){
   if(name==='미배정') return 999; // 미배정은 항상 맨 끝
   var i = MGR_ORDER.indexOf(name);
@@ -2387,6 +2390,7 @@ function init(){
   // 로그인 시 항상 초기 상태로 리셋
   resetAllState();
   loadClients();
+  syncStaffList(); // 재직 직원 기준으로 STAFF_LIST 자동 동기화 (하드코딩 의존 제거)
   loadTemplates();
   loadCalEvents();
   updateTxPeriod();
@@ -2735,6 +2739,7 @@ function openClient(){
   editCId=null; platRows=[];
   var delBtn=document.getElementById('moClientDelBtn'); if(delBtn){delBtn.style.display='none';delBtn.dataset.allowed='0';}
   clearCForm();
+  fillClientMgrDropdowns(); // 담당자 드롭다운을 최신 재직자 명단으로 채움
   document.getElementById('moClientTtl').textContent='거래처 추가';
   cTab('basic',document.querySelector('#moClient .tab'));
   document.getElementById('moClient').style.display='flex';
@@ -2742,10 +2747,33 @@ function openClient(){
   var mb=document.querySelector('#moClient .mo-box'); if(mb) mb.scrollTop=0;
 }
 
+// 거래처 수정/등록 모달의 담당자 드롭다운(f-mgr 기장담당, f-wm2 원천세담당)을
+// STAFF_LIST(재직자) 기준으로 다시 채움. 하드코딩 옵션 대신 최신 명단 반영.
+function fillClientMgrDropdowns(){
+  var names = (typeof STAFF_LIST!=='undefined' && STAFF_LIST.length) ? STAFF_LIST : [];
+  // 표시 순서 정렬 (MGR_ORDER 기준)
+  var ordered = names.slice().sort(function(a,b){return mgrSortIndex(a)-mgrSortIndex(b);});
+  var mgrEl=document.getElementById('f-mgr');
+  if(mgrEl){
+    var cur=mgrEl.value;
+    mgrEl.innerHTML='<option value="미배정">미배정</option>'
+      + ordered.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+    mgrEl.value=cur;
+  }
+  var wmEl=document.getElementById('f-wm2');
+  if(wmEl){
+    var cur2=wmEl.value;
+    wmEl.innerHTML='<option value="">선택 안함</option>'
+      + ordered.map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+    wmEl.value=cur2;
+  }
+}
+
 function editClient(id){
   const c=ALL.find(x=>x.id===id); if(!c) return;
   editCId=id; platRows=c.platforms?[...c.platforms]:[];
   clearCForm();
+  fillClientMgrDropdowns(); // 담당자 드롭다운을 최신 재직자 명단으로 채움
   const map={
     'f-name':'name','f-type':'type','f-rep':'rep','f-biz':'bizNo','f-ssn':'ssn',
     'f-ct':'contract','f-mgr':'manager','f-fee':'fee','f-phone':'phone',
@@ -6357,7 +6385,7 @@ function ctClear(){
 }
 
 // =================== 연차관리 ===================
-var STAFF_LIST = ['황효건','김서지','안지윤','유승희','김희진'];
+var STAFF_LIST = ['유승희','정예림','임다은','황효건','김희진'];
 
 // 연차관리 전용: 황효건(대표)·김희진은 연차 관리 대상에서 제외
 function getLeaveStaffList(){
@@ -6614,6 +6642,21 @@ function closeMo(id){
 // =================== 직원 관리 ===================
 var STAFFS = [];
 
+// 앱 시작 시 재직 직원 기준으로 STAFF_LIST 자동 동기화 (직원관리 페이지 안 열어도 최신 유지)
+async function syncStaffList(){
+  try{
+    var snap = await db.collection('staffs').get();
+    STAFFS = snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    var active = STAFFS.filter(function(s){return s.status==='재직';}).map(function(s){return s.name;});
+    if(active.length){
+      // MGR_ORDER 순서를 우선 적용, 그 외 재직자는 뒤에 붙임
+      var ordered = MGR_ORDER.filter(function(n){return active.indexOf(n)>=0;});
+      active.forEach(function(n){ if(ordered.indexOf(n)<0) ordered.push(n); });
+      STAFF_LIST = ordered;
+    }
+  }catch(e){ console.error('syncStaffList 실패:', e); }
+}
+
 function loadStaffPage(){
   initDefaultStaff().then(function(){
   db.collection('staffs').get().then(function(snap){
@@ -6690,16 +6733,25 @@ async function doHandover(){
   var from=document.getElementById('moHandover').dataset.from;
   var to=document.getElementById('ho-target').value;
   if(!to){alert('인수인계 담당자를 선택하세요');return;}
-  var targets=ALL.filter(function(c){return c.manager===from&&c.status==='활성';});
+  // 대상: 기장담당(manager)이 from이거나, 원천세 담당(whtManager)이 from인 활성 거래처
+  var targets=ALL.filter(function(c){
+    return c.status==='활성' && (c.manager===from || (c.whtSep&&c.whtManager===from));
+  });
   var batch=db.batch();
   targets.forEach(function(c){
-    batch.update(db.collection('clients').doc(c.id),{manager:to});
+    var upd={};
+    if(c.manager===from) upd.manager=to;                       // 기장담당이 from이면 이전
+    if(c.whtSep&&c.whtManager===from) upd.whtManager=to;       // 원천세 별도담당이 from이면 이전
+    batch.update(db.collection('clients').doc(c.id), upd);
   });
   await batch.commit();
-  targets.forEach(function(c){c.manager=to;});
+  targets.forEach(function(c){
+    if(c.manager===from) c.manager=to;
+    if(c.whtSep&&c.whtManager===from) c.whtManager=to;
+  });
   closeMo('moHandover');
   renderStaffList();
-  alert(targets.length+'개 거래처를 '+to+'님에게 이전했습니다.');
+  alert(targets.length+'개 거래처를 '+to+'님에게 이전했습니다. (기장담당·원천세담당 포함)');
 }
 
 
