@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.53</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.54</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3242,9 +3242,9 @@ async function loadTax(){
             || hasSalaryDone(whtYr, [_cM2], c.id, 'labor')
             || hasSalaryDone(whtYr, [_cM2], c.id, 'retire');
       }
-      // 매월 납부자는 whtYn='Y' 필수, 반기 납부자(whtSemi='Y')는 whtYn 무관
-      if(c.whtSemi!=='Y' && c.whtYn!=='Y') return false;
-      // 반기 업체는 6월/12월에만 표시
+      // 매월 납부자는 whtYn='Y' 필수, 반기 납부자(whtSemi='Y')도 whtYn='Y' 필수
+      if(c.whtYn!=='Y') return false;
+      // 반기 업체는 6월(상반기분)/12월(하반기분)에만 표시
       if(c.whtSemi==='Y'&&pd!=='6'&&pd!=='12') return false;
       // 계약일 필터: 그 신고분의 마감월(귀속월 다음달, 반기는 7월/1월) 기준으로 계약이 마감 이후면 제외
       var _dueM;
@@ -3254,11 +3254,9 @@ async function loadTax(){
                  : (c.whtSemi!=='Y' && pdNum===12) ? String(parseInt(whtYr)+1)
                  : whtYr;
       if(!whtContractOK(c, _dueYr, _dueM)) return false;
-      // 급여관리에서 해당 월에 일용/사업/근로/퇴직 중 하나라도 체크된 업체만
-      return hasSalaryDone(whtYr, whtMonths, c.id, 'daily')
-          || hasSalaryDone(whtYr, whtMonths, c.id, 'biz')
-          || hasSalaryDone(whtYr, whtMonths, c.id, 'labor')
-          || hasSalaryDone(whtYr, whtMonths, c.id, 'retire');
+      // 급여 유무와 무관하게 그 달(또는 반기) 신고 대상이면 전체 표시 (분모).
+      //   급여없음/급여있음/신고완료 처리 여부는 화면에서 구분 표시 → 누락 감지
+      return true;
     });
     // whtManager 기준으로 역할 필터 적용
     clients=myClientsFilter(clients,'txMgrFilter',true);
@@ -9120,23 +9118,19 @@ function renderDashStatus(){
       }
       // (폐업자는 위에서 처리됨) 이하는 비폐업 업체 — 활성만 대상, 기장중지·이관 등은 제외 (신고체크와 동일 기준)
       if(c.status!=='활성') return false;
-      // 반기납부(whtSemi='Y'): 7월(상반기 마감)/1월(하반기 마감)에만 대상, whtYn 무관
+      // 반기납부(whtSemi='Y'): 7월(상반기분 마감)/1월(하반기분 마감)에만 신고 대상.
+      //   매월과 동일 기준 — whtYn='Y'이면 급여 이력 유무와 무관하게 분모 (미처리 누락 감지)
       if(c.whtSemi==='Y'){
         if(m!==7 && m!==1) return false;
-        var isH1 = (m===7);
-        var halfMonths = isH1 ? [1,2,3,4,5,6] : [7,8,9,10,11,12];
-        var halfYr = isH1 ? String(yr) : String(parseInt(yr)-1);
-        // 그 반기 급여 이력이 있으면 대상
-        if(!hasSalaryInHalf(halfYr, halfMonths, c.id)) return false;
+        if(c.whtYn!=='Y') return false;
         return whtContractOK(c, yr, m); // 계약일이 마감(다음달10일) 이후면 제외
       }
-      // 매월 납부자: whtYn='Y' 필수
+      // 매월 납부자: whtYn='Y'이면 그 달 급여 유무와 무관하게 원천세 신고 대상 (분모).
+      //   → 아직 처리(급여없음/급여있음/신고완료) 안 한 업체가 미처리로 남아 누락 감지 가능
       if(c.whtYn!=='Y') return false;
       // 계약일이 그 월분 마감일 이후면 제외 (마감 지난 뒤 계약한 신규업체)
       if(!whtContractOK(c, yr, m)) return false;
-      // 그 달(prevM2) 실제 급여실적(일용/사업/근로/퇴직)이 있어야 대상 — 급여없음은 신고 안 하므로 제외
-      var _wsc=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
-      return !!(_wsc&&(_wsc[c.id+'_daily_done']||_wsc[c.id+'_biz_done']||_wsc[c.id+'_labor_done']||_wsc[c.id+'_retire_done']));
+      return true;
     },
     getDone:function(chk,c){
       if(chk[c.id]&&chk[c.id].done) return true;
