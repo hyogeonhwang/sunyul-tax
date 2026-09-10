@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.54</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.55</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -7615,20 +7615,8 @@ async function saveSalaryInstant(docId,key,val,cbEl){
 
   await saveSalary(docId,key,val);
 
-  // 원천세 신고체크 자동 연동 (급여없음 포함, 유형 완료 시 = 그달 급여처리 완료로 간주)
-  if(key.endsWith('_daily_done')||key.endsWith('_biz_done')||key.endsWith('_labor_done')||key.endsWith('_retire_done')||key.endsWith('_no_salary')){
-    var cid=key.replace(/_(?:daily|biz|labor|retire)_done$|_no_salary$/,'');
-    var parts=docId.split('_');
-    if(parts.length>=3){
-      var salYr=parts[1], salM=parseInt(parts[2]);
-      var whtKey='tax_'+salYr+'_wht_'+salM;
-      // 일용/사업/근로/퇴직 + 급여없음 중 하나라도 체크되어 있으면 그달 원천세 완료로 간주
-      var allDone=row?Array.from(row.querySelectorAll('input[onchange*="_done"],input[onchange*="_no_salary"]')).some(function(el){return el===cbEl?val:el.checked;}):val;
-      await db.collection('taxChecks').doc(whtKey).set({[cid]:{done:allDone}},{merge:true});
-      if(DASH_TAX_CACHE[whtKey]) DASH_TAX_CACHE[whtKey][cid]={done:allDone};
-      if(openTabs.includes('dashboard')) renderDashStatus();
-    }
-  }
+  // [분리] 급여관리 체크는 급여 처리만 의미. 원천세 신고완료는 신고체크에서 실제 신고 후 수기로 체크.
+  //   (자동 연동 제거 — 급여만 하고 신고 안 한 경우를 미완료로 남겨 누락 감지)
 }
 
 async function saveSalary(docId,key,val){
@@ -9133,13 +9121,8 @@ function renderDashStatus(){
       return true;
     },
     getDone:function(chk,c){
-      if(chk[c.id]&&chk[c.id].done) return true;
-      // 반기납부는 신고체크만 완료로 인정 (급여 처리로 자동 완료 X)
-      if(c.whtSemi==='Y') return false;
-      // 매월납부: 급여관리에서 그 달 급여처리 완료(급여없음/일용/사업/근로/퇴직 중 하나) = 원천세 마감으로 간주
-      var sc=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][prevM2];
-      if(sc&&(sc[c.id+'_no_salary']||sc[c.id+'_daily_done']||sc[c.id+'_biz_done']||sc[c.id+'_labor_done']||sc[c.id+'_retire_done'])) return true;
-      return false;
+      // 급여관리 체크로 자동완료하지 않음. 신고체크에서 실제 신고 후 수기로 체크한 것만 완료.
+      return !!(chk[c.id]&&chk[c.id].done);
     }
   });
 
