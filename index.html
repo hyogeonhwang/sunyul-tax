@@ -3224,7 +3224,8 @@ async function loadTax(){
     clients = clients.concat(closedInPd);
     clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
     clients=clients.filter(c=>{
-      if(!c._whtMgr||c._whtMgr==='미배정') return false;
+      // 담당 미배정도 목록에 남긴다 (누락 방지). '미배정' 그룹으로 표시됨.
+      if(!c._whtMgr) c._whtMgr='미배정';
       // 폐업자: 위에서 이미 폐업월=pd 조건 걸었으니 통과
       // - 매월납부: 폐업 그 달 급여 이력 있으면 표시
       // - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 표시
