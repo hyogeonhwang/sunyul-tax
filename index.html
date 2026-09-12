@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.56</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.57</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3222,9 +3222,10 @@ async function loadTax(){
       return _cYr===parseInt(whtYr) && _cM===pdNum;
     });
     clients = clients.concat(closedInPd);
-    clients=clients.map(c=>({...c,_whtMgr:c.whtSep&&c.whtManager?c.whtManager:c.manager}));
+    clients=clients.map(c=>({...c,_whtMgr:(c.whtSep&&c.whtManager?c.whtManager:c.manager)||'미배정'}));
     clients=clients.filter(c=>{
-      if(!c._whtMgr||c._whtMgr==='미배정') return false;
+      // 담당자 미배정도 제외하지 않음 → '미배정' 그룹으로 신고체크에 표시 (담당자 미지정 업체 누락 방지)
+      if(!c._whtMgr) c._whtMgr='미배정';
       // 폐업자: 위에서 이미 폐업월=pd 조건 걸었으니 통과
       // - 매월납부: 폐업 그 달 급여 이력 있으면 표시
       // - 반기납부: 그 반기 안에 급여 이력 하나라도 있으면 표시
