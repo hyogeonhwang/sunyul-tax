@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.57</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.60</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -2058,6 +2058,10 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
                 oninput="this.value=Math.min(Math.max(parseInt(this.value)||1,1),31)">
             </div>
           </div>
+          <div class="fld" id="f-salary-start-wrap">
+            <label>급여 시작월 <span style="color:#aab;font-size:11px;font-weight:400">(비우면 계약월부터)</span></label>
+            <input class="fi" type="text" id="f-salary-start" placeholder="예: 202608" maxlength="7" inputmode="numeric" oninput="fmtYearMonth(this)">
+          </div>
         </div>
         <div id="f-salary-fixed-wrap" style="margin-bottom:12px">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
@@ -2778,7 +2782,7 @@ function editClient(id){
     'f-name':'name','f-type':'type','f-rep':'rep','f-biz':'bizNo','f-ssn':'ssn',
     'f-ct':'contract','f-mgr':'manager','f-fee':'fee','f-phone':'phone',
     'f-mobile':'mobile','f-email':'email','f-stat':'status','f-addr':'addr',
-    'f-nid':'ntsId','f-npw':'ntsPw','f-pos':'posContact','f-bst':'bizStart','f-enddate':'endDate','f-bizcode':'bizCode','f-wht-yn':'whtYn','f-salary-day':'salaryDay',
+    'f-nid':'ntsId','f-npw':'ntsPw','f-pos':'posContact','f-bst':'bizStart','f-enddate':'endDate','f-bizcode':'bizCode','f-wht-yn':'whtYn','f-salary-day':'salaryDay','f-salary-start':'salaryStart',
     'f-vtype':'vatType','f-vcycle':'vatCycle','f-wm2':'whtManager','f-wsemi':'whtSemi','f-memo':'memo'
   };
   Object.entries(map).forEach(([id,k])=>{
@@ -2843,6 +2847,7 @@ function clearCForm(){
   var fed=document.getElementById('f-enddate'); if(fed) fed.value='';
   var fwy=document.getElementById('f-wht-yn'); if(fwy){fwy.value='';togglePayrollFields('');}
   var fsd=document.getElementById('f-salary-day'); if(fsd) fsd.value='';
+  var fss=document.getElementById('f-salary-start'); if(fss) fss.value='';
   var fsdo=document.getElementById('f-salary-day-other'); if(fsdo){fsdo.value='';fsdo.style.display='none';}
   var fsf=document.getElementById('f-salary-fixed'); if(fsf) fsf.checked=false;
   var fbc=document.getElementById('f-bizcode'); if(fbc) fbc.value='';
@@ -2898,6 +2903,7 @@ async function saveClient(){
     whtSemi:v('f-wsemi')||'N',
     whtYn:whtYnVal,
     salaryDay:v('f-salary-day')||'',
+    salaryStart:v('f-salary-start')||'',
     salaryFixed:document.getElementById('f-salary-fixed')?.checked||false,
     bizCode:v('f-bizcode')||'',
     endDate:v('f-enddate')||'',
@@ -3907,14 +3913,25 @@ function isWhtTargetForMonth(c, yr, m){
 // 계약일 기준 원천세 대상 여부: 계약일이 그 월분 신고마감일(다음달 10일, 주말이면 익영업일)보다
 // 늦으면 제외. 계약일이 없으면 기존 업체로 보고 포함(true). yr/m = 신고 마감월(예: m=7 → 6월분).
 function whtContractOK(c, yr, m){
-  if(!c.contract) return true; // 계약일 미입력 → 기존 업체로 간주, 포함
-  var parts=String(c.contract).split('-');
-  var cy=parseInt(parts[0]), cm=parseInt(parts[1]), cd=parseInt(parts[2]);
-  if(!cy||!cm||!cd) return true; // 형식 이상 → 안전하게 포함
-  var _adl=adjustDeadline(parseInt(yr), m, 10); // 그 월분 신고마감일(10일, 주말보정)
-  var dueDate=new Date(_adl.y, _adl.m-1, _adl.d);
-  var ctDate=new Date(cy, cm-1, cd);
-  return ctDate<=dueDate; // 계약일 ≤ 마감일이면 대상
+  // 급여 시작월(salaryStart) 우선. 없으면 계약일(contract) 기준.
+  var startYM=null;
+  if(c.salaryStart){
+    var sp=String(c.salaryStart).split('-');
+    var sy=parseInt(sp[0]), sm=parseInt(sp[1]);
+    if(sy&&sm) startYM=sy*100+sm;
+  }
+  if(startYM===null){
+    if(!c.contract) return true; // 시작월·계약일 둘 다 없음 → 기존 업체로 간주, 포함
+    var parts=String(c.contract).split('-');
+    var cy=parseInt(parts[0]), cm=parseInt(parts[1]);
+    if(!cy||!cm) return true;
+    startYM=cy*100+cm;
+  }
+  // m은 마감월(귀속월+1). 귀속연월 = 마감월의 직전월.
+  var owM = m===1?12:m-1;
+  var owY = m===1?parseInt(yr)-1:parseInt(yr);
+  var owYM = owY*100+owM;
+  return owYM>=startYM; // 귀속월 ≥ 시작월(급여시작월 또는 계약월)이면 대상
 }
 
 // 범용 계약일 필터: 계약일이 지정한 신고마감일(dueYr-dueMon-dueDay)보다 늦으면 제외.
@@ -5260,6 +5277,19 @@ function fmtPhoneInput(el){
 }
 
 // 주민등록번호 자동 하이픈 (앞 6자리-뒤 7자리, 예: 950507-2072814)
+// 연월 자동 하이픈 (202608 → 2026-08). 월 13 이상은 12로 보정
+function fmtYearMonth(el){
+  var raw=(el.value||'').replace(/[^0-9]/g,'').slice(0,6);
+  if(raw.length<=4){ el.value=raw; return; }
+  var y=raw.slice(0,4), mo=raw.slice(4,6);
+  if(mo.length===2){
+    var mn=parseInt(mo,10);
+    if(mn<1) mn=1; if(mn>12) mn=12;
+    mo=String(mn).padStart(2,'0');
+  }
+  el.value=y+'-'+mo;
+}
+
 function fmtSsnInput(el){
   var raw=(el.value||'').replace(/[^0-9]/g,'').slice(0,13);
   el.value = raw.length>6 ? raw.slice(0,6)+'-'+raw.slice(6) : raw;
@@ -7441,13 +7471,21 @@ async function renderSalary(){
     if(c.type==='신고대리') return false;
     // 그 달(yr-m) 급여기록이 있는지 (현재 상태와 무관)
     var _hasRec = chk && (chk[c.id+'_no_salary']||chk[c.id+'_daily_done']||chk[c.id+'_biz_done']||chk[c.id+'_labor_done']||chk[c.id+'_retire_done']);
-    // 계약월 이전 달은 제외 (계약 이후부터 우리가 급여관리) — 단, 이미 그 달 급여기록이 있으면 유지
-    if(c.contract && !_hasRec){
-      var _cp=String(c.contract).split('-'); var _cy=parseInt(_cp[0]), _cm=parseInt(_cp[1]);
-      if(_cy&&_cm){
+    // 시작월 이전 달은 제외 (시작월부터 우리가 급여관리) — 단, 이미 그 달 급여기록이 있으면 유지
+    //   시작월 = 급여 시작월(salaryStart) 우선, 없으면 계약월
+    if(!_hasRec){
+      var _startYM=null;
+      if(c.salaryStart){
+        var _sp=String(c.salaryStart).split('-'); var _sy=parseInt(_sp[0]), _sm=parseInt(_sp[1]);
+        if(_sy&&_sm) _startYM=_sy*100+_sm;
+      }
+      if(_startYM===null && c.contract){
+        var _cp=String(c.contract).split('-'); var _cy=parseInt(_cp[0]), _cm=parseInt(_cp[1]);
+        if(_cy&&_cm) _startYM=_cy*100+_cm;
+      }
+      if(_startYM!==null){
         var viewYM=parseInt(yr)*100+parseInt(m);
-        var ctYM=_cy*100+_cm;
-        if(viewYM<ctYM) return false; // 조회월이 계약월보다 이르면 대상 아님
+        if(viewYM<_startYM) return false; // 조회월이 시작월보다 이르면 대상 아님
       }
     }
     // 현재 whtYn=Y이고 활성이면 포함 (정상 케이스)
