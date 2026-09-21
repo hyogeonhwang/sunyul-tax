@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.60</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.61</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -8996,28 +8996,21 @@ var WHT_CLOSED = {};
 // 반환: {y, m, prevClosed, prevY, prevM, warnUnclosed}
 //  - prevClosed: 직전월이 마감되었는지
 //  - warnUnclosed: 직전월 미마감인데 다음다음달이 되어 자동전환된 경우 true (경고용)
-function getWhtBase(){
-  var now=new Date();
-  var cy=now.getFullYear(), cm=now.getMonth()+1;
-  // 직전월
+function getWhtBase(baseYr, baseM){
+  // 조회월(baseYr-baseM) 기준. 미지정 시 오늘 기준.
+  var cy, cm;
+  if(baseYr&&baseM){ cy=parseInt(baseYr); cm=parseInt(baseM); }
+  else { var now=new Date(); cy=now.getFullYear(); cm=now.getMonth()+1; }
+  // 직전월 (조회월의 직전월분이 그 달 신고 대상)
   var pm = cm===1?12:cm-1;
   var py = cm===1?cy-1:cy;
   var prevKey = py+'_'+pm;
   var prevClosed = !!WHT_CLOSED[prevKey];
   if(prevClosed){
-    // 직전월 마감됨 → 당월분 표시
+    // 직전월분 마감됨 → 당월분 표시 (다음 신고 준비)
     return {y:cy, m:cm, prevClosed:true, prevY:py, prevM:pm, warnUnclosed:false};
   }
-  // 직전월 미마감 — 안전장치: 직전월의 "다음다음 달"이 지났으면 자동 당월 전환 + 경고
-  // 직전월(py-pm) 기준 다음다음 달 = pm+2
-  var limM = pm+2, limY = py;
-  while(limM>12){ limM-=12; limY++; }
-  // 현재가 limY-limM 이상이면 자동 전환
-  var curIdx = cy*12+cm, limIdx = limY*12+limM;
-  if(curIdx>=limIdx){
-    return {y:cy, m:cm, prevClosed:false, prevY:py, prevM:pm, warnUnclosed:true};
-  }
-  // 정상: 직전월분 표시 (마감 버튼 노출)
+  // 직전월분 미마감 → 직전월분 표시 (마감 버튼 노출)
   return {y:py, m:pm, prevClosed:false, prevY:py, prevM:pm, warnUnclosed:false};
 }
 
@@ -9046,10 +9039,11 @@ async function loadDashTaxCache(){
   var yr=String(DASH_YEAR||new Date().getFullYear());
   var m=DASH_MONTH||(new Date().getMonth()+1);
   var keys=[];
-  // 원천세 - 대시보드 선택 월의 직전월이 대상월 (renderDashStatus와 동일 로직)
+  // 원천세 - 직전월분과 당월분 둘 다 캐시 (마감 여부에 따라 renderDashStatus가 선택)
   var prevM=m===1?12:m-1;
   var prevYr=m===1?String(parseInt(yr)-1):yr;
   keys.push('tax_'+prevYr+'_wht_'+prevM);
+  keys.push('tax_'+yr+'_wht_'+m); // 당월분 (직전월 마감 시 표시될 대상)
   // 부가세 (예정/확정 - pd는 1~4)
   var vatPdMap={1:4, 4:1, 7:2, 10:3};
   if(vatPdMap[m]) keys.push('tax_'+yr+'_vat_'+vatPdMap[m]);
@@ -9137,10 +9131,11 @@ function renderDashStatus(){
 
   var taxTypes=[];
 
-  // 원천세 - 대시보드 선택 월(m)의 직전월이 원천세 대상월 (신고 마감: 선택 월 10일)
-  // 예: 대시보드 7월 선택 → 6월분 원천세, 5월 선택 → 4월분
-  var prevM2 = m===1?12:m-1;
-  var prevYr2 = m===1?String(parseInt(yr)-1):yr;
+  // 원천세 - 조회월 기준, 직전월분이 대상. 단 직전월분을 마감하면 당월분으로 전환 (마감 버튼 방식)
+  var _wb=getWhtBase(yr, m);
+  var prevM2 = _wb.m;
+  var prevYr2 = String(_wb.y);
+  var _whtPrevY=_wb.prevY, _whtPrevM=_wb.prevM, _whtPrevClosed=_wb.prevClosed;
   taxTypes.push({lbl:'원천세 신고 ('+prevM2+'월분)', docKey:'tax_'+prevYr2+'_wht_'+prevM2,
     deadline:{month:m,day:10},
     filter:function(c){
@@ -9710,11 +9705,11 @@ function renderDashStatus(){
       detailHtml+='</div>';
     }
 
-    // 원천세 줄: 마감 버튼 + 미마감 경고 (대시보드 선택 월 기반)
+    // 원천세 줄: 마감 버튼 (마감 대상 = 직전월분. 표시월과 별개)
     var whtBtnHtml='', whtWarnHtml='';
     if(t.docKey.indexOf('_wht_')>-1){
-      var _whtY=prevYr2, _whtM=prevM2;  // 원천세 대상월 (대시보드 선택 월의 직전월)
-      var _whtClosed=!!WHT_CLOSED[_whtY+'_'+_whtM];
+      var _whtY=_whtPrevY, _whtM=_whtPrevM;  // 마감 대상은 항상 직전월분 (표시월이 아님)
+      var _whtClosed=_whtPrevClosed;
       if(_whtClosed){
         // 마감됨 → 마감취소 버튼
         whtBtnHtml='<button onclick="event.stopPropagation();toggleWhtClose('+_whtY+','+_whtM+',false)" '
