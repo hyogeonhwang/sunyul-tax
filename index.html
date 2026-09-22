@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.61</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.62</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -677,6 +677,11 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
               <option value="20일">20일</option>
               <option value="25일">25일</option>
               <option value="말일">말일</option>
+            </select>
+            <select class="sel" id="sal-fixed-filter" onchange="renderSalary()">
+              <option value="">전체 구분</option>
+              <option value="fixed">고정</option>
+              <option value="var">변동</option>
             </select>
             <button class="btn btn-p btn-sm" onclick="renderSalary()">조회</button>
           </div>
@@ -7436,6 +7441,7 @@ async function renderSalary(){
   var yr=document.getElementById('sal-year')?.value||'2026';
   var m=document.getElementById('sal-month')?.value||(new Date().getMonth()+1);
   var dayF=document.getElementById('sal-day-filter')?.value||'';
+  var fixedF=document.getElementById('sal-fixed-filter')?.value||'';
   var el=document.getElementById('sal-body'); if(!el) return;
   el.innerHTML='<div class="ld"><div class="sp"></div></div>';
 
@@ -7498,6 +7504,9 @@ async function renderSalary(){
     }
     if(salQ&&!(c.name||'').toLowerCase().includes(salQ)) return false;
     if(dayF&&fmtSalDay(c.salaryDay)!==fmtSalDay(dayF)) return false;
+    // 구분 필터: 고정(salaryFixed=true) / 변동(salaryFixed=false/미설정)
+    if(fixedF==='fixed' && !c.salaryFixed) return false;
+    if(fixedF==='var' && c.salaryFixed) return false;
     // 원천담당자: whtSep=true이면 whtManager, 아니면 manager
     var effMgr = (c.whtSep&&c.whtManager) ? c.whtManager : c.manager;
     // 담당자 필터값 기준 (직원은 기본값이 자기 이름, 전체·타인 선택 가능)
