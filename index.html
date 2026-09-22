@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.62</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.63</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -6912,26 +6912,24 @@ function toggleLeaveDate(status){
 
 // 직원 초기 데이터 자동 등록
 async function initDefaultStaff(){
+  var snap=await db.collection('staffs').get();
+  // 이미 직원이 하나라도 있으면 자동 추가 안 함 (삭제한 직원이 되살아나는 것 방지)
+  //   → 최초 설치처럼 staffs가 완전히 비었을 때만 초기 직원 세팅
+  if(!snap.empty) return;
   var defaults=[
     {name:'황효건', email:'hg@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'대표세무사', memo:''},
-    {name:'김서지', email:'sj@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
-    {name:'안지윤', email:'jy@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
-    {name:'유승희', email:'sh@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
     {name:'김희진', email:'hj@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
+    {name:'유승희', email:'sh@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'세무사', memo:''},
+    {name:'정예림', email:'yl@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'사원', memo:''},
+    {name:'임다은', email:'de@sunyul.com', joinDate:'', leaveDate:'', status:'재직', title:'사원', memo:''},
   ];
-  var snap=await db.collection('staffs').get();
-  // 이미 등록된 직원 이름 수집
-  var existingNames = snap.docs.map(function(d){return d.data().name;});
-  // 누락된 직원만 필터링
-  var missing = defaults.filter(function(d){return existingNames.indexOf(d.name) < 0;});
-  if(missing.length === 0) return;
   var batch=db.batch();
-  missing.forEach(function(s){
+  defaults.forEach(function(s){
     var ref=db.collection('staffs').doc();
     batch.set(ref,Object.assign(s,{createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
   });
   await batch.commit();
-  console.log('누락된 직원 자동 추가:', missing.map(function(m){return m.name;}).join(', '));
+  console.log('초기 직원 세팅 완료 (staffs가 비어있어 최초 세팅)');
 }
 
 
