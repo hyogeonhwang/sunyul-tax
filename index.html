@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.64</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.65</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3211,8 +3211,9 @@ async function loadTax(){
     const isJunggan=pdNum===1||pdNum===3; // 1기예정, 2기예정
     clients=clients.filter(c=>{
       if(isJunggan){
-        // 예정: 면세 제외, 법인(일반/간이) + 분기신고 일반과세 개인
+        // 예정: 면세 제외, 신고대리 제외(개인이라 예정신고 안 함), 법인 + 분기신고 일반과세 개인
         if(c.vatType==='면세') return false;
+        if(c.type==='신고대리') return false; // 신고대리는 예정신고 대상 아님 (vatCycle 오입력 방어)
         return c.type==='법인' || (c.vatType==='일반' && c.vatCycle==='분기');
       } else {
         // 확정: 면세 제외, 법인 + 일반과세자
