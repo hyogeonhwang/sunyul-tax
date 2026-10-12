@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.63</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.64</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -2247,11 +2247,49 @@ const USERS = {
   ['jy@sunyul.com']:{name:'안지윤',role:'staff',title:'사원'},
 };
 // 담당자 표시 순서 공용 기준 (모든 드롭다운/그룹 목록이 이 순서를 따름)
-const MGR_ORDER = ['황효건','김희진','유승희','정예림','임다은'];
+// 담당자 표시 순서 — STAFFS(직원관리) 기반으로 자동 생성.
+//   규칙: 황효건(대표) → 김희진(세무사) 고정 → 나머지 재직자 입사일순(입사일 없으면 앞) → 미배정 끝
+//   STAFFS 로드 전 폴백 기본값. buildMgrOrder()가 STAFFS 로드 후 갱신.
+let MGR_ORDER = ['황효건','김희진','유승희','정예림','임다은'];
+var MGR_ORDER_FIXED = ['황효건','김희진']; // 항상 맨 앞 고정 (대표·세무사)
+
+// 이메일 → 이름 조회 (STAFFS 우선, 없으면 USERS 폴백=퇴사자 과거기록). 둘 다 없으면 이메일 반환
+function nameByEmail(email){
+  if(!email) return '';
+  if(typeof STAFFS!=='undefined' && STAFFS.length){
+    var s=STAFFS.find(function(x){return x.email===email;});
+    if(s&&s.name) return s.name;
+  }
+  if(typeof USERS!=='undefined' && USERS[email] && USERS[email].name) return USERS[email].name;
+  return email;
+}
+// 이메일 → 역할 (admin은 ADMIN_EMAIL, 나머지 staff). STAFFS에 title로 구분 안 하므로 ADMIN_EMAIL 기준 유지
+function roleByEmail(email){
+  return (email===ADMIN_EMAIL) ? 'admin' : 'staff';
+}
+
+function buildMgrOrder(){
+  if(typeof STAFFS==='undefined' || !STAFFS.length) return; // 데이터 없으면 폴백 유지
+  var active = STAFFS.filter(function(s){return s.status==='재직';});
+  // 고정 인원(황효건·김희진) 중 재직자
+  var fixed = MGR_ORDER_FIXED.filter(function(n){return active.some(function(s){return s.name===n;});});
+  // 나머지 재직자: 입사일(joinDate) 오름차순. 입사일 없으면 맨 앞(기존 직원)
+  var rest = active.filter(function(s){return MGR_ORDER_FIXED.indexOf(s.name)<0;})
+    .sort(function(a,b){
+      var ja=a.joinDate||'', jb=b.joinDate||'';
+      if(!ja && jb) return -1;   // a만 입사일 없음 → a 먼저
+      if(ja && !jb) return 1;    // b만 입사일 없음 → b 먼저
+      if(ja===jb) return 0;
+      return ja<jb?-1:1;         // 둘 다 있으면 입사일 오름차순
+    })
+    .map(function(s){return s.name;});
+  MGR_ORDER = fixed.concat(rest);
+}
+
 function mgrSortIndex(name){
   if(name==='미배정') return 999; // 미배정은 항상 맨 끝
   var i = MGR_ORDER.indexOf(name);
-  return i===-1 ? 998 : i; // 명단에 없는 이름은 미배정 바로 앞
+  return i===-1 ? 998 : i; // 명단에 없는 이름(퇴사자 등)은 미배정 바로 앞
 }
 function sortByMgrOrder(names){
   return names.slice().sort(function(a,b){return mgrSortIndex(a)-mgrSortIndex(b);});
@@ -2270,7 +2308,7 @@ function setupMgrFilter(id, opts){
   var sel=document.getElementById(id);
   if(!sel) return;
   var isAdmin = (typeof ROLE!=='undefined' && ROLE==='admin');
-  var myNm = isAdmin ? '' : (typeof ME!=='undefined' && ME && typeof USERS!=='undefined' && USERS[ME.email] ? USERS[ME.email].name : '');
+  var myNm = isAdmin ? '' : (typeof ME!=='undefined' && ME ? nameByEmail(ME.email) : '');
   // everyone 옵션이거나 admin/직원 모두 드롭다운 표시 (직원도 필터로 전체·타인 조회 가능)
   var prev=opts.reset?'':sel.value;
   var names=(typeof STAFF_LIST!=='undefined'&&STAFF_LIST&&STAFF_LIST.length)
@@ -2297,9 +2335,10 @@ let calY=new Date().getFullYear(), calM=new Date().getMonth();
 auth.onAuthStateChanged(u=>{
     if(u){
     ME=u;
-    const info=USERS[u.email]||{name:u.email,role:'staff',title:''};
     ROLE = (u.email === ADMIN_EMAIL) ? 'admin' : 'staff';
-    document.getElementById('hUser').textContent=`${info.name} ${info.title}`;
+    var _nm=nameByEmail(u.email);
+    var _ti=(typeof USERS!=='undefined'&&USERS[u.email]&&USERS[u.email].title)?USERS[u.email].title:(ROLE==='admin'?'대표세무사':'');
+    document.getElementById('hUser').textContent=(_nm+' '+_ti).trim();
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     // 대시보드 로딩 스피너
@@ -4703,9 +4742,8 @@ function renderDash(){
   const isCurrentMonth=(yr===new Date().getFullYear() && m===new Date().getMonth()+1);
   const today=new Date();
   const d=isCurrentMonth?today.getDate():1;  // 현재월이면 오늘, 과거/미래월이면 1일 기준
-  const info=USERS[ME?.email]||{};
+  const myName=nameByEmail(ME?.email)||'';
   const isStaff=(ROLE!=='admin');
-  const myName=info.name||'';
 
   // ① 상단 통계 카드 (그 월 시점 활성 거래처)
   // 직원 로그인 시: 자기 담당 거래처만 카운트
@@ -4713,7 +4751,7 @@ function renderDash(){
   const tot=ALL.filter(c=>c.type!=='신고대리' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
   const agency=ALL.filter(c=>c.type==='신고대리' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
   const corp=ALL.filter(c=>c.type==='법인' && isActiveInMonth(c, yr, m) && staffFilter(c)).length;
-  const myC=ALL.filter(c=>c.manager===info.name && isActiveInMonth(c, yr, m)).length;
+  const myC=ALL.filter(c=>c.manager===myName && isActiveInMonth(c, yr, m)).length;
   const mDL=DL.filter(e=>e.m===m || (e.baseMon && e.baseMon===m));
   // 이번달 마감: 현재월이면 남은 마감, 그 외엔 전체 마감 (실제 마감일 기준 정렬)
   const upcoming=(isCurrentMonth?mDL.filter(e=>{
@@ -4729,7 +4767,7 @@ function renderDash(){
   if(se) se.innerHTML=`
     <div class="stat"><div class="stat-lbl">전체 거래처</div><div class="stat-val">${tot}</div><div class="stat-sub">활성 기준 · 신고대리 ${agency}개 별도</div></div>
     <div class="stat"><div class="stat-lbl">법인 거래처</div><div class="stat-val">${corp}</div><div class="stat-sub">대표 직접 관리</div></div>
-    <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${info.name||''} 담당</div></div>
+    <div class="stat"><div class="stat-lbl">내 담당</div><div class="stat-val">${myC}</div><div class="stat-sub">${myName||''} 담당</div></div>
     <div class="stat"><div class="stat-lbl">${m}월 마감</div><div class="stat-val">${upcoming.length}</div><div class="stat-sub">${m}월 세무 일정</div></div>`;
 
   // ② 긴급처리는 loadDashTaxCache 완료 후 renderUrgentSection()에서 처리
@@ -6499,8 +6537,7 @@ function initLeavePage(){
 function getMeName(){
   if(!ME) return '';
   // USERS(이메일→정보)에서 이름을 찾음. 하드코딩 매핑 제거로 직원 변경 자동 반영
-  if(ME.email && USERS[ME.email]) return USERS[ME.email].name;
-  return ME.email || '';
+  return nameByEmail(ME.email) || ME.email || '';
 }
 
 function getLeaveYear(){
@@ -6704,12 +6741,15 @@ async function syncStaffList(){
   try{
     var snap = await db.collection('staffs').get();
     STAFFS = snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-    var active = STAFFS.filter(function(s){return s.status==='재직';}).map(function(s){return s.name;});
-    if(active.length){
-      // MGR_ORDER 순서를 우선 적용, 그 외 재직자는 뒤에 붙임
-      var ordered = MGR_ORDER.filter(function(n){return active.indexOf(n)>=0;});
-      active.forEach(function(n){ if(ordered.indexOf(n)<0) ordered.push(n); });
-      STAFF_LIST = ordered;
+    buildMgrOrder();                                  // 담당자 순서 재계산 (황효건·김희진 고정+입사일순)
+    STAFF_LIST = MGR_ORDER.slice();                   // STAFF_LIST = 재직자 순서 그대로
+    // STAFFS 로드 전 헤더에 이메일로 떴을 수 있으니 이름으로 재갱신
+    if(ME&&ME.email){
+      var _h=document.getElementById('hUser');
+      if(_h){
+        var _ti=(typeof USERS!=='undefined'&&USERS[ME.email]&&USERS[ME.email].title)?USERS[ME.email].title:(ROLE==='admin'?'대표세무사':'');
+        _h.textContent=(nameByEmail(ME.email)+' '+_ti).trim();
+      }
     }
   }catch(e){ console.error('syncStaffList 실패:', e); }
 }
@@ -6718,9 +6758,9 @@ function loadStaffPage(){
   initDefaultStaff().then(function(){
   db.collection('staffs').get().then(function(snap){
     STAFFS = snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    buildMgrOrder();                    // 담당자 순서 재계산
+    STAFF_LIST = MGR_ORDER.slice();     // 재직자 순서 그대로
     renderStaffList();
-    // STAFF_LIST도 재직자 기준으로 동기화
-    STAFF_LIST = STAFFS.filter(function(s){return s.status==='재직';}).map(function(s){return s.name;});
     setupMgrFilter('cManager',{everyone:true}); // 거래처 관리 드롭다운도 갱신
   }).catch(function(){renderStaffList();});
   }); // initDefaultStaff
@@ -6877,8 +6917,8 @@ async function deleteStaff(id){
   try{
     await db.collection('staffs').doc(id).delete();
     STAFFS=STAFFS.filter(function(x){return x.id!==id;});
-    // STAFF_LIST도 재동기화 (재직자 기준)
-    STAFF_LIST=STAFFS.filter(function(x){return x.status==='재직';}).map(function(x){return x.name;});
+    buildMgrOrder();                    // 담당자 순서 재계산
+    STAFF_LIST=MGR_ORDER.slice();       // 재직자 순서 그대로
     setupMgrFilter('cManager',{everyone:true}); // 거래처 관리 드롭다운도 갱신
     renderStaffList();
     alert('"'+s.name+'" 직원이 삭제되었습니다.');
@@ -6891,17 +6931,22 @@ async function deleteStaff(id){
 function renderAcctTable(){
   var tbody = document.getElementById('acct-table-body');
   if(!tbody) return;
-  var rows = Object.keys(USERS).map(function(email){
-    var u = USERS[email];
-    var isAdmin = u.role==='admin';
+  // STAFFS(직원관리) 기반 — 재직자를 담당자 순서(MGR_ORDER)로. 신규 직원 자동 반영
+  var list = (typeof STAFFS!=='undefined' && STAFFS.length)
+    ? STAFFS.filter(function(s){return s.status==='재직';})
+        .slice().sort(function(a,b){return mgrSortIndex(a.name)-mgrSortIndex(b.name);})
+    : [];
+  var rows = list.map(function(s){
+    var isAdmin = (s.email===ADMIN_EMAIL);
+    var title = s.title || (isAdmin?'대표세무사':'');
     return '<tr>'
-      +'<td>'+u.name+'</td>'
-      +'<td>'+email+'</td>'
+      +'<td>'+(s.name||'')+'</td>'
+      +'<td>'+(s.email||'')+'</td>'
       +'<td><span class="bdg '+(isAdmin?'bdg-corp':'bdg-gen')+'">'+(isAdmin?'관리자':'직원')+'</span></td>'
-      +'<td>'+u.title+'</td>'
+      +'<td>'+title+'</td>'
       +'</tr>';
   }).join('');
-  tbody.innerHTML = rows;
+  tbody.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:#aab;padding:12px">직원 정보를 불러오는 중...</td></tr>';
 }
 
 
@@ -7456,7 +7501,7 @@ async function renderSalary(){
   }
 
   var mgrF=document.getElementById('sal-mgr-filter')?.value||'';
-  var myName=ROLE==='admin'?'':(USERS[ME?.email]?.name||'');
+  var myName=ROLE==='admin'?'':(nameByEmail(ME?.email)||'');
 
   // 급여 있는 업체만 (whtYn=Y), 기장중지 제외
   var salQ=(document.getElementById('sal-search')?.value||'').toLowerCase();
@@ -7751,7 +7796,7 @@ async function checkSalaryAlerts(){
   var curChk=curDoc.exists?curDoc.data():{};
   var prevChk=prevDoc.exists?prevDoc.data():{};
 
-  var myName=ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var myName=ROLE==='admin'?null:(nameByEmail(ME?.email)||'');
   var salClients=ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;
@@ -7841,7 +7886,7 @@ async function loadProfit(){
 function renderProfit(){
   var q = (document.getElementById('profit-search')?.value||'').toLowerCase();
   var mgrF = document.getElementById('profit-mgr')?.value||'';
-  var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var myName = ROLE==='admin'?null:(nameByEmail(ME?.email)||'');
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
     if(c.type==='신고대리') return false;  // 중간손익은 신고대리 제외
@@ -8458,7 +8503,7 @@ function renderSendList(){
   var mgrF = document.getElementById('send-mgr-filter')?.value||'';
   var typeF = document.getElementById('send-type-filter')?.value||'';
   var sendQ = (document.getElementById('send-search')?.value||'').toLowerCase();
-  var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var myName = ROLE==='admin'?null:(nameByEmail(ME?.email)||'');
 
   var clients = ALL.filter(function(c){
     if(c.status!=='활성') return false;
@@ -8729,7 +8774,7 @@ async function loadGoji(){
 function renderGoji(){
   var q = (document.getElementById('goji-search')?.value||'').toLowerCase();
   var mgrF = document.getElementById('goji-mgr')?.value||'';
-  var myName = ROLE==='admin'?null:(USERS[ME?.email]?.name||'');
+  var myName = ROLE==='admin'?null:(nameByEmail(ME?.email)||'');
   var clrBtn = document.getElementById('goji-search-clr');
   if(clrBtn) clrBtn.style.display = q?'block':'none';
 
@@ -9118,9 +9163,8 @@ function renderDashStatus(){
   var d=isCurMonth?new Date().getDate():1;
   var now=new Date();  // D-일 계산은 실제 오늘 기준
   // 직원 로그인 시: 자기 담당만 필터 (선택 담당자로 추후 세분화)
-  var _info=USERS[ME?.email]||{};
+  var myName=nameByEmail(ME?.email)||'';
   var isStaff=(ROLE!=='admin');
-  var myName=_info.name||'';
   // 처리현황 담당자 필터 (전체=빈 문자열, 특정 담당자 이름 또는 '미배정')
   var mgrFilter=document.getElementById('dashStatusMgrFilter')?document.getElementById('dashStatusMgrFilter').value:'';
   var effectiveMgr=isStaff?myName:mgrFilter;  // 직원은 자기 이름 강제, admin은 필터값
