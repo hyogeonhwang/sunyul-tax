@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.65</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.66</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -6752,6 +6752,9 @@ async function syncStaffList(){
         _h.textContent=(nameByEmail(ME.email)+' '+_ti).trim();
       }
     }
+    // STAFFS 로드 전 만들어진 담당자 드롭다운(cManager 등)을 최신 명단으로 재갱신
+    //   (로그인 직후 resetAllState에서 STAFFS 로드 전에 세팅됐을 수 있음 → 퇴사자가 남는 문제 방지)
+    if(document.getElementById('cManager')) setupMgrFilter('cManager',{everyone:true});
   }catch(e){ console.error('syncStaffList 실패:', e); }
 }
 
