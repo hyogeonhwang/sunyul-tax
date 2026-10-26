@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.67</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.68</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3361,9 +3361,12 @@ async function loadTax(){
 
   // corp 중간예납(pd=2)은 '가결산신고'로 분류된 법인만 진행률 대상 (고지납부·대상아님·미분류 제외)
   var _isCorpMid = (tp==='corp' && pd==='2');
+  // 부가세 예정신고(1기예정 pd=1, 2기예정 pd=3): 예정고지 납부(goji)·기준금액미만(none)은 우리 신고 아님 → 분모 제외
+  var _isVatPre = (tp==='vat' && (pd==='1'||pd==='3'));
   const activeList=clients.filter(c=>{
     if(chk[c.id]?.skip) return false;
     if(_isCorpMid && chk[c.id]?.corpMidType!=='가결산신고') return false;
+    if(_isVatPre){ var _gs=_gojiMap[c.id]?.status; if(_gs==='goji') return false; if(_gs==='none'&&!c.vatExcept) return false; }
     return true;
   });
   const skipCnt=clients.length-activeList.length;
@@ -3395,6 +3398,7 @@ async function loadTax(){
     const mActive=list.filter(c=>{
       if(chk[c.id]?.skip) return false;
       if(_isCorpMid && chk[c.id]?.corpMidType!=='가결산신고') return false;
+      if(_isVatPre){ var _gs=_gojiMap[c.id]?.status; if(_gs==='goji') return false; if(_gs==='none'&&!c.vatExcept) return false; }
       return true;
     });
     const mdone=mActive.filter(c=>chk[c.id]?.done).length;
