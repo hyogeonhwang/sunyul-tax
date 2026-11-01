@@ -2074,6 +2074,12 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
             <span>고정급여 <span style="color:#aab;font-size:11px;font-weight:400">(매월 동일 — 자료수취 불필요)</span></span>
           </label>
         </div>
+        <div id="f-daily-stmt-wrap" style="margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="f-daily-stmt" style="width:15px;height:15px;accent-color:#1A3169">
+            <span>일용 지급명세서 홈택스 직접 제출 <span style="color:#aab;font-size:11px;font-weight:400">(근로내용확인신고에서 국세청 전송이 안 되는 곳 — 노무법인 자료 업체 등)</span></span>
+          </label>
+        </div>
       </div>
       <!-- 소셜계정 -->
       <div id="ct-plat" style="display:none;min-height:440px">
@@ -2856,6 +2862,7 @@ function editClient(id){
     else{sdEl.value='기타';if(sdOther){sdOther.style.display='block';sdOther.value=parseInt(sd)||'';}}
   }
   var sfEl=document.getElementById('f-salary-fixed'); if(sfEl) sfEl.checked=!!c.salaryFixed;
+  var dsEl=document.getElementById('f-daily-stmt'); if(dsEl) dsEl.checked=!!c.dailyStmtOurs;
   setTimeout(function(){updateVatCycle(c.vatType||'일반');if(c.vatCycle){var el=document.getElementById('f-vcycle');if(el)el.value=c.vatCycle;}
     var excEl=document.getElementById('f-vat-except');if(excEl)excEl.checked=!!(c.vatExcept);},50);
   setTimeout(function(){if(c.bizCode){lookupBizCode(c.bizCode);var cl=document.getElementById('f-bizcode-clr');if(cl)cl.style.display='flex';}},100);
@@ -2894,6 +2901,7 @@ function clearCForm(){
   var fss=document.getElementById('f-salary-start'); if(fss) fss.value='';
   var fsdo=document.getElementById('f-salary-day-other'); if(fsdo){fsdo.value='';fsdo.style.display='none';}
   var fsf=document.getElementById('f-salary-fixed'); if(fsf) fsf.checked=false;
+  var fds=document.getElementById('f-daily-stmt'); if(fds) fds.checked=false;
   var fbc=document.getElementById('f-bizcode'); if(fbc) fbc.value='';
   var fbclr=document.getElementById('f-bizcode-clr'); if(fbclr) fbclr.style.display='none';
   var fbn=document.getElementById('f-bizcode-name'); if(fbn) fbn.textContent='';
@@ -2949,6 +2957,7 @@ async function saveClient(){
     salaryDay:v('f-salary-day')||'',
     salaryStart:v('f-salary-start')||'',
     salaryFixed:document.getElementById('f-salary-fixed')?.checked||false,
+    dailyStmtOurs:document.getElementById('f-daily-stmt')?.checked||false,
     bizCode:v('f-bizcode')||'',
     endDate:v('f-enddate')||'',
     payrollSettings:ps,platforms:platRows,memo:v('f-memo'),
@@ -4154,7 +4163,7 @@ async function renderPayroll(){
         var closed=getClosedPayrollBadge(c, tp, dueDateStr);
         var rowBg=isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent');
         html+='<tr style="border-top:1px solid #f0f2f7;'+rowBg+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+'</td>';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+((tp==='daily'&&c.dailyStmtOurs)?' <span class="bdg" style="background:#fff4d6;color:#8a6200;margin-left:4px">홈택스 직접</span>':'')+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
         html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
@@ -7460,6 +7469,9 @@ function togglePayrollFields(val){
   var sdw=document.getElementById('f-salary-day-wrap');
   var sfw=document.getElementById('f-salary-fixed-wrap');
   var smw=document.getElementById('f-wht-semi-wrap');
+  var dsw=document.getElementById('f-daily-stmt-wrap');
+  if(dsw) dsw.style.opacity=show?'1':'0.4';
+  var ds=document.getElementById('f-daily-stmt'); if(ds) ds.disabled=!show;
   if(sdw) sdw.style.opacity=show?'1':'0.4';
   if(sfw) sfw.style.opacity=show?'1':'0.4';
   if(smw) smw.style.opacity=show?'1':'0.4';
