@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.68</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.70</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -7181,9 +7181,10 @@ function renderUrgentSection(){
 // 매월 지급명세서 대상이 확정됐는지 (귀속월 급여관리에 일용/사업 체크가 하나라도 있는지)
 function hasPayTargets(e){
   var yr=String(DASH_YEAR||new Date().getFullYear());
-  var m=DASH_MONTH||(new Date().getMonth()+1);
-  var pyM=m===1?12:m-1;
-  var pyYr=m===1?(parseInt(yr)-1).toString():yr;
+  // 마감항목(e)의 지급월 기준 = (baseMon 또는 e.m) - 1. 조회월(DASH_MONTH) 아님 — 마감 밀림 대응
+  var _dueMon = (e&&(e.baseMon||e.m)) || (DASH_MONTH||(new Date().getMonth()+1));
+  var pyM=_dueMon===1?12:_dueMon-1;
+  var pyYr=_dueMon===1?(parseInt(yr)-1).toString():yr;
   var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
   return ALL.some(function(c){
     if(c.type==='신고대리') return false;
@@ -7262,10 +7263,11 @@ function getIncompleteClientsForDeadline(e){
   }
 
   if(e.t==='wht'){
-    // 처리현황 원천세와 동일 기준: 대시보드 선택 월(m)의 직전월이 원천세 대상월
-    // 예: 대시보드 6월 → 5월분 원천세 (6/10 신고 마감)
-    var whtBaseM=m===1?12:m-1;
-    var whtBaseY=m===1?String(parseInt(yr)-1):yr;
+    // 마감항목 기준: 원천세 신고월(e.m)의 직전월이 대상월. e.baseMon 있으면(주말 밀림) 그 원칙월 사용.
+    //   예: 11/10 마감 원천세 = 10월분. 조회월(m)이 아니라 마감항목 월로 판단 (마감 밀림 대응)
+    var _whtDueM = e.baseMon || e.m;
+    var whtBaseM = _whtDueM===1?12:_whtDueM-1;
+    var whtBaseY = _whtDueM===1?String(parseInt(yr)-1):yr;
     var whtKey='tax_'+whtBaseY+'_wht_'+whtBaseM;
     var whtChk=DASH_TAX_CACHE[whtKey]||{};
     var salData=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][whtBaseM]||{};
@@ -7324,8 +7326,11 @@ function getIncompleteClientsForDeadline(e){
   }
 
   if(e.t==='pay'){
-    var pyM=m===1?12:m-1;
-    var pyYr=m===1?(parseInt(yr)-1).toString():yr;
+    // 간이지급명세서 지급월(귀속월) = 마감항목의 원칙마감월(baseMon) - 1. baseMon 없으면 실제 마감월(e.m) - 1.
+    //   (조회월 m-1을 쓰면 안 됨 — 9월분 마감을 11월에 조회해도 9월분 데이터를 봐야 함)
+    var _dueMon = e.baseMon || e.m;
+    var pyM = _dueMon===1?12:_dueMon-1;
+    var pyYr = _dueMon===1?(parseInt(yr)-1).toString():yr;
     var pyChk=DASH_TAX_CACHE['payroll_monthly_'+pyYr]||{};
     var salCache=SALARY_CACHE[pyYr]&&SALARY_CACHE[pyYr][pyM]||{};
     return ALL.filter(function(c){
