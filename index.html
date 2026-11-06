@@ -2039,6 +2039,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
           <div class="fld" id="f-wht-semi-wrap">
             <label>원천세 납부방식</label>
             <select class="fi" id="f-wsemi">
+              <option value="">— 선택하세요 —</option>
               <option value="N">매월 납부</option>
               <option value="Y">반기 납부</option>
             </select>
@@ -2892,7 +2893,7 @@ function clearCForm(){
   updateVatCycle('일반');
   document.getElementById('f-vcycle').value='분기';
   var fwm2=document.getElementById('f-wm2'); if(fwm2) fwm2.value='';
-  var fws2=document.getElementById('f-wsemi'); if(fws2) fws2.value='N';
+  var fws2=document.getElementById('f-wsemi'); if(fws2) fws2.value='';
   var fwsep=document.getElementById('f-wht-sep'); if(fwsep) fwsep.checked=false;
   var wsd=document.getElementById('whtSepDiv'); if(wsd) wsd.style.display='none';
   var fed=document.getElementById('f-enddate'); if(fed) fed.value='';
@@ -2936,6 +2937,12 @@ async function saveClient(){
   if(!whtYnVal){
     alert('"원천세 해당"(급여 있음/없음)을 반드시 선택해주세요.\n\n급여 여부가 설정되지 않으면 급여관리·원천세 현황에서 누락됩니다.');
     var wel=document.getElementById('f-wht-yn'); if(wel) wel.focus();
+    return;
+  }
+  // 원천세 해당이면 납부방식(매월/반기)도 필수 — 기본값 '매월'로 저장돼 반기 업체가 매월로 잘못 잡히는 것 방지 (2026-11-06)
+  if(whtYnVal==='Y' && !v('f-wsemi')){
+    alert('"원천세 납부방식"(매월/반기)을 반드시 선택해주세요.\n\n잘못 들어가면 원천세 신고 대상 달이 틀려집니다.');
+    var wsl=document.getElementById('f-wsemi'); if(wsl) wsl.focus();
     return;
   }
   const ps={};
