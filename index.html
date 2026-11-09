@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.70</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.71</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3518,7 +3518,7 @@ async function loadTax(){
                     : (isGoji||isNone)
                     ? '<input type="checkbox" checked disabled style="opacity:0.4" title="'+(isGoji?'예정고지 납부':'신고불필요')+'">'
                     : `<input type="checkbox" ${chk[c.id]?.done?'checked':''} onchange="saveTax('${key}','${c.id}','done',this.checked)">`
-                  }
+                  }${tp==='wht'?whtPayBadge(chk[c.id]):''}
                 </td>
                 ${(tp!=='wht'&&tp!=='biz'&&!isGoji&&!isNone&&!isSkip)?`
                 <td style="padding:6px 10px;text-align:right">
@@ -7084,6 +7084,37 @@ function toggleUrgentDetail(uid){
   if(d){var o=d.style.display==='block';d.style.display=o?'none':'block';if(a)a.textContent=o?'▼':'▲';}
 }
 
+// 원천세 납부 확인(다마감 프로그램이 기한일 14시 홈택스·위택스 조회 → taxChecks에 payStatus 미납/납부, payAt 기록)
+// 기한일 당일 조회 결과만 표시(기한 지나면 의미 없음)
+function _todayStr(){ var t=new Date(); return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2); }
+function whtPayBadge(o){
+  if(!o||o.payStatus!=='미납'||String(o.payAt||'').slice(0,10)!==_todayStr()) return '';
+  return '<span title="'+String(o.payAt).slice(11,16)+' 홈택스·위택스 조회 기준 · 오늘 납부 마감" style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fdecec;color:#c0392b;margin-left:6px;font-weight:700">미납</span>';
+}
+async function addWhtPayUrgent(el){
+  try{
+    var t=new Date(), y=t.getFullYear(), pm=t.getMonth(); if(pm===0){ pm=12; y--; }
+    var doc=await db.collection('taxChecks').doc('tax_'+y+'_wht_'+pm).get(); if(!doc.exists) return;
+    var data=doc.data()||{}, today=_todayStr(), list=[];
+    Object.keys(data).forEach(function(cid){ var o=data[cid];
+      if(o&&o.payStatus==='미납'&&String(o.payAt||'').slice(0,10)===today){
+        var c=ALL.find(function(x){return x.id===cid;}); if(c) list.push({name:c.name, mgr:(c.whtSep&&c.whtManager?c.whtManager:c.manager)||'미배정'}); } });
+    if(!list.length) return;
+    list.sort(function(a,b){return a.mgr.localeCompare(b.mgr)||a.name.localeCompare(b.name);});
+    var uid='urgent-whtpay';
+    var box='<div style="margin-bottom:8px;border:0.5px solid #fcc;border-radius:8px;overflow:hidden">'
+      +'<div onclick="toggleUrgentDetail(\''+uid+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#fff5f5;cursor:pointer">'
+      +'<span style="font-size:13px;font-weight:600;color:#c0392b">🔴 원천세 납부 (오늘 마감)</span>'
+      +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;background:#e74c3c;color:#fff;padding:1px 7px;border-radius:20px">미납 '+list.length+'개</span>'
+      +'<span id="arr-'+uid+'" style="color:#aab;font-size:11px">▼</span></div></div>'
+      +'<div id="'+uid+'" style="display:none;background:#fff;border-top:0.5px solid #fcc;padding:4px 12px 8px">'
+      +list.map(function(c){return '<div style="font-size:11px;color:#c0392b;padding:3px 0;border-bottom:0.5px solid #fee9e9">'+c.name+'<span style="color:#aab;margin-left:6px">'+c.mgr+'</span></div>';}).join('')
+      +'</div></div>';
+    if(el.querySelector('#'+uid)) return;
+    if(/긴급 처리 항목이 없습니다/.test(el.textContent)) el.innerHTML=box; else el.insertAdjacentHTML('afterbegin',box);
+  }catch(e){ console.error('addWhtPayUrgent', e); }
+}
+
 function renderUrgentSection(){
   var urgentEl=document.getElementById('dashUrgent');
   if(!urgentEl) return;
@@ -7145,6 +7176,7 @@ function renderUrgentSection(){
 
   if(!urgent.length){
     urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
+    if(isCurMonth) addWhtPayUrgent(urgentEl);
     return;
   }
 
@@ -7179,6 +7211,7 @@ function renderUrgentSection(){
   }).join('');
 
   urgentEl.innerHTML=html;
+  if(isCurMonth) addWhtPayUrgent(urgentEl);
   }catch(err){
     urgentEl.innerHTML='<div style="text-align:center;padding:22px;color:#aab;font-size:13px">긴급 처리 항목이 없습니다 ✅</div>';
     console.error('renderUrgentSection error:', err);
