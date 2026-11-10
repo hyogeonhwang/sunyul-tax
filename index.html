@@ -517,7 +517,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.71</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.72</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -7089,7 +7089,7 @@ function toggleUrgentDetail(uid){
 function _todayStr(){ var t=new Date(); return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2); }
 function whtPayBadge(o){
   if(!o||o.payStatus!=='미납'||String(o.payAt||'').slice(0,10)!==_todayStr()) return '';
-  return '<span title="'+String(o.payAt).slice(11,16)+' 홈택스·위택스 조회 기준 · 오늘 납부 마감" style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fdecec;color:#c0392b;margin-left:6px;font-weight:700">미납</span>';
+  return '<span title="'+String(o.payAt).slice(11,16)+' 홈택스·위택스 조회 기준 · 오늘 납부 마감" style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fdecec;color:#c0392b;margin-left:6px;font-weight:700;white-space:nowrap;display:inline-block;vertical-align:middle;line-height:1.4">미납</span>';
 }
 async function addWhtPayUrgent(el){
   try{
