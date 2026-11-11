@@ -525,7 +525,7 @@ details.salx .salx-pop label:hover{background:#f4f6fb}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.73</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.74</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -716,7 +716,6 @@ details.salx .salx-pop label:hover{background:#f4f6fb}
               <option value="daily">일용직 (매월)</option>
               <option value="biz">사업소득 (매월)</option>
               <option value="labor">근로소득 간이 (반기)</option>
-              <option value="abiz">사업소득 연간</option>
               <option value="alabor">근로소득 연간</option>
               <option value="retire">퇴직소득 연간</option>
               <option value="int">이자소득 연간</option>
@@ -3848,7 +3847,7 @@ var SALARY_CACHE = {};
 
 // 폐업 거래처의 실효 지급명세서 마감일 계산
 // - 매월(daily/biz), 반기(labor) = 간이지급명세서: 폐업 다음달 말일
-// - 연간(abiz/alabor/retire/int/div/other) = 지급명세서: 폐업 다음다음달 말일
+// - 연간(alabor/retire/int/div/other) = 지급명세서: 폐업 다음다음달 말일 (사업소득 연간은 간이로 갈음, 2026-11-11)
 function getPayrollDeadlineForClosed(client, tp, defaultDueDate){
   if(!client.endDate) return defaultDueDate;
   var parts = client.endDate.split('-');
@@ -3940,6 +3939,12 @@ function salHasRec(chk, cid){ return !!chk && (!!chk[cid+'_no_salary'] || salHas
 function hasSalaryAny(yr, months, cid){
   return SAL_KINDS.some(function(tp){ return hasSalaryDone(yr, months, cid, tp); });
 }
+// 정한 소득 종류 중 하나라도 체크가 있나
+function hasSalaryKinds(yr, months, cid, kinds){
+  return kinds.some(function(tp){ return hasSalaryDone(yr, months, cid, tp); });
+}
+var PAY_SIMPLE_KINDS=['biz','daily','labor'];                     // 간이지급명세서(매월·반기)·일용 지급명세서가 있는 소득
+var PAY_ANNUAL_KINDS=['labor','retire','other','int','div'];       // 연간 지급명세서가 있는 소득 (사업소득은 간이로 갈음 — 소득세법 제164조제7항)
 // 반기 급여 이력 확인 (소득 종류 중 하나라도)
 function hasSalaryInHalf(yr, halfMonths, cid){ return hasSalaryAny(yr, halfMonths, cid); }
 // '그 외' 칸 글자: 고른 것이 있으면 '기타·이자', 없으면 '그 외'
@@ -4097,7 +4102,7 @@ async function renderPayroll(){
         }
         if(!c.endDate) return false;
         // 어느 지급명세서라도 아직 우리 대상이면 표시
-        var stillOurs = ['daily','biz','labor','abiz','alabor','retire','other','int','div'].some(function(tp){
+        var stillOurs = ['daily','biz','labor','alabor','retire','other','int','div'].some(function(tp){
           return isPayrollVisible(c, yrEndDue, tp);
         });
         if(!stillOurs) return false;
@@ -4488,7 +4493,7 @@ const DL_BASE=[
   // 지급명세서 (법정기한)
   {m:1,d:31,lbl:'간이지급명세서(근로 하반기)',t:'pay',pk:'semi'},
   {m:2,d:28,lbl:'지급명세서(이자·배당·기타)',t:'pay',pk:'ann',tps:['other','int','div']},
-  {m:3,d:10,lbl:'지급명세서(근로·사업·퇴직)',t:'pay',pk:'ann',tps:['abiz','alabor','retire']},
+  {m:3,d:10,lbl:'지급명세서(근로·퇴직)',t:'pay',pk:'ann',tps:['alabor','retire']},
   {m:7,d:31,lbl:'간이지급명세서(근로 상반기)',t:'pay',pk:'semi'},
   // 사업장현황신고 (면세사업자, 전년도 귀속분)
   {m:2,d:10,lbl:'사업장현황신고',t:'inc'},
@@ -7164,9 +7169,9 @@ function renderUrgentSection(){
       var _dueM = _cM===12?1:_cM+1;
       var _dueY = _cM===12?_cY+1:_cY;
       if(!(_dueY===parseInt(yrDash) && _dueM===m)) return false;
-      // 폐업연도 폐업월까지 실제 급여실적(일용/사업/근로/퇴직)이 있어야 지급명세서 대상 (급여없음만 있으면 제외)
+      // 폐업연도 폐업월까지 간이 대상 소득(사업·일용·근로)이 있어야 대상 (급여없음만·기타·이자·배당만이면 제외)
       var _months=[]; for(var _i=1;_i<=_cM;_i++) _months.push(_i);
-      return hasSalaryInHalf(String(_cY), _months, c.id);
+      return hasSalaryKinds(String(_cY), _months, c.id, PAY_SIMPLE_KINDS);
     });
     // 연간 지급명세서: 폐업 다음다음달 말일이 (yrDash, m)에 해당 + 실제 급여실적 필수
     var closedAnnual = closedClients.filter(function(c){
@@ -7177,7 +7182,7 @@ function renderUrgentSection(){
       while(_dueM>12){_dueM-=12;_dueY++;}
       if(!(_dueY===parseInt(yrDash) && _dueM===m)) return false;
       var _months=[]; for(var _i=1;_i<=_cM;_i++) _months.push(_i);
-      return hasSalaryInHalf(String(_cY), _months, c.id);
+      return hasSalaryKinds(String(_cY), _months, c.id, PAY_ANNUAL_KINDS);   // 연간 대상 소득만 (사업소득만 있으면 연간 없음)
     });
     if(closedSemiOrMonthly.length){
       // 그 달 말일 계산
@@ -7279,7 +7284,7 @@ function getIncompleteClientsForDeadline(e){
         return !chk[c.id+'_'+half];
       } else {
         // 연간: 그 해 이력이 있는 유형만 완료 여부 판정
-        var defs=[{tp:'abiz',sal:'biz'},{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'},{tp:'other',sal:'other'},{tp:'int',sal:'int'},{tp:'div',sal:'div'}];
+        var defs=[{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'},{tp:'other',sal:'other'},{tp:'int',sal:'int'},{tp:'div',sal:'div'}];
         var pending=false;
         defs.forEach(function(d){
           var hasSal = allMons.some(function(mm){return salCacheY[mm]&&salCacheY[mm][c.id+'_'+d.sal+'_done'];});
@@ -7502,7 +7507,6 @@ async function runCrossCheck(){
       }
     }
     if(ann310Near){
-      if(ps.abiz&&!pyAnn[c.id+'_abiz']) alerts.push('사업소득 연간 지급명세서 미제출 (마감: 3/10)');
       if(ps.alabor&&!pyAnn[c.id+'_alabor']) alerts.push('근로소득 연간 지급명세서 미제출 (마감: 3/10)');
       if(ps.retire&&!pyAnn[c.id+'_retire']) alerts.push('퇴직소득 연간 지급명세서 미제출 (마감: 3/10)');
     }
@@ -9576,7 +9580,7 @@ function renderDashStatus(){
     });
   }
 
-  // ③ 연간: 사업소득연간/근로소득연간/퇴직소득연간 — 3월 마감(직전연도 귀속분)
+  // ③ 연간: 근로소득연간/퇴직소득연간 — 3월 마감, 이자·배당·기타 — 2월 마감 (직전연도 귀속분)
   // payrollChecks/{yr}_annual 의 키: {cid}_{tp}  (tp: abiz/alabor/retire)
   if(m===3 || m===2){
     var annYr=String(parseInt(yr)-1); // 직전연도 급여관리 기준
@@ -9584,8 +9588,7 @@ function renderDashStatus(){
     var annAll=[1,2,3,4,5,6,7,8,9,10,11,12];
     var annDueDate = m===3 ? yr+'-03-10' : annualDueOf('other', annYr);  // 연간 지급명세서 마감 (이자·배당·기타 = 2월 말일)
     var pyAnnPrev = DASH_TAX_CACHE['payroll_annual_'+annYr]||{};
-    var annDefs = m===3 ? [
-      {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
+    var annDefs = m===3 ? [   // 사업소득 연간은 매월 간이로 갈음(소득세법 제164조제7항) → 없음
       {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
       {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'}
     ] : [
@@ -9614,8 +9617,7 @@ function renderDashStatus(){
   var closedAnnYr = yr;
   var closedAnnCache = SALARY_CACHE[closedAnnYr]||{};
   var closedAnnMonths = [1,2,3,4,5,6,7,8,9,10,11,12];
-  var closedAnnDefs = [
-    {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
+  var closedAnnDefs = [   // 사업소득은 폐업 간이(다음 달 말일)로 갈음
     {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
     {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'},
     {tp:'other', sal:'other',  lbl:'기타소득 연간'},
