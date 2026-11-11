@@ -227,6 +227,14 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
 .res-row:last-child{border-bottom:none}
 .res-row span:first-child{color:#667}
 .res-row span:last-child{font-weight:600}
+/* 급여관리 '그 외' 칸 (2026-11-11) */
+details.salx{position:relative;display:inline-block}
+details.salx>summary{list-style:none;cursor:pointer;font-size:11.5px;color:#889;padding:3px 8px;border:1px solid #dde;border-radius:6px;background:#fff;white-space:nowrap;user-select:none}
+details.salx>summary::-webkit-details-marker{display:none}
+details.salx.on>summary{color:#1A3169;font-weight:700;border-color:#1A3169;background:#edf1ff}
+details.salx .salx-pop{position:fixed;z-index:1000;background:#fff;border:1px solid #dde;border-radius:8px;box-shadow:0 6px 18px rgba(20,30,60,.14);padding:6px 4px;min-width:112px;text-align:left}
+details.salx .salx-pop label{display:flex;align-items:center;gap:7px;padding:5px 10px;font-size:12.5px;color:#333;cursor:pointer;border-radius:5px;white-space:nowrap}
+details.salx .salx-pop label:hover{background:#f4f6fb}
 </style>
 </head>
 <body>
@@ -517,7 +525,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1A3169}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.72</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.73</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3305,10 +3313,7 @@ async function loadTax(){
           return hasSalaryInHalf(whtYr, _halfMonths, c.id);
         }
         // 매월납부: 폐업 그 달 이력
-        return hasSalaryDone(whtYr, [_cM2], c.id, 'daily')
-            || hasSalaryDone(whtYr, [_cM2], c.id, 'biz')
-            || hasSalaryDone(whtYr, [_cM2], c.id, 'labor')
-            || hasSalaryDone(whtYr, [_cM2], c.id, 'retire');
+        return hasSalaryAny(whtYr, [_cM2], c.id);
       }
       // 매월 납부자는 whtYn='Y' 필수, 반기 납부자(whtSemi='Y')도 whtYn='Y' 필수
       if(c.whtYn!=='Y') return false;
@@ -3922,11 +3927,31 @@ function hasSalaryDone(yr, months, cid, type){
   return months.some(function(m){ return !!(SALARY_CACHE[yr][m] && SALARY_CACHE[yr][m][key]); });
 }
 
-// 반기 급여 이력 확인 (일용/사업/근로/퇴직 중 하나라도)
-function hasSalaryInHalf(yr, halfMonths, cid){
-  return ['daily','biz','labor','retire'].some(function(tp){
-    return hasSalaryDone(yr, halfMonths, cid, tp);
-  });
+// ===== 급여관리 소득 종류 — 이 목록 한 곳만 고치면 앱 전체에 적용 (2026-11-11 대표님: 기타·이자·배당도 근로·사업과 같은 소득) =====
+var SAL_KINDS=['labor','biz','daily','retire','other','int','div'];
+var SAL_KIND_LBL={labor:'근로소득',biz:'사업소득',daily:'일용직',retire:'퇴직소득',other:'기타소득',int:'이자소득',div:'배당소득'};
+var SAL_EXTRA=['other','int','div'];                 // 급여관리 '그 외' 칸에 들어가는 소득
+var SAL_EXTRA_SHORT={other:'기타',int:'이자',div:'배당'};
+// 그 달 소득 체크가 하나라도 있나 (없음 제외)
+function salHasKind(chk, cid){ return !!chk && SAL_KINDS.some(function(k){ return !!chk[cid+'_'+k+'_done']; }); }
+// 그 달 급여관리 기록이 있나 (없음 포함) = 급여관리 완료
+function salHasRec(chk, cid){ return !!chk && (!!chk[cid+'_no_salary'] || salHasKind(chk, cid)); }
+// 여러 달 중 소득 체크가 하나라도 있나
+function hasSalaryAny(yr, months, cid){
+  return SAL_KINDS.some(function(tp){ return hasSalaryDone(yr, months, cid, tp); });
+}
+// 반기 급여 이력 확인 (소득 종류 중 하나라도)
+function hasSalaryInHalf(yr, halfMonths, cid){ return hasSalaryAny(yr, halfMonths, cid); }
+// '그 외' 칸 글자: 고른 것이 있으면 '기타·이자', 없으면 '그 외'
+function salExtraLbl(isOn){
+  var s=SAL_EXTRA.filter(isOn).map(function(k){ return SAL_EXTRA_SHORT[k]; });
+  return s.length ? s.join('·') : '그 외';
+}
+// 지급명세서 연간 마감: 이자·배당·기타 = 다음해 2월 말일, 그 외 = 다음해 3/10
+function annualDueOf(tp, yr){
+  var y=parseInt(yr)+1;
+  if(SAL_EXTRA.indexOf(tp)>=0) return y+'-02-'+String(new Date(y,2,0).getDate());
+  return y+'-03-10';
 }
 
 // 원천세 신고 대상 판정 (공통)
@@ -3954,9 +3979,7 @@ function isWhtTargetForMonth(c, yr, m){
       return hasSalaryInHalf(String(closeYr), halfMonths, c.id);
     }
     // 매월납부: 폐업 그 달 이력만
-    return ['daily','biz','labor','retire'].some(function(tp){
-      return hasSalaryDone(String(closeYr), [closeMon], c.id, tp);
-    });
+    return hasSalaryAny(String(closeYr), [closeMon], c.id);
   }
   // (폐업자는 위에서 처리됨) 비폐업은 활성만 대상 — 기장중지·이관 제외
   if(c.status!=='활성') return false;
@@ -4033,9 +4056,7 @@ function taxDueDate(tp, yr, pd){
 }
 
 // 급여관리 업체 완료 판단: 이달없음 OR 유형 중 하나라도 체크
-function isSalDone(chk, cid){
-  return !!(chk[cid+'_no_salary']||chk[cid+'_daily_done']||chk[cid+'_biz_done']||chk[cid+'_labor_done']||chk[cid+'_retire_done']);
-}
+function isSalDone(chk, cid){ return salHasRec(chk, cid); }
 
 async function renderPayroll(){
   var yr=document.getElementById('pyYear')?.value||'2026';
@@ -4070,24 +4091,20 @@ async function renderPayroll(){
         // 폐업: endDate 없으면 표시 유지 (효건님 확인 필요 케이스)
         if(c.status==='폐업' && !c.endDate) {
           // 그 해 급여 이력 있으면 표시
-          var hasAnyClosed = ['daily','biz','labor','retire'].some(function(tp){
-            return hasSalaryDone(yr, allMonthsAll, c.id, tp);
-          });
+          var hasAnyClosed = hasSalaryAny(yr, allMonthsAll, c.id);
           if(!hasAnyClosed && c.whtYn!=='Y') return false;
           return true;
         }
         if(!c.endDate) return false;
         // 어느 지급명세서라도 아직 우리 대상이면 표시
-        var stillOurs = ['daily','biz','labor','abiz','alabor','retire'].some(function(tp){
+        var stillOurs = ['daily','biz','labor','abiz','alabor','retire','other','int','div'].some(function(tp){
           return isPayrollVisible(c, yrEndDue, tp);
         });
         if(!stillOurs) return false;
       }
       // 여기까지 왔으면 활성 또는 아직 신고 대상 - 이제 급여 이력/whtYn 확인
       if(c.whtYn==='Y') return true;
-      var hasAnyCheck = ['daily','biz','labor','retire'].some(function(tp){
-        return hasSalaryDone(yr, allMonthsAll, c.id, tp);
-      });
+      var hasAnyCheck = hasSalaryAny(yr, allMonthsAll, c.id);
       return hasAnyCheck;
     }),'pyMgrFilter',true);
     var mgrs={};
@@ -4103,8 +4120,8 @@ async function renderPayroll(){
       html+='<span style="font-size:12px;color:#889">('+list.length+'개 업체)</span>';
       html+='</div><div id="'+mgrId+'">';
       html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
-      html+='<colgroup><col><col style="width:140px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:70px"></colgroup>';
-      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">일용직</th><th style="padding:7px 10px;text-align:center">사업소득</th><th style="padding:7px 10px;text-align:center">근로소득</th><th style="padding:7px 10px;text-align:center">퇴직소득</th></tr></thead><tbody>';
+      html+='<colgroup><col><col style="width:140px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:96px"></colgroup>';
+      html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">일용직</th><th style="padding:7px 10px;text-align:center">사업소득</th><th style="padding:7px 10px;text-align:center">근로소득</th><th style="padding:7px 10px;text-align:center">퇴직소득</th><th style="padding:7px 10px;text-align:center">그 외</th></tr></thead><tbody>';
       list.forEach(function(c){
         var hasDa=hasSalaryDone(yr,allMonthsAll,c.id,'daily');
         var hasBz=hasSalaryDone(yr,allMonthsAll,c.id,'biz');
@@ -4119,6 +4136,8 @@ async function renderPayroll(){
         html+='<td class="cc" style="padding:8px 10px">'+(hasBz?chkMark:dash)+'</td>';
         html+='<td class="cc" style="padding:8px 10px">'+(hasLa?chkMark:dash)+'</td>';
         html+='<td class="cc" style="padding:8px 10px">'+(hasRe?chkMark:dash)+'</td>';
+        var exLbl=salExtraLbl(function(k){ return hasSalaryDone(yr,allMonthsAll,c.id,k); });
+        html+='<td class="cc" style="padding:8px 10px;font-size:12px;font-weight:600;color:#1A3169">'+(exLbl==='그 외'?dash:exLbl)+'</td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -4241,15 +4260,17 @@ async function renderPayroll(){
     var dl=dlMap[tp]||'3/10';
     await ensureSalaryCache(yr);
     var allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
-    // 연간 지급명세서 마감일: 다음해 3/10
-    var annualDueDate = (parseInt(yr)+1)+'-03-10';
+    // 연간 지급명세서 마감일: 다음해 3/10 (이자·배당·기타는 다음해 2월 말일)
+    var annualDueDate = annualDueOf(tp, yr);
     var clients=myClientsFilter(ALL.filter(function(c){
       if(c.type==='신고대리') return false;
       if(!isPayrollVisible(c, annualDueDate, tp)) return false;
       // 사업/근로/퇴직 연간: 선택연도(발생연도) 급여관리 체크 기준
-      var salType={'abiz':'biz','alabor':'labor','retire':'retire'}[tp]||null;
+      var salType={'abiz':'biz','alabor':'labor','retire':'retire','other':'other','int':'int','div':'div'}[tp]||null;
       if(salType){
-        if(!hasSalaryDone(yr, allMonths, c.id, salType)) return false;
+        // 이자·배당·기타: 급여관리 월별 체크가 기준. 예전에 거래처 설정에서 손으로 지정한 활성 업체도 계속 대상
+        var _manual = SAL_EXTRA.indexOf(tp)>=0 && c.status==='활성' && c.payrollSettings && c.payrollSettings[tp];
+        if(!hasSalaryDone(yr, allMonths, c.id, salType) && !_manual) return false;
       } else {
         // int/div/other — 수동 설정된 거래처만 (활성만)
         if(c.status!=='활성') return false;
@@ -4465,10 +4486,10 @@ const DL_BASE=[
   {m:6,d:30,lbl:'종합소득세 신고납부(성실신고)',t:'inc'},
   {m:8,d:31,lbl:'법인세 중간예납',t:'inc'},
   // 지급명세서 (법정기한)
-  {m:1,d:31,lbl:'간이지급명세서(근로 하반기)',t:'pay'},
-  {m:2,d:28,lbl:'지급명세서(이자·배당·기타)',t:'pay'},
-  {m:3,d:10,lbl:'지급명세서(근로·사업·퇴직)',t:'pay'},
-  {m:7,d:31,lbl:'간이지급명세서(근로 상반기)',t:'pay'},
+  {m:1,d:31,lbl:'간이지급명세서(근로 하반기)',t:'pay',pk:'semi'},
+  {m:2,d:28,lbl:'지급명세서(이자·배당·기타)',t:'pay',pk:'ann',tps:['other','int','div']},
+  {m:3,d:10,lbl:'지급명세서(근로·사업·퇴직)',t:'pay',pk:'ann',tps:['abiz','alabor','retire']},
+  {m:7,d:31,lbl:'간이지급명세서(근로 상반기)',t:'pay',pk:'semi'},
   // 사업장현황신고 (면세사업자, 전년도 귀속분)
   {m:2,d:10,lbl:'사업장현황신고',t:'inc'},
 ];
@@ -4873,7 +4894,9 @@ function renderDash(){
   if(statusEl){
     var pyM2=m===1?12:m-1;
     var pyYr2=m===1?(parseInt(yr)-1).toString():yr.toString();
-    ensureSalaryCache(pyYr2).then(function(){renderDashStatus();});
+    var _need=[ensureSalaryCache(pyYr2)];
+    if(m<=3) _need.push(ensureSalaryCache(String(parseInt(yr)-1)));   // 1~3월: 전년도 귀속 반기·연간 지급명세서
+    Promise.all(_need).then(function(){renderDashStatus(); if(typeof renderUrgentSection==='function') renderUrgentSection();});
   }
 }
 
@@ -7221,6 +7244,10 @@ function renderUrgentSection(){
 // 매월 지급명세서 대상이 확정됐는지 (귀속월 급여관리에 일용/사업 체크가 하나라도 있는지)
 function hasPayTargets(e){
   var yr=String(DASH_YEAR||new Date().getFullYear());
+  if(e && e.pk){                                   // 정기 반기·연간: 귀속연도 급여관리를 읽었으면 대상 확정
+    var _gy=(e.m===7)?yr:String(parseInt(yr)-1);
+    return !!SALARY_CACHE[_gy];
+  }
   // 마감항목(e)의 지급월 기준 = (baseMon 또는 e.m) - 1. 조회월(DASH_MONTH) 아님 — 마감 밀림 대응
   var _dueMon = (e&&(e.baseMon||e.m)) || (DASH_MONTH||(new Date().getMonth()+1));
   var pyM=_dueMon===1?12:_dueMon-1;
@@ -7240,10 +7267,11 @@ function getIncompleteClientsForDeadline(e){
   // 폐업 지급명세서: 이벤트에 clients 목록이 이미 있으므로 미완료만 필터
   if(e.t==='closedSemi' || e.t==='closedAnnual'){
     if(!e.clients) return [];
-    var chk = DASH_TAX_CACHE['payroll_'+ (e.t==='closedSemi'?'semi':'annual') +'_'+yr] || {};
-    var salCacheY = SALARY_CACHE[yr] || {};
     var allMons = [1,2,3,4,5,6,7,8,9,10,11,12];
     return e.clients.filter(function(c){
+      var _cy = String(c.endDate||'').split('-')[0] || yr;              // 2026-11-11: 체크·급여는 폐업연도(귀속연도) 기준
+      var chk = DASH_TAX_CACHE['payroll_'+ (e.t==='closedSemi'?'semi':'annual') +'_'+_cy] || {};
+      var salCacheY = SALARY_CACHE[_cy] || {};
       if(e.t==='closedSemi'){
         // 폐업월 속한 반기 기준
         var _cM = parseInt((c.endDate||'').split('-')[1])||0;
@@ -7251,7 +7279,7 @@ function getIncompleteClientsForDeadline(e){
         return !chk[c.id+'_'+half];
       } else {
         // 연간: 그 해 이력이 있는 유형만 완료 여부 판정
-        var defs=[{tp:'abiz',sal:'biz'},{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'}];
+        var defs=[{tp:'abiz',sal:'biz'},{tp:'alabor',sal:'labor'},{tp:'retire',sal:'retire'},{tp:'other',sal:'other'},{tp:'int',sal:'int'},{tp:'div',sal:'div'}];
         var pending=false;
         defs.forEach(function(d){
           var hasSal = allMons.some(function(mm){return salCacheY[mm]&&salCacheY[mm][c.id+'_'+d.sal+'_done'];});
@@ -7331,7 +7359,7 @@ function getIncompleteClientsForDeadline(e){
         } else {
           // 매월납부: 폐업 그 달 이력
           var _cSC=SALARY_CACHE[whtBaseY]&&SALARY_CACHE[whtBaseY][_cM]||{};
-          _hasClosedRec = !!(_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done']);
+          _hasClosedRec = !!(salHasRec(_cSC,c.id));
         }
         if(!_hasClosedRec) return false;
         // 폐업자: 신고체크만 완료로 인정
@@ -7354,15 +7382,38 @@ function getIncompleteClientsForDeadline(e){
         // 활성: 분모 포함
       } else {
         // 이관/기장중지: 그 달 급여기록 있어야 포함
-        var hasRec=salData[c.id+'_no_salary']||salData[c.id+'_daily_done']||salData[c.id+'_biz_done']||salData[c.id+'_labor_done']||salData[c.id+'_retire_done'];
+        var hasRec=salHasRec(salData,c.id);
         if(!hasRec) return false;
       }
       // 처리현황 getDone과 동일: 신고체크 done이거나 그 달 급여처리(급여없음/일용/사업/근로/퇴직) 중 하나면 완료
       var isDone = (whtChk[c.id]&&whtChk[c.id].done) || !!(
-        salData[c.id+'_no_salary']||salData[c.id+'_daily_done']||salData[c.id+'_biz_done']||salData[c.id+'_labor_done']||salData[c.id+'_retire_done']
+        salHasRec(salData,c.id)
       );
       return !isDone; // 미완료만 반환
     }).map(function(c){return {name:c.name,manager:c.manager||'미배정'};});
+  }
+
+  if(e.t==='pay' && e.pk){
+    // 2026-11-11: 정기 반기(근로 간이)·연간 지급명세서 — 귀속연도 급여관리 체크 대상 중 지급명세서 화면 미체크
+    var _salMap={abiz:'biz',alabor:'labor',retire:'retire',other:'other',int:'int',div:'div'};
+    var _gy = (e.m===7) ? yr : String(parseInt(yr)-1);                  // 귀속연도 (7월 마감만 당해)
+    var _sc = SALARY_CACHE[_gy] || {};
+    var _months = e.pk==='semi' ? (e.m===7?[1,2,3,4,5,6]:[7,8,9,10,11,12]) : [1,2,3,4,5,6,7,8,9,10,11,12];
+    var _pc = DASH_TAX_CACHE['payroll_'+(e.pk==='semi'?'semi':'annual')+'_'+_gy] || {};
+    var _tps = e.pk==='semi' ? ['labor'] : e.tps;
+    return ALL.filter(function(c){
+      if(c.type==='신고대리' || c.status==='폐업') return false;         // 폐업자는 '폐업 지급명세서'에서 따로
+      return _tps.some(function(tp){
+        var due = e.pk==='semi' ? (e.m===7? yr+'-07-31' : yr+'-01-31') : annualDueOf(tp, _gy);
+        if(!isPayrollVisible(c, due, tp)) return false;
+        var sal = e.pk==='semi' ? 'labor' : _salMap[tp];
+        var has = _months.some(function(mm){ return _sc[mm] && _sc[mm][c.id+'_'+sal+'_done']; })
+               || (SAL_EXTRA.indexOf(tp)>=0 && c.payrollSettings && c.payrollSettings[tp]);   // 예전에 손으로 지정한 업체도
+        if(!has) return false;
+        var key = e.pk==='semi' ? c.id+'_'+(e.m===7?'1':'2') : c.id+'_'+tp;
+        return !_pc[key];
+      });
+    }).map(function(c){return {name:c.name,manager:(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정')};});
   }
 
   if(e.t==='pay'){
@@ -7423,6 +7474,12 @@ async function runCrossCheck(){
   var pySemi=pySemiDoc.exists?pySemiDoc.data():{};
   var pyAnn=pyAnnDoc.exists?pyAnnDoc.data():{};
   var salChk=salDoc.exists?salDoc.data():{};
+  var pyAnnPrevX={};
+  if(ann228Near){                                  // 2월: 전년도 귀속 연간 체크 + 전년도 급여관리
+    var _pa=await db.collection('payrollChecks').doc((parseInt(yr)-1)+'_annual').get();
+    pyAnnPrevX=_pa.exists?_pa.data():{};
+    await ensureSalaryCache(String(parseInt(yr)-1));
+  }
 
   _crossAlerts=[];
 
@@ -7430,7 +7487,7 @@ async function runCrossCheck(){
     var ps=c.payrollSettings||{};
     var alerts=[];
     if(c.whtYn==='Y'){
-      var salDone=salChk[c.id+'_done'];
+      var salDone=salHasKind(salChk,c.id);
       var whtDone=whtChk[c.id]&&whtChk[c.id].done;
       // 원천세 신고 누락 - 긴급처리 제외 (신고체크에서 관리)
       // if(whtNear&&salDone&&!whtDone) alerts.push(...);
@@ -7450,9 +7507,11 @@ async function runCrossCheck(){
       if(ps.retire&&!pyAnn[c.id+'_retire']) alerts.push('퇴직소득 연간 지급명세서 미제출 (마감: 3/10)');
     }
     if(ann228Near){
-      if(ps.int&&!pyAnn[c.id+'_int']) alerts.push('이자소득 연간 지급명세서 미제출 (마감: 2/28)');
-      if(ps.div&&!pyAnn[c.id+'_div']) alerts.push('배당소득 연간 지급명세서 미제출 (마감: 2/28)');
-      if(ps.other&&!pyAnn[c.id+'_other']) alerts.push('기타소득 연간 지급명세서 미제출 (마감: 2/28)');
+      // 2026-11-11: 이자·배당·기타 = 전년도 급여관리 월별 체크(또는 예전 손 지정), 체크는 전년도 귀속 문서
+      SAL_EXTRA.forEach(function(tp){
+        var _has = ps[tp] || hasSalaryDone(String(parseInt(yr)-1), [1,2,3,4,5,6,7,8,9,10,11,12], c.id, tp);
+        if(_has && !pyAnnPrevX[c.id+'_'+tp]) alerts.push(SAL_KIND_LBL[tp]+' 연간 지급명세서 미제출 (마감: 2/28)');
+      });
     }
     if(alerts.length)
       _crossAlerts.push({id:c.id,name:c.name,manager:c.manager||'미배정',alerts:alerts});
@@ -7584,7 +7643,7 @@ async function renderSalary(){
   var clients=ALL.filter(function(c){
     if(c.type==='신고대리') return false;
     // 그 달(yr-m) 급여기록이 있는지 (현재 상태와 무관)
-    var _hasRec = chk && (chk[c.id+'_no_salary']||chk[c.id+'_daily_done']||chk[c.id+'_biz_done']||chk[c.id+'_labor_done']||chk[c.id+'_retire_done']);
+    var _hasRec = chk && (salHasRec(chk,c.id));
     // 시작월 이전 달은 제외 (시작월부터 우리가 급여관리) — 단, 이미 그 달 급여기록이 있으면 유지
     //   시작월 = 급여 시작월(salaryStart) 우선, 없으면 계약월
     if(!_hasRec){
@@ -7653,7 +7712,7 @@ async function renderSalary(){
     html+='</div>';
     html+='<div id="'+mgrId+'">';
     html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
-    html+='<colgroup><col><col style="width:130px"><col style="width:60px"><col style="width:60px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:140px"></colgroup>';
+    html+='<colgroup><col><col style="width:130px"><col style="width:60px"><col style="width:60px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:65px"><col style="width:92px"><col style="width:140px"></colgroup>';
     html+='<thead><tr style="background:#fafafa">'
       +'<th style="padding:7px 10px;text-align:left">상호</th>'
       +'<th style="padding:7px 10px;text-align:left">사업자번호</th>'
@@ -7665,6 +7724,7 @@ async function renderSalary(){
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">사업소득</th>'
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">근로소득</th>'
       +'<th style="padding:7px 10px;text-align:center;font-size:11px">퇴직소득</th>'
+      +'<th style="padding:7px 10px;text-align:center;font-size:11px" title="기타·이자·배당소득">그 외</th>'
       +'<th style="padding:7px 10px">메모</th>'
       +'</tr></thead><tbody>';
     list.forEach(function(c){
@@ -7691,17 +7751,19 @@ async function renderSalary(){
       html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_biz_done')+'</td>';
       html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_labor_done')+'</td>';
       html+='<td class="cc" style="padding:8px 10px">'+typeChk(c.id+'_retire_done')+'</td>';
+      html+='<td class="cc" style="padding:8px 6px">'+salExtraCell(docId,chk,c.id)+'</td>';
       // 메모
       html+='<td style="padding:8px 10px"><input style="border:1px solid #dde;border-radius:5px;padding:4px 8px;font-size:12px;width:130px" value="'+(chk[c.id+'_memo']||'')+'" placeholder="메모..." onblur="saveSalary(&quot;'+docId+'&quot;,&quot;'+c.id+'_memo&quot;,this.value)"></td>';
       html+='</tr>';
     });
     // 합계 행 계산
-    var sumDaily=0, sumBiz=0, sumLabor=0, sumRetire=0;
+    var sumDaily=0, sumBiz=0, sumLabor=0, sumRetire=0, sumExtra=0;
     list.forEach(function(c){
       if(chk[c.id+'_daily_done']) sumDaily++;
       if(chk[c.id+'_biz_done']) sumBiz++;
       if(chk[c.id+'_labor_done']) sumLabor++;
       if(chk[c.id+'_retire_done']) sumRetire++;
+      if(SAL_EXTRA.some(function(k){ return chk[c.id+'_'+k+'_done']; })) sumExtra++;
     });
     html+='<tfoot>'
       +'<tr style="background:#EAF3DE;border-top:1.5px solid #C0DD97">'
@@ -7711,6 +7773,7 @@ async function renderSalary(){
       +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumBiz?'#3B6D11':'#aab')+'">'+sumBiz+'개</td>'
       +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumLabor?'#3B6D11':'#aab')+'">'+sumLabor+'개</td>'
       +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumRetire?'#3B6D11':'#aab')+'">'+sumRetire+'개</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:700;color:'+(sumExtra?'#3B6D11':'#aab')+'">'+sumExtra+'개</td>'
       +'<td></td>'
       +'</tr>'
       +'</tfoot>';
@@ -7724,8 +7787,42 @@ async function renderSalary(){
   }
 }
 
+// 급여관리 '그 외' 칸: 누르면 기타·이자·배당 체크 목록이 열림 (체크는 다른 소득과 같은 칸 {cid}_{종류}_done)
+function salExtraCell(docId, chk, cid){
+  var lb=salExtraLbl(function(k){ return !!chk[cid+'_'+k+'_done']; });
+  var h='<details class="salx'+(lb!=='그 외'?' on':'')+'"><summary><span class="salx-t">'+lb+'</span> ▾</summary><div class="salx-pop">';
+  SAL_EXTRA.forEach(function(k){
+    var key=cid+'_'+k+'_done';
+    h+='<label><input type="checkbox" '+(chk[key]?'checked':'')+' onchange="saveSalaryInstant(&quot;'+docId+'&quot;,&quot;'+key+'&quot;,this.checked,this)">'+SAL_KIND_LBL[k]+'</label>';
+  });
+  return h+'</div></details>';
+}
+document.addEventListener('click', function(e){
+  document.querySelectorAll('details.salx[open]').forEach(function(d){ if(!d.contains(e.target)) d.removeAttribute('open'); });
+});
+// 목록은 화면 기준(fixed)으로 띄움 — 담당자 묶음 상자(overflow:hidden)·합계 줄에 잘리지 않게. 아래 자리가 모자라면 위로 엶 (2026-11-11)
+document.addEventListener('toggle', function(e){
+  var d=e.target; if(!d||!d.classList||!d.classList.contains('salx')||!d.open) return;
+  document.querySelectorAll('details.salx[open]').forEach(function(o){ if(o!==d) o.removeAttribute('open'); });
+  var sm=d.querySelector('summary'), pop=d.querySelector('.salx-pop'); if(!sm||!pop) return;
+  var r=sm.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight;
+  var left=Math.min(Math.max(8, r.left+r.width/2-w/2), window.innerWidth-w-8);
+  var top=(r.bottom+4+h > window.innerHeight-8 && r.top-4-h > 8) ? r.top-4-h : r.bottom+4;
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+}, true);
+// 화면을 굴리면 떠 있는 목록은 닫음 (자리가 어긋나지 않게)
+window.addEventListener('scroll', function(){ document.querySelectorAll('details.salx[open]').forEach(function(o){ o.removeAttribute('open'); }); }, true);
+
 async function saveSalaryInstant(docId,key,val,cbEl){
   var row=cbEl?cbEl.closest('tr'):null;
+  // '그 외' 칸 글자 즉시 바꿈 (기타·이자 …)
+  var dx=cbEl&&cbEl.closest?cbEl.closest('details.salx'):null;
+  if(dx){
+    var _ins=dx.querySelectorAll('input[type=checkbox]');
+    var _lb=salExtraLbl(function(k){ var i=SAL_EXTRA.indexOf(k); return !!(_ins[i]&&(_ins[i]===cbEl?val:_ins[i].checked)); });
+    var _sm=dx.querySelector('summary .salx-t'); if(_sm) _sm.textContent=_lb;
+    dx.classList.toggle('on', _lb!=='그 외');
+  }
   // 행 스타일 즉시 업데이트
   if(row){
     var noSal=row.querySelector('input[onchange*="_no_salary"]');
@@ -7760,7 +7857,7 @@ async function saveSalaryInstant(docId,key,val,cbEl){
     if(grpDiv){
       var grpRows=grpDiv.querySelectorAll('tbody tr');
       var grpDone=0;
-      var sumD=0,sumB=0,sumL=0,sumR=0;
+      var sumD=0,sumB=0,sumL=0,sumR=0,sumX=0;
       grpRows.forEach(function(r){
         var noSalEl=r.querySelector('input[onchange*="_no_salary"]');
         var typeDoneEls=r.querySelectorAll('input[onchange*="_done"]:not([onchange*="_no_salary"])');
@@ -7769,6 +7866,7 @@ async function saveSalaryInstant(docId,key,val,cbEl){
         if(r.querySelector('input[onchange*="_biz_done"]')?.checked) sumB++;
         if(r.querySelector('input[onchange*="_labor_done"]')?.checked) sumL++;
         if(r.querySelector('input[onchange*="_retire_done"]')?.checked) sumR++;
+        if(r.querySelector('details.salx input:checked')) sumX++;
       });
       var grpTotal=grpRows.length;
       var grpHdr=grpDiv.previousElementSibling;
@@ -7783,8 +7881,8 @@ async function saveSalaryInstant(docId,key,val,cbEl){
       var tfoot=grpDiv.querySelector('tfoot tr');
       if(tfoot){
         var cells=tfoot.querySelectorAll('td');
-        var types=[sumD,sumB,sumL,sumR];
-        for(var ti=0;ti<4;ti++){
+        var types=[sumD,sumB,sumL,sumR,sumX];
+        for(var ti=0;ti<types.length;ti++){
           var cell=cells[ti+2];
           if(cell){cell.textContent=types[ti]+'개';cell.style.color=types[ti]?'#3B6D11':'#aab';}
         }
@@ -7876,7 +7974,7 @@ async function checkSalaryAlerts(){
     if(c.salaryDay==='말일'&&todayIsLastDay) return true;
     if(c.salaryDay===day.toString()+'일'||c.salaryDay===day.toString()) return true;
     return false;
-  }).filter(function(c){return !curChk[c.id+'_done'];}); // 미처리만
+  }).filter(function(c){return !salHasRec(curChk,c.id);}); // 미처리만
 
   var todayWrap=document.getElementById('today-salary-wrap');
   var todayBody=document.getElementById('today-salary-body');
@@ -7907,7 +8005,7 @@ async function checkSalaryAlerts(){
   }
 
   // 전달 미처리 업체
-  var prevTargets=salClients.filter(function(c){return !prevChk[c.id+'_done'];});
+  var prevTargets=salClients.filter(function(c){return !salHasRec(prevChk,c.id);});
   var prevWrap=document.getElementById('prev-salary-wrap');
   var prevBody=document.getElementById('prev-salary-body');
   if(prevWrap&&prevBody){
@@ -9199,6 +9297,11 @@ async function loadDashTaxCache(){
   // 연간(사업/근로/퇴직) 캐시 — 정기 3월 + 폐업자 마감월이므로 항상 로드
   var pyAnnDoc=await db.collection('payrollChecks').doc(yr+'_annual').get();
   DASH_TAX_CACHE['payroll_annual_'+yr] = pyAnnDoc.exists ? pyAnnDoc.data() : {};
+  // 2026-11-11: 지급명세서 화면은 귀속연도 문서({귀속연도}_semi/_annual)에 저장 → 1~3월 마감(전년도 귀속)은 전년도 문서를 봐야 함
+  var _pyPrevYr=String(parseInt(yr)-1);
+  var _pyPrev=await Promise.all([db.collection('payrollChecks').doc(_pyPrevYr+'_semi').get(), db.collection('payrollChecks').doc(_pyPrevYr+'_annual').get()]);
+  DASH_TAX_CACHE['payroll_semi_'+_pyPrevYr] = _pyPrev[0].exists ? _pyPrev[0].data() : {};
+  DASH_TAX_CACHE['payroll_annual_'+_pyPrevYr] = _pyPrev[1].exists ? _pyPrev[1].data() : {};
 
   // 예정고지 데이터 캐시 (부가세 예정달에만)
   var vatPdMap2={1:4,4:1,7:2,10:3};
@@ -9275,7 +9378,7 @@ function renderDashStatus(){
         }
         // 매월납부: 폐업 그 달 이력
         var _closeSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
-        return !!(_closeSC&&(_closeSC[c.id+'_no_salary']||_closeSC[c.id+'_daily_done']||_closeSC[c.id+'_biz_done']||_closeSC[c.id+'_labor_done']||_closeSC[c.id+'_retire_done']));
+        return !!(_closeSC&&(salHasRec(_closeSC,c.id)));
       }
       // (폐업자는 위에서 처리됨) 이하는 비폐업 업체 — 활성만 대상, 기장중지·이관 등은 제외 (신고체크와 동일 기준)
       if(c.status!=='활성') return false;
@@ -9467,7 +9570,7 @@ function renderDashStatus(){
       if(!hasLabor) return;
       var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
       pyTotalCalc++;
-      var ok=!!pySemiChk[c.id+'_'+semiHalf];
+      var ok=!!(DASH_TAX_CACHE['payroll_semi_'+semiYr]||{})[c.id+'_'+semiHalf];
       if(ok) pyDoneCalc++;
       pyDetailRows.push({id:c.id,name:c.name,grp:'근로소득 간이 ('+(semiHalf==='1'?'상반기':'하반기')+')',mgr:effMgr,done:ok});
     });
@@ -9475,26 +9578,32 @@ function renderDashStatus(){
 
   // ③ 연간: 사업소득연간/근로소득연간/퇴직소득연간 — 3월 마감(직전연도 귀속분)
   // payrollChecks/{yr}_annual 의 키: {cid}_{tp}  (tp: abiz/alabor/retire)
-  if(m===3){
+  if(m===3 || m===2){
     var annYr=String(parseInt(yr)-1); // 직전연도 급여관리 기준
     var aCache=SALARY_CACHE[annYr]||{};
     var annAll=[1,2,3,4,5,6,7,8,9,10,11,12];
-    var annDueDate = yr+'-03-10';  // 연간 지급명세서 마감
-    var annDefs=[
+    var annDueDate = m===3 ? yr+'-03-10' : annualDueOf('other', annYr);  // 연간 지급명세서 마감 (이자·배당·기타 = 2월 말일)
+    var pyAnnPrev = DASH_TAX_CACHE['payroll_annual_'+annYr]||{};
+    var annDefs = m===3 ? [
       {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
       {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
       {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'}
+    ] : [
+      {tp:'other', sal:'other',  lbl:'기타소득 연간'},
+      {tp:'int',   sal:'int',    lbl:'이자소득 연간'},
+      {tp:'div',   sal:'div',    lbl:'배당소득 연간'}
     ];
     annDefs.forEach(function(ad){
       actClients.forEach(function(c){
         // 폐업자는 ④(폐업 다음다음달 마감월)에서 전담 처리 — 정기 3/10 계산에서 제외
         if(c.status==='폐업') return;
         if(!isPayrollVisible(c, annDueDate, ad.tp)) return;
-        var hasSal=annAll.some(function(mm){return aCache[mm]&&aCache[mm][c.id+'_'+ad.sal+'_done'];});
+        var hasSal=annAll.some(function(mm){return aCache[mm]&&aCache[mm][c.id+'_'+ad.sal+'_done'];})
+          || (SAL_EXTRA.indexOf(ad.tp)>=0 && c.payrollSettings && c.payrollSettings[ad.tp]);   // 예전에 손으로 지정한 업체도
         if(!hasSal) return;
         var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
         pyTotalCalc++;
-        var ok=!!pyAnnChk[c.id+'_'+ad.tp];
+        var ok=!!pyAnnPrev[c.id+'_'+ad.tp];
         if(ok) pyDoneCalc++;
         pyDetailRows.push({id:c.id,name:c.name,grp:ad.lbl,mgr:effMgr,done:ok});
       });
@@ -9508,7 +9617,10 @@ function renderDashStatus(){
   var closedAnnDefs = [
     {tp:'abiz',  sal:'biz',    lbl:'사업소득 연간'},
     {tp:'alabor',sal:'labor',  lbl:'근로소득 연간'},
-    {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'}
+    {tp:'retire',sal:'retire', lbl:'퇴직소득 연간'},
+    {tp:'other', sal:'other',  lbl:'기타소득 연간'},
+    {tp:'int',   sal:'int',    lbl:'이자소득 연간'},
+    {tp:'div',   sal:'div',    lbl:'배당소득 연간'}
   ];
   actClients.forEach(function(c){
     if(c.status !== '폐업' || !c.endDate) return;
@@ -9522,10 +9634,11 @@ function renderDashStatus(){
     if(m===3 && _cY < parseInt(yr)) return;
     var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
     closedAnnDefs.forEach(function(ad){
-      var hasSal = closedAnnMonths.some(function(mm){return closedAnnCache[mm]&&closedAnnCache[mm][c.id+'_'+ad.sal+'_done'];});
+      var _cAC = SALARY_CACHE[String(_cY)]||closedAnnCache;      // 폐업연도 급여관리 (11·12월 폐업은 전년도)
+      var hasSal = closedAnnMonths.some(function(mm){return _cAC[mm]&&_cAC[mm][c.id+'_'+ad.sal+'_done'];});
       if(!hasSal) return;
       pyTotalCalc++;
-      var ok=!!pyAnnChk[c.id+'_'+ad.tp];
+      var ok=!!(DASH_TAX_CACHE['payroll_annual_'+_cY]||pyAnnChk)[c.id+'_'+ad.tp];
       if(ok) pyDoneCalc++;
       pyDetailRows.push({id:c.id,name:c.name,grp:ad.lbl+' (폐업)',mgr:effMgr,done:ok});
     });
@@ -9552,7 +9665,7 @@ function renderDashStatus(){
       if(!hasLabor) return;
       var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
       pyTotalCalc++;
-      var ok=!!pySemiChk[c.id+'_'+_semiHalf];
+      var ok=!!(DASH_TAX_CACHE['payroll_semi_'+_cY]||{})[c.id+'_'+_semiHalf];
       if(ok) pyDoneCalc++;
       pyDetailRows.push({id:c.id,name:c.name,grp:'근로소득 간이 ('+(_isH1?'상반기':'하반기')+', 폐업)',mgr:effMgr,done:ok});
     });
@@ -9623,7 +9736,7 @@ function renderDashStatus(){
     var whtTargets=ALL.filter(function(c){
       if(c.status!=='활성'||c.type==='신고대리'||c.whtYn!=='Y') return false;
       var mData=salCache[prevM2];
-      return !!(mData&&(mData[c.id+'_no_salary']||mData[c.id+'_daily_done']||mData[c.id+'_biz_done']||mData[c.id+'_labor_done']||mData[c.id+'_retire_done']));
+      return !!(mData&&(salHasRec(mData,c.id)));
     });
     var whtDone=whtTargets.filter(function(c){return whtChk[c.id]&&whtChk[c.id].done;}).length;
     if(whtDone>whtTargets.length) crossAlerts.push('⚠️ 원천세: 급여관리 대상 '+whtTargets.length+'개인데 신고완료 '+whtDone+'개 — 데이터 확인 필요');
@@ -9645,7 +9758,7 @@ function renderDashStatus(){
     }
     if(c.whtYn!=='Y') return false;
     var s=_xSC[_xM]||{};
-    return !!(s[c.id+'_daily_done']||s[c.id+'_biz_done']||s[c.id+'_labor_done']||s[c.id+'_retire_done']);
+    return !!(salHasKind(s,c.id));
   }
   var noWhtMgr=ALL.filter(function(c){
     if(!_isWhtTargetX(c)) return false;
@@ -9783,7 +9896,7 @@ function renderDashStatus(){
               return hasSalaryInHalf(prevYr2, _halfMonthsX, c.id);
             }
             var _cSC=SALARY_CACHE[prevYr2]&&SALARY_CACHE[prevYr2][_cM];
-            return !!(_cSC&&(_cSC[c.id+'_no_salary']||_cSC[c.id+'_daily_done']||_cSC[c.id+'_biz_done']||_cSC[c.id+'_labor_done']||_cSC[c.id+'_retire_done']));
+            return !!(_cSC&&(salHasRec(_cSC,c.id)));
           }
           if(c.status!=='활성') return false;
           // 매월납부는 whtYn='Y' 필수, 반기납부(whtSemi='Y')는 whtYn 무관 + 마감월(7월/1월)만
@@ -9804,7 +9917,7 @@ function renderDashStatus(){
           else if(!sCache) reason='급여 캐시 미반영 (새로고침 필요)';
           else {
             var mc=sCache;
-            var hasChk=!!(mc[c.id+'_no_salary']||mc[c.id+'_daily_done']||mc[c.id+'_biz_done']||mc[c.id+'_labor_done']||mc[c.id+'_retire_done']);
+            var hasChk=!!(salHasRec(mc,c.id));
             reason=hasChk?'급여 캐시 미반영 (새로고침 필요)':'급여 체크 미완료';
           }
           return {c:c,reason:reason};
