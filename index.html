@@ -525,7 +525,7 @@ details.salx .salx-pop label:hover{background:#f4f6fb}
         <div>
           <div class="card" style="margin-bottom:12px">
             <div class="card-hdr">
-              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.74</span></div>
+              <div class="card-ttl">📊 처리 현황 <span style="font-size:9px;color:#ccd;font-weight:400">v4.75</span></div>
               <div style="display:flex;align-items:center;gap:8px">
                 <select id="dashStatusMgrFilter" onchange="renderDashStatus()" style="padding:3px 8px;font-size:12px;border:1px solid #dde;border-radius:5px;background:#fff;display:none">
                   <option value="">전체 담당자</option>
@@ -3944,6 +3944,8 @@ function hasSalaryKinds(yr, months, cid, kinds){
   return kinds.some(function(tp){ return hasSalaryDone(yr, months, cid, tp); });
 }
 var PAY_SIMPLE_KINDS=['biz','daily','labor'];                     // 간이지급명세서(매월·반기)·일용 지급명세서가 있는 소득
+// 간이·일용 지급명세서 대상 소득 — 일용은 '홈택스 직접 제출' 체크 업체만 (그 외는 근로내용확인신고로 국세청 자동전송)
+function payStmtKinds(c){ return PAY_SIMPLE_KINDS.filter(function(k){ return k!=='daily' || (c&&c.dailyStmtOurs); }); }
 var PAY_ANNUAL_KINDS=['labor','retire','other','int','div'];       // 연간 지급명세서가 있는 소득 (사업소득은 간이로 갈음 — 소득세법 제164조제7항)
 // 반기 급여 이력 확인 (소득 종류 중 하나라도)
 function hasSalaryInHalf(yr, halfMonths, cid){ return hasSalaryAny(yr, halfMonths, cid); }
@@ -4171,20 +4173,25 @@ async function renderPayroll(){
     if(!clients.length){el.innerHTML='<div class="es"><div class="es-ic">📋</div><div>'+lbl+' 대상 거래처가 없습니다</div></div>';return;}
     var doc=await db.collection('payrollChecks').doc(yr+'_monthly').get();
     var chk=doc.exists?doc.data():{};
-    var done=clients.filter(function(c){return chk[c.id+'_'+lbl+'_'+pd];}).length;
-    var pct=Math.round(done/clients.length*100);
+    // 일용직 탭: 홈택스 직접 제출 미체크 업체 = 근로내용확인신고 자동전송 → 회색 표시, 분모 제외
+    var isAutoD=function(c){return tp==='daily'&&!c.dailyStmtOurs;};
+    var actPy=clients.filter(function(c){return !isAutoD(c);});
+    var done=actPy.filter(function(c){return chk[c.id+'_'+lbl+'_'+pd];}).length;
+    var pct=actPy.length?Math.round(done/actPy.length*100):0;
     var mgrs={};
     clients.forEach(function(c){var m=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');if(!mgrs[m])mgrs[m]=[];mgrs[m].push(c);});
-    var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+clients.length+' 완료 ('+pct+'%)</span></div>';
+    var html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="flex:1"><div class="pgbar"><div class="pgfill" style="width:'+pct+'%"></div></div></div><span class="pct-text" style="font-size:13px;font-weight:700;color:#1A3169">'+done+'/'+actPy.length+' 완료 ('+pct+'%)</span></div>';
     Object.entries(mgrs).sort(function(a,b){return mgrSortIndex(a[0])-mgrSortIndex(b[0]);}).forEach(function([mgr,list]){
-      var mdone=list.filter(function(c){return chk[c.id+'_'+lbl+'_'+pd];}).length;
+      list=list.filter(function(c){return !isAutoD(c);}).concat(list.filter(isAutoD)); // 자동전송은 그룹 맨 아래
+      var mAct=list.filter(function(c){return !isAutoD(c);});
+      var mdone=mAct.filter(function(c){return chk[c.id+'_'+lbl+'_'+pd];}).length;
       var mgrId='py-mgr-'+mgr.replace(/[^a-zA-Z0-9가-힣]/g,'_');
       html+='<div style="margin-bottom:12px;border:1px solid #eef;border-radius:10px;overflow:hidden">';
       html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f7f8fb;cursor:pointer" onclick="toggleMgrGroup(&quot;'+mgrId+'&quot;)">';
       html+='<span id="arr-'+mgrId+'" style="color:#889;width:16px">▼</span>';
       html+='<span style="font-size:13px;font-weight:700;color:#1A3169;min-width:80px">담당: '+mgr+'</span>';
-      html+='<span style="font-size:12px;color:#889">('+mdone+'/'+list.length+' 완료)</span>';
-      html+='<div style="flex:1"><div style="background:#e8ecf4;border-radius:3px;height:5px"><div style="background:#1A3169;width:'+(list.length?Math.round(mdone/list.length*100):0)+'%;height:5px;border-radius:3px"></div></div></div>';
+      html+='<span style="font-size:12px;color:#889">('+mdone+'/'+mAct.length+' 완료)</span>';
+      html+='<div style="flex:1"><div style="background:#e8ecf4;border-radius:3px;height:5px"><div style="background:#1A3169;width:'+(mAct.length?Math.round(mdone/mAct.length*100):0)+'%;height:5px;border-radius:3px"></div></div></div>';
       html+='</div><div id="'+mgrId+'">';
       html+='<table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col><col style="width:140px"><col style="width:70px"><col style="width:80px"></colgroup>';
       html+='<thead><tr style="background:#fafafa"><th style="padding:7px 10px;text-align:left">상호</th><th style="padding:7px 10px;text-align:left">사업자번호</th><th style="padding:7px 10px;text-align:center">유형</th><th style="padding:7px 10px;text-align:center">제출완료</th></tr></thead><tbody>';
@@ -4192,12 +4199,14 @@ async function renderPayroll(){
         var k=c.id+'_'+lbl+'_'+pd;
         var isDone=chk[k];
         var closed=getClosedPayrollBadge(c, tp, dueDateStr);
-        var rowBg=isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent');
+        var _auto=isAutoD(c);
+        var rowBg=_auto?'background:#fafbfc;opacity:0.55;border-left:3px solid transparent':(isDone?'background:#f0faf4;border-left:3px solid #27ae60':(closed.isClosed?closed.rowStyle+';border-left:3px solid #C9A84C':'border-left:3px solid transparent'));
         html+='<tr style="border-top:1px solid #f0f2f7;'+rowBg+'">';
-        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+((tp==='daily'&&c.dailyStmtOurs)?' <span class="bdg" style="background:#fff4d6;color:#8a6200;margin-left:4px">홈택스 직접</span>':'')+'</td>';
+        html+='<td style="padding:8px 10px;font-weight:600;color:#1A3169"><span style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" data-cid="'+c.id+'" onclick="editClient(this.dataset.cid)">'+c.name+'</span>'+closed.badge+((tp==='daily'&&c.dailyStmtOurs)?' <span class="bdg" style="background:#fff4d6;color:#8a6200;margin-left:4px">홈택스 직접</span>':'')+(_auto?' <span class="bdg" style="background:#f0f2f7;color:#889;margin-left:4px">근로내용확인신고 자동전송</span>':'')+'</td>';
         html+='<td style="padding:8px 10px;font-family:monospace;font-size:11.5px">'+(c.bizNo||'-')+'</td>';
         html+='<td style="padding:8px 10px;text-align:center"><span class="bdg" style="background:#e0e8ff;color:#2243a0">'+lbl+'</span></td>';
-        html+='<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
+        html+=_auto?'<td class="cc" style="padding:8px 10px;font-size:11px;color:#aab">-</td>'
+          :'<td class="cc" style="padding:8px 10px"><input type="checkbox" '+(isDone?'checked':'')+' onchange="savePyInstant(&quot;'+yr+'_monthly&quot;,&quot;'+k+'&quot;,this.checked,this)"></td>';
         html+='</tr>';
       });
       html+='</tbody></table></div></div>';
@@ -7171,7 +7180,7 @@ function renderUrgentSection(){
       if(!(_dueY===parseInt(yrDash) && _dueM===m)) return false;
       // 폐업연도 폐업월까지 간이 대상 소득(사업·일용·근로)이 있어야 대상 (급여없음만·기타·이자·배당만이면 제외)
       var _months=[]; for(var _i=1;_i<=_cM;_i++) _months.push(_i);
-      return hasSalaryKinds(String(_cY), _months, c.id, PAY_SIMPLE_KINDS);
+      return hasSalaryKinds(String(_cY), _months, c.id, payStmtKinds(c));
     });
     // 연간 지급명세서: 폐업 다음다음달 말일이 (yrDash, m)에 해당 + 실제 급여실적 필수
     var closedAnnual = closedClients.filter(function(c){
@@ -7433,7 +7442,7 @@ function getIncompleteClientsForDeadline(e){
       if(c.type==='신고대리') return false;
       if(!isActiveInMonth(c, parseInt(yr), m)) return false;
       var hasBiz=salCache[c.id+'_biz_done'];
-      var hasDaily=salCache[c.id+'_daily_done'];
+      var hasDaily=salCache[c.id+'_daily_done'] && c.dailyStmtOurs; // 일용은 홈택스 직접 제출 업체만
       if(!hasBiz&&!hasDaily) return false;
       var bizDone=!hasBiz||pyChk[c.id+'_사업소득_'+pyM];
       var dailyDone=!hasDaily||pyChk[c.id+'_일용직_'+pyM];
@@ -7496,7 +7505,7 @@ async function runCrossCheck(){
       var whtDone=whtChk[c.id]&&whtChk[c.id].done;
       // 원천세 신고 누락 - 긴급처리 제외 (신고체크에서 관리)
       // if(whtNear&&salDone&&!whtDone) alerts.push(...);
-      if(pyMonNear&&salDone&&ps.daily&&!pyMon[c.id+'_일용직_'+prevM])
+      if(pyMonNear&&salDone&&ps.daily&&c.dailyStmtOurs&&!pyMon[c.id+'_일용직_'+prevM])
         alerts.push('일용직 지급명세서 미제출 (마감: '+curM+'/'+lastDay+')');
       if(pyMonNear&&salDone&&ps.biz&&!pyMon[c.id+'_사업소득_'+prevM])
         alerts.push('사업소득 지급명세서 미제출 (마감: '+curM+'/'+lastDay+')');
@@ -9538,7 +9547,7 @@ function renderDashStatus(){
   var pyMonthlyDue = yr+'-'+String(m).padStart(2,'0')+'-'+String(new Date(parseInt(yr),m,0).getDate()).padStart(2,'0');
   actClients.forEach(function(c){
     var effMgr=(c.whtSep&&c.whtManager)?c.whtManager:(c.manager||'미배정');
-    if(mChkForPy[c.id+'_daily_done'] && isPayrollVisible(c, pyMonthlyDue, 'daily')){
+    if(mChkForPy[c.id+'_daily_done'] && c.dailyStmtOurs && isPayrollVisible(c, pyMonthlyDue, 'daily')){
       pyTotalCalc++;
       var dOk=!!pyMonChk[c.id+'_일용직_'+pyM];
       if(dOk) pyDoneCalc++;
@@ -9724,7 +9733,7 @@ function renderDashStatus(){
     var pyChk=DASH_TAX_CACHE['payroll_monthly_'+salYr]||{};
     var displayDaily=0, displayBiz=0, doneDaily=0, doneBiz=0;
     ALL.filter(function(c){return c.status==='활성'&&c.type!=='신고대리';}).forEach(function(c){
-      if(mChk[c.id+'_daily_done']){ displayDaily++; if(pyChk[c.id+'_일용직_'+salM]) doneDaily++; }
+      if(mChk[c.id+'_daily_done'] && c.dailyStmtOurs){ displayDaily++; if(pyChk[c.id+'_일용직_'+salM]) doneDaily++; }
       if(mChk[c.id+'_biz_done']){ displayBiz++; if(pyChk[c.id+'_사업소득_'+salM]) doneBiz++; }
     });
     // 신고완료가 화면표시보다 많으면 → 예전 데이터 오류
